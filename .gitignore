@@ -1,0 +1,78 @@
+# Flutter/Dart/Pub related
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+
+# iOS
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/app.flx
+ios/Flutter/app.zip
+ios/Flutter/flutter_assets/
+ios/Flutter/ephemeral/
+ios/Pods/
+ios/.symlinks/
+ios/Podfile.lock
+ios/Podfile.ios
+
+# macOS
+macos/Flutter/ephemeral/
+macos/Pods/
+macos/Podfile.lock
+
+# Android
+android/.gradle/
+android/app/debug/
+android/app/profile/
+android/app/release/
+android/key.properties
+*.jks
+*.keystore
+
+# Windows
+windows/runner/Debug/
+windows/runner/Release/
+windows/runner/*.pdb
+windows/runner/*.ilk
+windows/runner/*.exp
+windows/runner/*.lib
+windows/runner/*.dll
+
+# Linux
+linux/runner/
+
+# Web
+web/.dart_tool/
+
+# VS Code
+.vscode/
+
+# IntelliJ/Android Studio
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Xcode
+*.xcworkspace
+*.xcuserstate
+*.xcuserdata
+*.xcodeproj/project.xcworkspace/xcuserdata
+*.xcodeproj/xcuserdata
+
+# Others
+*.log
+*.tmp
+*.swp
+*.DS_Store
+
+# Environment files
+.env
+.env.*
+
+# Secrets/keys (добавьте свои файлы с секретами ниже при необходимости)
+# api_keys.json
+# config.yaml 

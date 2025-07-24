@@ -1,0 +1,5 @@
+  # HTTP requests
+  http: ^1.1.0
+  
+  # Image picker for avatar selection
+  image_picker: ^1.0.7 
