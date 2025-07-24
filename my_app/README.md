@@ -1,16 +1,95 @@
-# my_app
+# NinjaTrainingFlutter
 
-A new Flutter project.
+Мобильное приложение для тренировок в стиле ниндзя. Позволяет пользователям проходить тренировочные программы, отслеживать прогресс, просматривать достижения и управлять своим профилем. Присутствует административная часть для создания и редактирования программ.
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+## Оглавление
+- [Описание](#описание)
+- [Структура проекта](#структура-проекта)
+- [Запуск проекта](#запуск-проекта)
+- [Best Practices](#best-practices)
+- [Контакты](#контакты)
 
-A few resources to get you started if this is your first Flutter project:
+---
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## Описание
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+**NinjaTrainingFlutter** — это кроссплатформенное приложение на Flutter для тренировок, с поддержкой пользовательских и системных программ, достижений, профиля и административных функций.
+
+---
+
+## Структура проекта
+
+```
+NinjaTrainingFlutter/
+├── my_app/
+│   ├── lib/
+│   │   ├── constants/         # Константы (цвета, API и др.)
+│   │   ├── models/            # Модели данных (User, Training и др.)
+│   │   ├── providers/         # Провайдеры состояния (Auth, Timer и др.)
+│   │   ├── screens/           # Экраны приложения
+│   │   │   ├── achievements/  # Экраны достижений
+│   │   │   ├── admin_program_constructor/  # Админка программ
+│   │   │   ├── admin_training_constructor/ # Админка тренировок
+│   │   │   ├── profile/       # Экраны профиля
+│   │   │   ├── system_program/# Системные тренировки
+│   │   │   ├── system_training/# Системные тренировки (детали)
+│   │   │   ├── user/          # Пользовательские тренировки
+│   │   │   └── main_screen.dart # Главный экран
+│   │   ├── services/          # Сервисы (API, работа с программами и тренировками)
+│   │   ├── utils/             # Вспомогательные утилиты
+│   │   └── widgets/           # Переиспользуемые виджеты
+│   ├── assets/
+│   │   ├── images/            # Картинки и логотипы
+│   │   └── sounds/            # Звуковые файлы
+│   ├── test/                  # Тесты приложения
+│   ├── pubspec.yaml           # Основные зависимости и настройки Flutter
+│   └── README.md              # Этот файл
+├── android/ios/macos/linux/windows/ # Платформенные папки
+└── .gitignore                 # Исключения для git
+```
+
+---
+
+## Запуск проекта
+
+1. **Установите Flutter:**  
+   [Инструкция по установке Flutter](https://docs.flutter.dev/get-started/install)
+
+2. **Установите зависимости:**
+   ```sh
+   flutter pub get
+   ```
+
+3. **Запустите проект:**
+   ```sh
+   flutter run
+   ```
+   Можно указать устройство или эмулятор, если их несколько.
+
+4. **Тесты:**
+   ```sh
+   flutter test
+   ```
+
+---
+
+## Best Practices
+- Все секреты и параметры окружения должны храниться вне репозитория (см. .gitignore).
+- Для новых моделей, сервисов и экранов используйте соответствующие папки.
+- Для переиспользуемых компонентов используйте папку `widgets`.
+- Для управления состоянием используйте провайдеры из папки `providers`.
+- Для тестов используйте папку `test` и следуйте структуре по доменам.
+- Не храните чувствительные данные (ключи, пароли) в коде или в репозитории.
+
+---
+
+## Контакты
+- Автор/разработчик: [Ваше имя или команда]
+- Email: [ваш email]
+- Telegram: [ваш telegram]
+
+---
+
+_Этот проект создан с использованием Flutter. Добро пожаловать к сотрудничеству и развитию!_
