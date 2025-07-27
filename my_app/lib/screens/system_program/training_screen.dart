@@ -10,6 +10,7 @@ import 'inactive_training_screen.dart';
 import '../../services/api_service.dart';
 import 'system_training_list_widget.dart'; // Added import for SystemTrainingListWidget
 import '../../screens/admin_training_constructor/admin_training_constructor_screen.dart'; // Added import for AdminTrainingConstructorScreen
+import '../my_training/my_training_list_widget.dart'; // Added import for MyTrainingListWidget
 
 class TrainingScreen extends StatefulWidget {
   const TrainingScreen({Key? key}) : super(key: key);
@@ -417,6 +418,9 @@ class _TrainingScreenState extends State<TrainingScreen> {
                         child:
                             SystemTrainingListWidget(), // TODO: реализовать виджет
                       ),
+                      // Новый блок "Мои тренировки"
+                      const SizedBox(height: 32),
+                      MyTrainingListWidget(),
                     ],
                   ),
                 ),

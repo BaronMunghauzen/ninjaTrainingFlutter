@@ -33,12 +33,30 @@ class Training {
       trainingType: json['training_type'] ?? '',
       caption: json['caption'] ?? '',
       description: json['description'] ?? '',
-      difficultyLevel: json['difficulty_level'] ?? 0,
-      duration: json['duration'] ?? 0,
-      order: json['order'] ?? 0,
+      difficultyLevel: json['difficulty_level'] is int
+          ? json['difficulty_level']
+          : int.tryParse(json['difficulty_level']?.toString() ?? '0') ?? 0,
+      duration: json['duration'] is int
+          ? json['duration']
+          : int.tryParse(json['duration']?.toString() ?? '0') ?? 0,
+      order: json['order'] is int
+          ? json['order']
+          : int.tryParse(json['order']?.toString() ?? '0') ?? 0,
       muscleGroup: json['muscle_group'] ?? '',
-      stage: json['stage'] ?? 0,
-      program: Program.fromJson(json['program'] ?? {}),
+      stage: json['stage'] is int
+          ? json['stage']
+          : int.tryParse(json['stage']?.toString() ?? '0') ?? 0,
+      program: json['program'] != null
+          ? Program.fromJson(json['program'])
+          : Program(
+              uuid: '',
+              actual: false,
+              programType: '',
+              caption: '',
+              description: '',
+              difficultyLevel: 0,
+              order: 0,
+            ),
       user: json['user'],
     );
   }
