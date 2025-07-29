@@ -319,7 +319,7 @@ class ExerciseGroup {
   final String caption;
   final String description;
   final String muscleGroup;
-  final List<Exercise> exercises;
+  final List<String> exercises; // Изменено на List<String> для UUID
 
   ExerciseGroup({
     required this.uuid,
@@ -339,7 +339,7 @@ class ExerciseGroup {
       muscleGroup: json['muscle_group'] ?? '',
       exercises:
           (json['exercises'] as List<dynamic>?)
-              ?.map((e) => Exercise.fromJson(e))
+              ?.map((e) => e.toString())
               .toList() ??
           [],
     );

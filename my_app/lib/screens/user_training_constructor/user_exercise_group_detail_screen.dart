@@ -64,9 +64,9 @@ class _UserExerciseGroupDetailScreenState
               if (confirmed == true) {
                 // Удаляем все упражнения в группе
                 bool allDeleted = true;
-                for (final exercise in widget.exerciseGroup.exercises) {
+                for (final exerciseUuid in widget.exerciseGroup.exercises) {
                   final success = await UserTrainingService.deleteExercise(
-                    exercise.uuid,
+                    exerciseUuid,
                   );
                   if (!success) {
                     allDeleted = false;
@@ -144,7 +144,7 @@ class _UserExerciseGroupDetailScreenState
               child: ListView.builder(
                 itemCount: widget.exerciseGroup.exercises.length,
                 itemBuilder: (context, index) {
-                  final exercise = widget.exerciseGroup.exercises[index];
+                  final exerciseUuid = widget.exerciseGroup.exercises[index];
                   return Card(
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(
@@ -153,42 +153,18 @@ class _UserExerciseGroupDetailScreenState
                         color: AppColors.textPrimary,
                       ),
                       title: Text(
-                        exercise.caption,
+                        'Упражнение ${index + 1}',
                         style: const TextStyle(
                           color: AppColors.textPrimary,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            exercise.description,
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Подходы: ${exercise.setsCount}, Повторения: ${exercise.repsCount}, Отдых: ${exercise.restTime}с',
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 12,
-                            ),
-                          ),
-                          if (exercise.withWeight) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              'Вес: ${exercise.weight} кг',
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ],
+                      subtitle: Text(
+                        'UUID: $exerciseUuid',
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                   );
