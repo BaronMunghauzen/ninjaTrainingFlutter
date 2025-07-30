@@ -56,11 +56,34 @@ class AuthProvider extends ChangeNotifier {
         return 'Пароли не совпадают';
       }
 
-      final body = {'username': username, 'email': email, 'password': password};
+      final body = {'login': username, 'email': email, 'password': password};
 
       final response = await ApiService.post('/auth/register/', body: body);
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // Успешная регистрация - сохраняем токен и UUID
+        final data = ApiService.decodeJson(response.body);
+        final userToken = data['access_token'];
+        final userUuid = data['user_uuid'];
+
+        if (userToken != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('user_token', userToken);
+
+          // Если user_uuid нет в ответе, попробуем получить его из токена или запросить профиль
+          if (userUuid != null) {
+            await prefs.setString('user_uuid', userUuid);
+            _userUuid = userUuid;
+          }
+
+          _isAuthenticated = true;
+          ApiService.updateToken(userToken);
+          notifyListeners();
+
+          // Загружаем профиль пользователя для получения UUID
+          await fetchUserProfile();
+        }
+
         return null; // Успешная регистрация
       } else {
         final data = ApiService.decodeJson(response.body);
@@ -91,7 +114,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> login(String username, String password) async {
     try {
-      final body = {'username': username, 'password': password};
+      final body = {'login': username, 'password': password};
 
       final response = await ApiService.post('/auth/login/', body: body);
 
