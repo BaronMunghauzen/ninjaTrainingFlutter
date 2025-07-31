@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/custom_text_field.dart';
@@ -91,6 +93,9 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(error), backgroundColor: AppColors.error),
         );
+      } else if (error == null && mounted) {
+        // Если нет ошибки, значит авторизация/регистрация прошла успешно
+        // AuthProvider автоматически обновит состояние и перенаправит пользователя
       }
     } finally {
       if (mounted) {

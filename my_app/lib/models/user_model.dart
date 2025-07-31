@@ -17,6 +17,7 @@ class UserModel {
   final String? description;
   final DateTime? updatedAt;
   final String? avatarUuid;
+  final bool emailVerified;
 
   UserModel({
     required this.subscriptionStatus,
@@ -37,6 +38,7 @@ class UserModel {
     this.description,
     this.updatedAt,
     this.avatarUuid,
+    required this.emailVerified,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -65,6 +67,7 @@ class UserModel {
           ? DateTime.parse(json['updated_at'])
           : null,
       avatarUuid: json['avatar_uuid'],
+      emailVerified: json['email_verified'] ?? false,
     );
   }
 
@@ -88,6 +91,7 @@ class UserModel {
       'description': description,
       'updated_at': updatedAt?.toIso8601String(),
       'avatar_uuid': avatarUuid,
+      'email_verified': emailVerified,
     };
   }
 
@@ -111,6 +115,7 @@ class UserModel {
     String? description,
     DateTime? updatedAt,
     String? avatarUuid,
+    bool? emailVerified,
   }) {
     return UserModel(
       subscriptionStatus: subscriptionStatus ?? this.subscriptionStatus,
@@ -131,6 +136,7 @@ class UserModel {
       description: description ?? this.description,
       updatedAt: updatedAt ?? this.updatedAt,
       avatarUuid: avatarUuid ?? this.avatarUuid,
+      emailVerified: emailVerified ?? this.emailVerified,
     );
   }
 }
