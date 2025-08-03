@@ -49,8 +49,8 @@ class _ProgramConstructorScreenState extends State<ProgramConstructorScreen> {
     }
   }
 
-  Future<ImageProvider?> _loadProgramImage(String? imageUuid) async {
-    if (imageUuid == null || imageUuid.isEmpty) return null;
+  Future<ImageProvider?> _loadProgramImage(int? imageUuid) async {
+    if (imageUuid == null) return null;
     try {
       final response = await ApiService.get('/files/file/$imageUuid');
       if (response.statusCode == 200) {

@@ -70,9 +70,11 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
 
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() {
-      _isLoading = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       String? error;

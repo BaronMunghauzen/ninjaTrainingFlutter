@@ -10,7 +10,7 @@ class ProgramShortInfo extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (program.imageUuid != null && program.imageUuid!.isNotEmpty)
+        if (program.imageUuid != null)
           Container(
             width: 64,
             height: 64,

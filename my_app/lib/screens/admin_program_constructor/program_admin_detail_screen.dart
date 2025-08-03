@@ -193,8 +193,8 @@ class _ProgramAdminDetailScreenState extends State<ProgramAdminDetailScreen> {
     }
   }
 
-  Future<ImageProvider?> _loadProgramImage(String? imageUuid) async {
-    if (imageUuid == null || imageUuid.isEmpty) return null;
+  Future<ImageProvider?> _loadProgramImage(int? imageUuid) async {
+    if (imageUuid == null) return null;
     try {
       final response = await ApiService.get('/files/file/$imageUuid');
       if (response.statusCode == 200) {
@@ -267,8 +267,8 @@ class _ProgramAdminDetailScreenState extends State<ProgramAdminDetailScreen> {
     }
   }
 
-  Future<void> _deleteProgramImage(String? imageUuid) async {
-    if (imageUuid == null || imageUuid.isEmpty) return;
+  Future<void> _deleteProgramImage(int? imageUuid) async {
+    if (imageUuid == null) return;
     try {
       final response = await ApiService.delete('/files/file/$imageUuid');
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -287,15 +287,17 @@ class _ProgramAdminDetailScreenState extends State<ProgramAdminDetailScreen> {
     }
   }
 
-  void _showImageModal(String? imageUuid) {
+  void _showImageModal(int? imageUuid) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => AvatarModal(
-        hasAvatar: imageUuid != null && imageUuid.isNotEmpty,
+        hasAvatar: imageUuid != null,
         onUploadPhoto: () => _uploadProgramImage(widget.programUuid),
-        onDeletePhoto: imageUuid != null && imageUuid.isNotEmpty
-            ? () => _deleteProgramImage(imageUuid)
+        onDeletePhoto: imageUuid != null
+            ? () => _deleteProgramImage(
+                imageUuid is int ? imageUuid as int : null,
+              )
             : null,
       ),
     );
@@ -382,12 +384,19 @@ class _ProgramAdminDetailScreenState extends State<ProgramAdminDetailScreen> {
                   children: [
                     Center(
                       child: FutureBuilder<ImageProvider?>(
-                        future: _loadProgramImage(programData?['image_uuid']),
+                        future: _loadProgramImage(
+                          programData?['image_uuid'] is int
+                              ? (programData?['image_uuid'] as int)
+                              : null,
+                        ),
                         builder: (context, snapshot) {
                           final image = snapshot.data;
                           return GestureDetector(
-                            onTap: () =>
-                                _showImageModal(programData?['image_uuid']),
+                            onTap: () => _showImageModal(
+                              programData?['image_uuid'] is int
+                                  ? (programData?['image_uuid'] as int)
+                                  : null,
+                            ),
                             child: Container(
                               width: 120,
                               height: 120,

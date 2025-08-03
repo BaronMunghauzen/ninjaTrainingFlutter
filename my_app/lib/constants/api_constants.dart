@@ -12,7 +12,7 @@ class ApiConstants {
   // File/Avatar endpoints
   static String getFileUrl(String fileUuid) => '$baseUrl/files/file/$fileUuid';
   static String uploadAvatarUrl(String userUuid) =>
-      '$baseUrl/files/upload/avatar/$userUuid';
+      '$baseUrl/auth/upload/avatar/$userUuid';
   static String deleteFileUrl(String fileUuid) =>
       '$baseUrl/files/file/$fileUuid';
 
