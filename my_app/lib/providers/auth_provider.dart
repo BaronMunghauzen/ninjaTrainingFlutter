@@ -16,21 +16,45 @@ class AuthProvider extends ChangeNotifier {
   String? get userUuid => _userUuid;
   UserModel? get userProfile => _userProfile;
   bool get isLoadingProfile => _isLoadingProfile;
+  bool get isEmailVerified => _userProfile?.emailVerified ?? false;
 
   AuthProvider() {
     _checkAuthStatus();
   }
 
   Future<void> _checkAuthStatus() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userToken = prefs.getString('user_token');
-    final userUuid = prefs.getString('user_uuid');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userToken = prefs.getString('user_token');
+      final userUuid = prefs.getString('user_uuid');
 
-    if (userToken != null && userToken.isNotEmpty && userUuid != null) {
-      _isAuthenticated = true;
-      _userUuid = userUuid;
-      // Оптимизация: обновляем токен в API сервисе
-      ApiService.updateToken(userToken);
+      print(
+        'Checking auth status: token=${userToken != null ? 'exists' : 'null'}, uuid=${userUuid ?? 'null'}',
+      );
+
+      if (userToken != null && userToken.isNotEmpty) {
+        _isAuthenticated = true;
+        // Оптимизация: обновляем токен в API сервисе
+        ApiService.updateToken(userToken);
+        notifyListeners();
+
+        print('User authenticated, loading profile...');
+        // Загружаем профиль пользователя для проверки подтверждения почты
+        await fetchUserProfile();
+      } else {
+        print('No valid token found, user not authenticated');
+        // Убеждаемся, что состояние не аутентифицировано
+        _isAuthenticated = false;
+        _userUuid = null;
+        _userProfile = null;
+        notifyListeners();
+      }
+    } catch (e) {
+      print('Error checking auth status: $e');
+      // При ошибке также сбрасываем состояние
+      _isAuthenticated = false;
+      _userUuid = null;
+      _userProfile = null;
       notifyListeners();
     }
   }
@@ -39,7 +63,13 @@ class AuthProvider extends ChangeNotifier {
   Future<String?> signIn(String username, String password) async {
     try {
       final success = await login(username, password);
-      return success ? null : 'Неверные учетные данные';
+      if (success) {
+        // После успешного входа проверяем подтверждение почты
+        await fetchUserProfile();
+        return null;
+      } else {
+        return 'Неверные учетные данные';
+      }
     } catch (e) {
       return 'Ошибка входа: $e';
     }
@@ -61,20 +91,15 @@ class AuthProvider extends ChangeNotifier {
       final response = await ApiService.post('/auth/register/', body: body);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // Успешная регистрация - сохраняем токен и UUID
+        // Успешная регистрация - сохраняем токен
         final data = ApiService.decodeJson(response.body);
         final userToken = data['access_token'];
-        final userUuid = data['user_uuid'];
 
         if (userToken != null) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('user_token', userToken);
 
-          // Если user_uuid нет в ответе, попробуем получить его из токена или запросить профиль
-          if (userUuid != null) {
-            await prefs.setString('user_uuid', userUuid);
-            _userUuid = userUuid;
-          }
+          print('Registration successful: token saved');
 
           _isAuthenticated = true;
           ApiService.updateToken(userToken);
@@ -114,29 +139,28 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> login(String username, String password) async {
     try {
-      final body = {'login': username, 'password': password};
+      final body = {'user_identity': username, 'password': password};
 
       final response = await ApiService.post('/auth/login/', body: body);
 
       if (response.statusCode == 200) {
         final data = ApiService.decodeJson(response.body);
         final userToken = data['access_token'];
-        final userUuid = data['user_uuid'];
 
-        if (userToken != null && userUuid != null) {
+        if (userToken != null) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('user_token', userToken);
-          await prefs.setString('user_uuid', userUuid);
+
+          print('Login successful: token saved');
 
           _isAuthenticated = true;
-          _userUuid = userUuid;
 
           // Оптимизация: обновляем токен в API сервисе
           ApiService.updateToken(userToken);
 
           notifyListeners();
 
-          // Загружаем профиль пользователя
+          // Загружаем профиль пользователя для получения UUID
           await fetchUserProfile();
           return true;
         }
@@ -149,6 +173,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    print('Logging out user...');
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('user_token');
     await prefs.remove('user_uuid');
@@ -160,6 +185,7 @@ class AuthProvider extends ChangeNotifier {
     // Оптимизация: очищаем токен в API сервисе
     ApiService.updateToken(null);
 
+    print('User logged out successfully');
     notifyListeners();
   }
 
@@ -174,10 +200,17 @@ class AuthProvider extends ChangeNotifier {
         // Обновляем userUuid если оно есть в ответе
         if (data['uuid'] != null) {
           _userUuid = data['uuid'];
+          // Сохраняем UUID в SharedPreferences
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('user_uuid', data['uuid']);
         }
+      } else if (response.statusCode == 401) {
+        // Если токен недействителен, выходим из системы
+        await logout();
       }
     } catch (e) {
       print('Error fetching user profile: $e');
+      // При ошибках сети не сбрасываем состояние аутентификации
     } finally {
       _isLoadingProfile = false;
       notifyListeners();
@@ -218,6 +251,47 @@ class AuthProvider extends ChangeNotifier {
       }
     } catch (e) {
       return 'Ошибка обновления профиля: $e';
+    }
+  }
+
+  Future<String?> updateEmail(String email) async {
+    if (_userUuid == null) return 'Пользователь не найден';
+
+    try {
+      final response = await ApiService.put(
+        '/auth/update/$_userUuid',
+        body: {'email': email},
+      );
+
+      if (response.statusCode == 200) {
+        await fetchUserProfile();
+        return null;
+      } else {
+        final data = ApiService.decodeJson(response.body);
+        return data['detail']?.toString() ?? 'Ошибка обновления email';
+      }
+    } catch (e) {
+      return 'Ошибка обновления email: $e';
+    }
+  }
+
+  Future<String?> resendVerificationEmail(String email) async {
+    if (_userUuid == null) return 'Пользователь не найден';
+
+    try {
+      final response = await ApiService.post(
+        '/auth/resend-verification/?email=$email',
+        body: {},
+      );
+
+      if (response.statusCode == 200) {
+        return null;
+      } else {
+        final data = ApiService.decodeJson(response.body);
+        return data['detail']?.toString() ?? 'Ошибка отправки письма';
+      }
+    } catch (e) {
+      return 'Ошибка отправки письма: $e';
     }
   }
 

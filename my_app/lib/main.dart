@@ -4,7 +4,7 @@ import 'constants/app_colors.dart';
 import 'providers/auth_provider.dart';
 import 'providers/timer_overlay_provider.dart';
 import 'screens/profile/auth_screen.dart';
-import 'screens/main_screen.dart';
+import 'screens/main_screen_wrapper.dart';
 import 'widgets/global_timer_overlay.dart';
 import 'services/api_service.dart';
 
@@ -95,8 +95,15 @@ class AuthWrapper extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, child) {
+        // Показываем индикатор загрузки во время инициализации
+        if (authProvider.isLoadingProfile && authProvider.isAuthenticated) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
         if (authProvider.isAuthenticated) {
-          return const MainScreen();
+          return const MainScreenWrapper();
         } else {
           return const AuthScreen();
         }
