@@ -240,7 +240,10 @@ class AuthProvider extends ChangeNotifier {
       if (gender != null) body['gender'] = gender;
       if (description != null) body['description'] = description;
 
-      final response = await ApiService.put('/users/$_userUuid', body: body);
+      final response = await ApiService.put(
+        '/auth/update/$_userUuid',
+        body: body,
+      );
 
       if (response.statusCode == 200) {
         await fetchUserProfile();
@@ -299,10 +302,13 @@ class AuthProvider extends ChangeNotifier {
     if (_userUuid == null) return 'Пользователь не найден';
 
     try {
-      final response = await ApiService.delete('/users/$_userUuid/avatar');
+      final response = await ApiService.delete('/auth/avatar/$_userUuid');
 
       if (response.statusCode == 200) {
-        await fetchUserProfile();
+        // Обновляем профиль без уведомления слушателей, чтобы избежать перехода
+        await _updateUserProfileSilently();
+        // Принудительно уведомляем слушателей для обновления UI
+        notifyListeners();
         return null;
       } else {
         final data = ApiService.decodeJson(response.body);
@@ -334,13 +340,16 @@ class AuthProvider extends ChangeNotifier {
       final tempFile = File('${tempDir.path}/$fileName');
       await tempFile.writeAsBytes(fileBytes);
       final response = await ApiService.multipart(
-        '/users/$_userUuid/upload-avatar',
+        '/auth/upload/avatar/$_userUuid',
         fileField: 'file',
         filePath: tempFile.path,
         mimeType: mimeType,
       );
       if (response.statusCode == 200) {
-        await fetchUserProfile();
+        // Обновляем профиль без уведомления слушателей, чтобы избежать перехода
+        await _updateUserProfileSilently();
+        // Принудительно уведомляем слушателей для обновления UI
+        notifyListeners();
         return null;
       } else {
         final data = ApiService.decodeJson(response.body);
@@ -348,6 +357,57 @@ class AuthProvider extends ChangeNotifier {
       }
     } catch (e) {
       return 'Ошибка загрузки аватара: $e';
+    }
+  }
+
+  /// Обновляет профиль пользователя без уведомления слушателей
+  Future<void> _updateUserProfileSilently() async {
+    try {
+      final response = await ApiService.get('/auth/me/');
+      if (response.statusCode == 200) {
+        final data = ApiService.decodeJson(response.body);
+        final newProfile = UserModel.fromJson(data);
+
+        // Проверяем, изменились ли данные
+        final hasChanges =
+            _userProfile?.avatarUuid != newProfile.avatarUuid ||
+            _userProfile?.email != newProfile.email ||
+            _userProfile?.firstName != newProfile.firstName ||
+            _userProfile?.lastName != newProfile.lastName;
+
+        _userProfile = newProfile;
+
+        // Обновляем userUuid если оно есть в ответе
+        if (data['uuid'] != null) {
+          _userUuid = data['uuid'];
+          // Сохраняем UUID в SharedPreferences
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('user_uuid', data['uuid']);
+        }
+
+        // Логируем изменения для отладки
+        if (hasChanges) {
+          print('Profile updated: avatarUuid=${newProfile.avatarUuid}');
+        }
+
+        // НЕ вызываем notifyListeners() чтобы избежать перехода
+      } else if (response.statusCode == 401) {
+        // Если токен недействителен, выходим из системы
+        await logout();
+      }
+    } catch (e) {
+      print('Error updating user profile silently: $e');
+    }
+  }
+
+  /// Публичный метод для обновления профиля без уведомления слушателей
+  Future<bool> refreshUserProfileSilently() async {
+    try {
+      await _updateUserProfileSilently();
+      return true;
+    } catch (e) {
+      print('Error refreshing profile silently: $e');
+      return false;
     }
   }
 }

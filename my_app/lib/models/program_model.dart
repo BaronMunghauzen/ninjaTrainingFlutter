@@ -31,7 +31,7 @@ class Program {
   final int order;
   final String? scheduleType;
   final String? trainingDays;
-  final String? imageUuid;
+  final int? imageUuid;
   final Category? category;
   final dynamic user; // null в данном случае
 
@@ -50,6 +50,19 @@ class Program {
     this.user,
   });
 
+  static int? _parseImageUuid(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is String) {
+      final parsed = int.tryParse(value);
+      if (parsed != null) return parsed;
+    }
+    print(
+      'Warning: Could not parse imageUuid: $value (type: ${value.runtimeType})',
+    );
+    return null;
+  }
+
   factory Program.fromJson(Map<String, dynamic> json) {
     return Program(
       uuid: json['uuid'] ?? '',
@@ -61,7 +74,7 @@ class Program {
       order: json['order'] ?? 0,
       scheduleType: json['schedule_type'],
       trainingDays: json['training_days'],
-      imageUuid: json['image_uuid'],
+      imageUuid: _parseImageUuid(json['image_uuid']),
       category: json['category'] != null
           ? Category.fromJson(json['category'])
           : null,

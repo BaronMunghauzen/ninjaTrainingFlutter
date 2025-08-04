@@ -25,10 +25,12 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
-    // Загружаем профиль пользователя при инициализации главного экрана
+    // Загружаем профиль пользователя при инициализации главного экрана только если он еще не загружен
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authProvider = context.read<AuthProvider>();
-      if (authProvider.isAuthenticated && authProvider.userProfile == null) {
+      if (authProvider.isAuthenticated &&
+          authProvider.userProfile == null &&
+          !authProvider.isLoadingProfile) {
         authProvider.fetchUserProfile();
       }
     });

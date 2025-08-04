@@ -31,16 +31,20 @@ class _ContactScreenState extends State<ContactScreen> {
   Future<void> _sendMessage() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isSending = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isSending = true;
+      });
+    }
 
     // Имитация отправки
     await Future.delayed(const Duration(seconds: 2));
 
-    setState(() {
-      _isSending = false;
-    });
+    if (mounted) {
+      setState(() {
+        _isSending = false;
+      });
+    }
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

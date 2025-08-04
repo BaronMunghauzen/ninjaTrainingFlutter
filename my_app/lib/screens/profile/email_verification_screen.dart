@@ -20,6 +20,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
   final _emailController = TextEditingController();
   bool _isLoading = false;
   bool _isResending = false;
+  bool _hasEmailChanges = false;
+  String _originalEmail = '';
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -47,9 +49,20 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authProvider = context.read<AuthProvider>();
       if (authProvider.userProfile != null) {
-        _emailController.text = authProvider.userProfile!.email;
+        _originalEmail = authProvider.userProfile!.email;
+        _emailController.text = _originalEmail;
+        _emailController.addListener(_onEmailChanged);
       }
     });
+  }
+
+  void _onEmailChanged() {
+    final hasChanges = _emailController.text.trim() != _originalEmail;
+    if (hasChanges != _hasEmailChanges) {
+      setState(() {
+        _hasEmailChanges = hasChanges;
+      });
+    }
   }
 
   @override
@@ -68,15 +81,23 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
 
     try {
       final authProvider = context.read<AuthProvider>();
-      final error = await authProvider.updateEmail(
-        _emailController.text.trim(),
-      );
+      String? error;
+
+      if (_hasEmailChanges) {
+        // Если email изменился, отправляем PUT запрос для обновления
+        error = await authProvider.updateEmail(_emailController.text.trim());
+      } else {
+        // Если email не изменился, только обновляем информацию о пользователе
+        await authProvider.fetchUserProfile();
+      }
 
       if (error == null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Email успешно обновлен. Проверьте почту для подтверждения.',
+              _hasEmailChanges
+                  ? 'Email успешно обновлен. Проверьте почту для подтверждения.'
+                  : 'Информация о пользователе обновлена.',
             ),
             backgroundColor: AppColors.success,
           ),
@@ -219,37 +240,65 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
                         const SizedBox(height: 40),
 
                         // Поле для изменения email
-                        CustomTextField(
-                          label: 'Email',
-                          hint: 'Введите новый email',
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          prefixIcon: const Icon(
-                            Icons.email_outlined,
-                            color: AppColors.textSecondary,
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Введите email';
-                            }
-                            if (!Provider.of<AuthProvider>(
-                              context,
-                              listen: false,
-                            ).isValidEmail(value)) {
-                              return 'Введите корректный email';
-                            }
-                            return null;
-                          },
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            CustomTextField(
+                              label: 'Email',
+                              hint: 'Введите новый email',
+                              controller: _emailController,
+                              keyboardType: TextInputType.emailAddress,
+                              prefixIcon: const Icon(
+                                Icons.email_outlined,
+                                color: AppColors.textSecondary,
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Введите email';
+                                }
+                                if (!Provider.of<AuthProvider>(
+                                  context,
+                                  listen: false,
+                                ).isValidEmail(value)) {
+                                  return 'Введите корректный email';
+                                }
+                                return null;
+                              },
+                            ),
+                            if (_hasEmailChanges)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.info_outline,
+                                      size: 16,
+                                      color: AppColors.primary,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Email будет обновлен',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
                         ),
 
                         const SizedBox(height: 24),
 
                         // Кнопка обновления email
                         CustomButton(
-                          text: 'Подтвердить',
+                          text: _hasEmailChanges
+                              ? 'Обновить email'
+                              : 'Обновить информацию',
                           onPressed: _updateEmail,
                           isLoading: _isLoading,
-                          icon: Icons.check,
+                          icon: _hasEmailChanges ? Icons.email : Icons.refresh,
                           height: 56,
                         ),
 

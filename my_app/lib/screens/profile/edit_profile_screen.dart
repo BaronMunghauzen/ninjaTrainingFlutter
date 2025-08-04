@@ -96,9 +96,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isSaving = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isSaving = true;
+      });
+    }
 
     final authProvider = context.read<AuthProvider>();
     final error = await authProvider.updateUserProfile(
@@ -122,9 +124,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           : _descriptionController.text.trim(),
     );
 
-    setState(() {
-      _isSaving = false;
-    });
+    if (mounted) {
+      setState(() {
+        _isSaving = false;
+      });
+    }
 
     if (mounted) {
       if (error == null) {

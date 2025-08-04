@@ -19,14 +19,18 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _notificationsEnabled = true;
   bool _isDarkTheme = true;
+  bool _isRefreshing = false;
 
   @override
   void initState() {
     super.initState();
-    // Загружаем профиль при открытии экрана
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AuthProvider>().fetchUserProfile();
-    });
+    // Убираем автоматическую загрузку профиля, чтобы избежать проблем с навигацией
+    // Профиль будет загружен через Consumer<AuthProvider>
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 
   @override
@@ -48,14 +52,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: Consumer<AuthProvider>(
         builder: (context, authProvider, child) {
-          if (authProvider.isLoadingProfile) {
+          if (authProvider.isLoadingProfile || _isRefreshing) {
             return const Center(
               child: CircularProgressIndicator(color: const Color(0xFF1F2121)),
             );
           }
 
           final userProfile = authProvider.userProfile;
-          if (userProfile == null) {
+          if (userProfile == null && !_isRefreshing) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -69,8 +73,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 16),
                   CustomButton(
                     text: 'Попробовать снова',
-                    onPressed: () {
-                      authProvider.fetchUserProfile();
+                    onPressed: () async {
+                      setState(() {
+                        _isRefreshing = true;
+                      });
+
+                      try {
+                        final success = await authProvider
+                            .refreshUserProfileSilently();
+                        if (success) {
+                          setState(() {});
+                        }
+                      } catch (e) {
+                        print('Error retrying profile load: $e');
+                      } finally {
+                        setState(() {
+                          _isRefreshing = false;
+                        });
+                      }
                     },
                   ),
                 ],
@@ -78,10 +98,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
             );
           }
 
+          // Проверяем, что профиль загружен
+          if (userProfile == null) {
+            return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF1F2121)),
+            );
+          }
+
           return RefreshIndicator(
             onRefresh: () async {
               // Обновляем профиль при pull-to-refresh
-              await authProvider.fetchUserProfile();
+              setState(() {
+                _isRefreshing = true;
+              });
+
+              try {
+                final success = await authProvider.refreshUserProfileSilently();
+                if (success) {
+                  // Принудительно обновляем UI
+                  setState(() {});
+                }
+              } catch (e) {
+                print('Error refreshing profile: $e');
+              } finally {
+                setState(() {
+                  _isRefreshing = false;
+                });
+              }
             },
             color: const Color(0xFF1F2121),
             backgroundColor: const Color(0xFF2A2A2A),
@@ -117,6 +160,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     color: Colors.white,
                                   );
                                 },
+                                // Добавляем кэш-бюстер для принудительного обновления изображения
+                                cacheWidth: 120,
+                                cacheHeight: 120,
+                                key: ValueKey(
+                                  userProfile.avatarUuid,
+                                ), // Уникальный ключ для принудительного обновления
                               ),
                             )
                           : const Icon(
@@ -475,21 +524,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
             final fileBytes = await result.readAsBytes();
             final fileName = result.name;
             final error = await authProvider.uploadAvatar(fileBytes, fileName);
-            if (mounted) {
+
+            // Проверяем, что виджет все еще активен и контекст доступен
+            if (mounted && context.mounted) {
               if (error == null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Фото успешно загружено',
-                      style: TextStyle(color: AppColors.textPrimary),
+                // Принудительно обновляем UI после успешной загрузки
+                setState(() {});
+
+                // Дополнительная проверка перед показом SnackBar
+                if (mounted && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Фото успешно загружено',
+                        style: TextStyle(color: AppColors.textPrimary),
+                      ),
+                      backgroundColor: Color(0xFF1F2121),
                     ),
-                    backgroundColor: Color(0xFF1F2121),
-                  ),
-                );
+                  );
+                }
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(error), backgroundColor: Colors.red),
-                );
+                // Дополнительная проверка перед показом SnackBar
+                if (mounted && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(error), backgroundColor: Colors.red),
+                  );
+                }
               }
             }
           } else {
@@ -502,24 +562,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 final authProvider = context.read<AuthProvider>();
                 final error = await authProvider.deleteAvatar();
 
-                if (mounted) {
+                // Проверяем, что виджет все еще активен и контекст доступен
+                if (mounted && context.mounted) {
                   if (error == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Аватар успешно удален',
-                          style: TextStyle(color: AppColors.textPrimary),
+                    // Принудительно обновляем UI после успешного удаления
+                    setState(() {});
+
+                    // Дополнительная проверка перед показом SnackBar
+                    if (mounted && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Аватар успешно удален',
+                            style: TextStyle(color: AppColors.textPrimary),
+                          ),
+                          backgroundColor: Color(0xFF1F2121),
                         ),
-                        backgroundColor: Color(0xFF1F2121),
-                      ),
-                    );
+                      );
+                    }
                   } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(error),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
+                    // Дополнительная проверка перед показом SnackBar
+                    if (mounted && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(error),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
                   }
                 }
               }
