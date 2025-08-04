@@ -41,12 +41,12 @@ class ExerciseReference {
   final String caption;
   final int? imageId;
   final String uuid;
-  final String? userId;
+  final dynamic userId;
   final String description;
   final String muscleGroup;
   final DateTime createdAt;
   final DateTime updatedAt;
-  final String? user;
+  final dynamic user;
   final dynamic
   image; // Changed from String? to dynamic to handle both String and Map
 
@@ -107,11 +107,11 @@ class Training {
   final String caption;
   final int? imageId;
   final String uuid;
-  final String? userId;
+  final dynamic userId;
   final String description;
   final DateTime createdAt;
   final DateTime updatedAt;
-  final String? user;
+  final dynamic user;
   final dynamic
   image; // Changed from String? to dynamic to handle both String and Map
 
