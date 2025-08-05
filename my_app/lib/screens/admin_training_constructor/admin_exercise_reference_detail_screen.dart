@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../../services/api_service.dart';
+import '../../widgets/video_player_widget.dart';
 import 'admin_exercise_reference_edit_screen.dart';
 
 class AdminExerciseReferenceDetailScreen extends StatefulWidget {
@@ -66,6 +69,255 @@ class _AdminExerciseReferenceDetailScreenState
     }
   }
 
+  // Функция для загрузки видео
+  Future<void> _uploadVideo() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? video = await picker.pickVideo(source: ImageSource.gallery);
+
+      if (video != null) {
+        final File videoFile = File(video.path);
+        final response = await ApiService.uploadFile(
+          '/exercise_reference/${widget.exerciseReferenceUuid}/upload-video',
+          videoFile,
+          'file',
+        );
+
+        if (response.statusCode == 200) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Видео успешно загружено')),
+          );
+          _fetchExercise(); // Обновляем данные
+        } else {
+          // Пытаемся получить детали ошибки из ответа
+          String errorMessage = 'Ошибка загрузки видео: ${response.statusCode}';
+          try {
+            final errorData = ApiService.decodeJson(response.body);
+            if (errorData is Map && errorData.containsKey('detail')) {
+              errorMessage = errorData['detail'];
+            }
+          } catch (e) {
+            // Если не удалось распарсить JSON, используем стандартное сообщение
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+          );
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+    }
+  }
+
+  // Функция для загрузки изображения
+  Future<void> _uploadImage() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+
+      if (image != null) {
+        final File imageFile = File(image.path);
+        final response = await ApiService.uploadFile(
+          '/exercise_reference/${widget.exerciseReferenceUuid}/upload-image',
+          imageFile,
+          'file',
+        );
+
+        if (response.statusCode == 200) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Изображение успешно загружено')),
+          );
+          _fetchExercise(); // Обновляем данные
+        } else {
+          // Пытаемся получить детали ошибки из ответа
+          String errorMessage =
+              'Ошибка загрузки изображения: ${response.statusCode}';
+          try {
+            final errorData = ApiService.decodeJson(response.body);
+            if (errorData is Map && errorData.containsKey('detail')) {
+              errorMessage = errorData['detail'];
+            }
+          } catch (e) {
+            // Если не удалось распарсить JSON, используем стандартное сообщение
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+          );
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+    }
+  }
+
+  // Функция для удаления видео
+  Future<void> _deleteVideo() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Удалить видео?'),
+        content: const Text('Вы уверены, что хотите удалить видео?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final response = await ApiService.delete(
+          '/exercise_reference/${widget.exerciseReferenceUuid}/delete-video',
+        );
+
+        if (response.statusCode == 200) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Видео успешно удалено')),
+          );
+          _fetchExercise(); // Обновляем данные
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Ошибка удаления видео: ${response.statusCode}'),
+            ),
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      }
+    }
+  }
+
+  // Функция для удаления изображения
+  Future<void> _deleteImage() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Удалить изображение?'),
+        content: const Text('Вы уверены, что хотите удалить изображение?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final response = await ApiService.delete(
+          '/exercise_reference/${widget.exerciseReferenceUuid}/delete-image',
+        );
+
+        if (response.statusCode == 200) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Изображение успешно удалено')),
+          );
+          _fetchExercise(); // Обновляем данные
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Ошибка удаления изображения: ${response.statusCode}',
+              ),
+            ),
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      }
+    }
+  }
+
+  Widget _buildFileManagementButtons() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Управление файлами',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: _uploadVideo,
+                icon: const Icon(Icons.video_library),
+                label: const Text('Загрузить видео'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: _uploadImage,
+                icon: const Icon(Icons.image),
+                label: const Text('Загрузить фото'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: exercise!['video_uuid'] != null
+                    ? _deleteVideo
+                    : null,
+                icon: const Icon(Icons.delete),
+                label: const Text('Удалить видео'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: exercise!['image_uuid'] != null
+                    ? _deleteImage
+                    : null,
+                icon: const Icon(Icons.delete),
+                label: const Text('Удалить фото'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -115,6 +367,16 @@ class _AdminExerciseReferenceDetailScreenState
                   Text('Описание: ${exercise!['description'] ?? ''}'),
                   const SizedBox(height: 8),
                   Text('Мышечная группа: ${exercise!['muscle_group'] ?? ''}'),
+                  const SizedBox(height: 24),
+                  // Видеоплеер
+                  VideoPlayerWidget(
+                    imageUuid: exercise!['image_uuid'],
+                    videoUuid: exercise!['video_uuid'],
+                    height: 250,
+                  ),
+                  const SizedBox(height: 24),
+                  // Кнопки управления файлами
+                  _buildFileManagementButtons(),
                 ],
               ),
             ),
