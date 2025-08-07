@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/api_constants.dart';
@@ -360,6 +361,107 @@ class ApiService {
     } catch (e) {
       print('$_logPrefix ❌ Ошибка декодирования JSON: $e');
       print('$_logPrefix 📦 Строка JSON: $jsonString');
+      rethrow;
+    }
+  }
+
+  /// Метод для загрузки файлов
+  static Future<http.Response> uploadFile(
+    String endpoint,
+    File file,
+    String fieldName, {
+    Map<String, String>? additionalFields,
+    Duration timeout = const Duration(seconds: 60),
+  }) async {
+    try {
+      await initializeToken();
+
+      final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+
+      // Создаем multipart request
+      final request = http.MultipartRequest('POST', uri);
+
+      // Добавляем заголовки авторизации
+      if (_cachedToken != null) {
+        request.headers['Cookie'] = 'users_access_token=$_cachedToken';
+      }
+
+      // Определяем MIME тип файла на основе расширения
+      String? mimeType;
+      final extension = file.path.split('.').last.toLowerCase();
+      switch (extension) {
+        case 'jpg':
+        case 'jpeg':
+          mimeType = 'image/jpeg';
+          break;
+        case 'png':
+          mimeType = 'image/png';
+          break;
+        case 'gif':
+          mimeType = 'image/gif';
+          break;
+        case 'webp':
+          mimeType = 'image/webp';
+          break;
+        case 'mp4':
+          mimeType = 'video/mp4';
+          break;
+        case 'mov':
+          mimeType = 'video/quicktime';
+          break;
+        case 'avi':
+          mimeType = 'video/x-msvideo';
+          break;
+        case 'mkv':
+          mimeType = 'video/x-matroska';
+          break;
+      }
+
+      // Добавляем файл с правильным MIME типом
+      final fileStream = http.ByteStream(file.openRead());
+      final fileLength = await file.length();
+      final multipartFile = http.MultipartFile(
+        fieldName,
+        fileStream,
+        fileLength,
+        filename: file.path.split('/').last,
+        contentType: mimeType != null ? MediaType.parse(mimeType) : null,
+      );
+      request.files.add(multipartFile);
+
+      // Добавляем дополнительные поля
+      if (additionalFields != null) {
+        request.fields.addAll(additionalFields);
+      }
+
+      // Логируем запрос
+      _logRequest(
+        method: 'POST',
+        uri: uri.toString(),
+        headers: request.headers,
+        body: 'Multipart file upload: ${file.path} (MIME: $mimeType)',
+      );
+
+      // Отправляем запрос
+      final streamedResponse = await request.send().timeout(timeout);
+      final response = await http.Response.fromStream(streamedResponse);
+
+      // Логируем ответ
+      _logResponse(
+        method: 'POST',
+        uri: uri.toString(),
+        statusCode: response.statusCode,
+        headers: response.headers,
+        body: response.body,
+      );
+
+      return response;
+    } catch (e) {
+      _logError(
+        method: 'POST',
+        uri: '${ApiConstants.baseUrl}$endpoint',
+        error: e.toString(),
+      );
       rethrow;
     }
   }
