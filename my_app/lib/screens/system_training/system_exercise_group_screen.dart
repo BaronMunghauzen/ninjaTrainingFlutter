@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../models/exercise_model.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/video_player_widget.dart';
 import '../../constants/app_colors.dart';
-import 'dart:math';
 import 'package:my_app/providers/timer_overlay_provider.dart';
 import 'package:provider/provider.dart';
 
@@ -24,6 +24,8 @@ class SystemExerciseGroupScreen extends StatefulWidget {
 class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
   Map<String, dynamic>? groupData;
   List<ExerciseModel> exercises = [];
+  Map<String, Map<String, dynamic>> exerciseReferences =
+      {}; // Хранилище данных справочника
   bool isLoading = true;
   int currentPage = 0;
   List<List<UserExerciseRow>> userExerciseRows = [];
@@ -51,7 +53,29 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
           final exResp = await ApiService.get('/exercises/$uuid');
           if (exResp.statusCode == 200) {
             final exJson = ApiService.decodeJson(exResp.body);
-            loaded.add(ExerciseModel.fromJson(exJson));
+            final exercise = ExerciseModel.fromJson(exJson);
+            loaded.add(exercise);
+
+            // Получаем данные из справочника упражнений
+            final exerciseReferenceUuid = exJson['exercise_reference_uuid'];
+            if (exerciseReferenceUuid != null) {
+              try {
+                final refResp = await ApiService.get(
+                  '/exercise_reference/$exerciseReferenceUuid',
+                );
+                if (refResp.statusCode == 200) {
+                  final refJson = ApiService.decodeJson(refResp.body);
+                  exerciseReferences[uuid] = refJson;
+                  print(
+                    '📚 Получены данные справочника для упражнения $uuid: image_uuid=${refJson['image_uuid']}, video_uuid=${refJson['video_uuid']}',
+                  );
+                }
+              } catch (e) {
+                print(
+                  '❌ Ошибка при загрузке справочника упражнения $exerciseReferenceUuid: $e',
+                );
+              }
+            }
           }
         }
         setState(() {
@@ -340,8 +364,6 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
   }
 
   Future<void> _onFinishExercise(int exIndex, ExerciseModel ex) async {
-    final userUuid = widget.userTraining['user']?['uuid'] ?? '';
-    final trainingUuid = widget.userTraining['training']?['uuid'] ?? '';
     for (int i = 0; i < userExerciseRows[exIndex].length; i++) {
       final row = userExerciseRows[exIndex][i];
       if (row.userExerciseUuid != null) {
@@ -354,6 +376,45 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
     if (mounted) {
       Navigator.of(context).pop();
     }
+  }
+
+  List<Widget> _buildVideoSection(ExerciseModel exercise) {
+    final exerciseRef = exerciseReferences[exercise.uuid];
+    final videoUuid = exerciseRef?['video_uuid'];
+
+    // Если нет video_uuid, не показываем секцию с видео вообще
+    if (videoUuid == null) {
+      return [];
+    }
+
+    // Если есть video_uuid, показываем контейнер с плеером
+    return [
+      Container(
+        height: 180,
+        decoration: BoxDecoration(
+          color: AppColors.inputBorder,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: _buildVideoPlayer(exercise),
+        ),
+      ),
+    ];
+  }
+
+  Widget _buildVideoPlayer(ExerciseModel exercise) {
+    final exerciseRef = exerciseReferences[exercise.uuid];
+    final videoUuid = exerciseRef?['video_uuid'];
+    final imageUuid = exerciseRef?['image_uuid'];
+
+    // Этот метод вызывается только когда video_uuid есть
+    return VideoPlayerWidget(
+      videoUuid: videoUuid,
+      imageUuid: imageUuid,
+      width: double.infinity,
+      height: 180,
+    );
   }
 
   @override
@@ -393,20 +454,7 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 12),
-                            Container(
-                              height: 180,
-                              decoration: BoxDecoration(
-                                color: AppColors.inputBorder,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Center(
-                                child: Icon(
-                                  Icons.videocam,
-                                  size: 48,
-                                  color: Colors.black38,
-                                ),
-                              ),
-                            ),
+                            ..._buildVideoSection(ex),
                             const SizedBox(height: 20),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,

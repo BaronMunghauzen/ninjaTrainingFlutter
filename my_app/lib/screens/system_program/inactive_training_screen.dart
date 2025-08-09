@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/program_service.dart';
+import '../../constants/app_colors.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import 'active_training_screen.dart';
 import '../../services/api_service.dart';
-import 'dart:convert';
 import 'weeks_days_navigation.dart';
 
 class InactiveTrainingScreen extends StatefulWidget {
@@ -19,11 +20,20 @@ class InactiveTrainingScreen extends StatefulWidget {
 class _InactiveTrainingScreenState extends State<InactiveTrainingScreen> {
   Map<String, dynamic>? programData;
   bool isLoading = true;
+  String? _authToken;
 
   @override
   void initState() {
     super.initState();
+    _loadAuthToken();
     _loadData();
+  }
+
+  Future<void> _loadAuthToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _authToken = prefs.getString('user_token');
+    });
   }
 
   Future<void> _loadData() async {
@@ -48,160 +58,263 @@ class _InactiveTrainingScreenState extends State<InactiveTrainingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final weeks = List.generate(4, (i) => '${i + 1} неделя');
-    final days = List.generate(7, (i) => 'День ${i + 1}');
-    final screenWidth = MediaQuery.of(context).size.width;
-
     return Scaffold(
-      appBar: AppBar(title: const Text('Программа')),
+      appBar: AppBar(
+        title: const Text('Программа'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      extendBodyBehindAppBar: true,
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : programData == null
           ? const Center(child: Text('Не удалось загрузить программу'))
-          : Column(
+          : Stack(
+              fit: StackFit.expand,
               children: [
-                // Навигация по неделям и дням сверху
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: WeeksDaysNavigation(weeksCount: 4, daysCount: 7),
+                // Фоновое изображение с сильным затемнением
+                if (programData!['image_uuid'] != null)
+                  Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.network(
+                        '${ApiService.baseUrl}/files/file/${programData!['image_uuid']}',
+                        fit: BoxFit.cover,
+                        headers: _authToken != null
+                            ? {'Cookie': 'users_access_token=$_authToken'}
+                            : {},
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: AppColors.background,
+                            child: const Center(
+                              child: Icon(
+                                Icons.fitness_center,
+                                size: 100,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          );
+                        },
+                        key: ValueKey(programData!['image_uuid']),
+                      ),
+                      // Темная накладка для очень сильного затемнения
+                      Container(color: Colors.black.withOpacity(0.7)),
+                    ],
+                  )
+                else
+                  Container(
+                    color: AppColors.background,
+                    child: const Center(
+                      child: Icon(
+                        Icons.fitness_center,
+                        size: 100,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                // Темный оверлей для читаемости
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withOpacity(0.3),
+                        Colors.black.withOpacity(0.7),
+                      ],
+                    ),
+                  ),
                 ),
-                // Основной контент
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        const Spacer(),
-                        // Информация и кнопка по центру
-                        Center(
+                // Контент
+                SafeArea(
+                  child: Column(
+                    children: [
+                      // Навигация по неделям и дням сверху
+                      Container(
+                        margin: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: WeeksDaysNavigation(weeksCount: 4, daysCount: 7),
+                      ),
+                      // Основной контент
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
                           child: Column(
-                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
-                                programData!['caption'] ?? '',
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                programData!['description'] ?? '',
-                                style: const TextStyle(fontSize: 16),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 32),
-                              SizedBox(
-                                width: 220,
-                                height: 56,
-                                child: ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Theme.of(
-                                      context,
-                                    ).colorScheme.primary.withOpacity(0.08),
-                                    foregroundColor: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                    elevation: 0,
-                                    shadowColor: Colors.transparent,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
+                              const Spacer(),
+                              // Информация и кнопка по центру
+                              Center(
+                                child: Container(
+                                  padding: const EdgeInsets.all(24),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.7),
+                                    borderRadius: BorderRadius.circular(20),
                                   ),
-                                  onPressed: () async {
-                                    final authProvider =
-                                        Provider.of<AuthProvider>(
-                                          context,
-                                          listen: false,
-                                        );
-                                    final userUuid = authProvider.userUuid;
-                                    if (userUuid == null) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Ошибка: не найден userUuid',
-                                          ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        programData!['caption'] ?? '',
+                                        style: const TextStyle(
+                                          fontSize: 28,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                          shadows: [
+                                            Shadow(
+                                              offset: Offset(0, 2),
+                                              blurRadius: 4,
+                                              color: Colors.black54,
+                                            ),
+                                          ],
                                         ),
-                                      );
-                                      return;
-                                    }
-                                    setState(() {
-                                      isLoading = true;
-                                    });
-                                    try {
-                                      final userProgramUuid =
-                                          await ProgramService.addUserProgram(
-                                            widget.programUuid,
-                                            userUuid,
-                                            null, // caption будет получен автоматически из программы
-                                          );
-
-                                      if (userProgramUuid != null) {
-                                        // После успешного добавления — проверяем активность
-                                        final queryParams = {
-                                          'user_uuid': userUuid,
-                                          'program_uuid': widget.programUuid,
-                                          'status': 'active',
-                                        };
-                                        final checkResponse =
-                                            await ApiService.get(
-                                              '/user_programs/',
-                                              queryParams: queryParams,
-                                            );
-                                        if (checkResponse.statusCode == 200) {
-                                          final data = ApiService.decodeJson(
-                                            checkResponse.body,
-                                          );
-                                          if (data is List && data.isNotEmpty) {
-                                            Navigator.of(
-                                              context,
-                                            ).pushReplacement(
-                                              MaterialPageRoute(
-                                                builder: (context) =>
-                                                    ActiveTrainingScreen(
-                                                      userProgramData:
-                                                          data.first,
-                                                    ),
-                                              ),
-                                            );
-                                            return;
-                                          }
-                                        }
-                                      } else {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Ошибка запуска программы',
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        programData!['description'] ?? '',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.white,
+                                          shadows: [
+                                            Shadow(
+                                              offset: Offset(0, 1),
+                                              blurRadius: 2,
+                                              color: Colors.black54,
+                                            ),
+                                          ],
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      const SizedBox(height: 32),
+                                      SizedBox(
+                                        width: 220,
+                                        height: 56,
+                                        child: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: AppColors.primary,
+                                            foregroundColor: Colors.white,
+                                            elevation: 8,
+                                            shadowColor: Colors.black
+                                                .withOpacity(0.3),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
                                             ),
                                           ),
-                                        );
-                                      }
-                                    } catch (e) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(content: Text('Ошибка: $e')),
-                                      );
-                                    } finally {
-                                      setState(() {
-                                        isLoading = false;
-                                      });
-                                    }
-                                  },
-                                  child: const Text('Начать программу'),
+                                          onPressed: () async {
+                                            final authProvider =
+                                                Provider.of<AuthProvider>(
+                                                  context,
+                                                  listen: false,
+                                                );
+                                            final userUuid =
+                                                authProvider.userUuid;
+                                            if (userUuid == null) {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Ошибка: не найден userUuid',
+                                                  ),
+                                                ),
+                                              );
+                                              return;
+                                            }
+                                            setState(() {
+                                              isLoading = true;
+                                            });
+                                            try {
+                                              final userProgramUuid =
+                                                  await ProgramService.addUserProgram(
+                                                    widget.programUuid,
+                                                    userUuid,
+                                                    null, // caption будет получен автоматически из программы
+                                                  );
+
+                                              if (userProgramUuid != null) {
+                                                // После успешного добавления — проверяем активность
+                                                final queryParams = {
+                                                  'user_uuid': userUuid,
+                                                  'program_uuid':
+                                                      widget.programUuid,
+                                                  'status': 'active',
+                                                };
+                                                final checkResponse =
+                                                    await ApiService.get(
+                                                      '/user_programs/',
+                                                      queryParams: queryParams,
+                                                    );
+                                                if (checkResponse.statusCode ==
+                                                    200) {
+                                                  final data =
+                                                      ApiService.decodeJson(
+                                                        checkResponse.body,
+                                                      );
+                                                  if (data is List &&
+                                                      data.isNotEmpty) {
+                                                    Navigator.of(
+                                                      context,
+                                                    ).pushReplacement(
+                                                      MaterialPageRoute(
+                                                        builder: (context) =>
+                                                            ActiveTrainingScreen(
+                                                              userProgramData:
+                                                                  data.first,
+                                                            ),
+                                                      ),
+                                                    );
+                                                    return;
+                                                  }
+                                                }
+                                              } else {
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                      'Ошибка запуска программы',
+                                                    ),
+                                                  ),
+                                                );
+                                              }
+                                            } catch (e) {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text('Ошибка: $e'),
+                                                ),
+                                              );
+                                            } finally {
+                                              setState(() {
+                                                isLoading = false;
+                                              });
+                                            }
+                                          },
+                                          child: const Text(
+                                            'Начать программу',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
+                              const Spacer(),
                             ],
                           ),
                         ),
-                        const Spacer(),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ],

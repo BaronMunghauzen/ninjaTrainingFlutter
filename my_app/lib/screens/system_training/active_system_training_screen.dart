@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../constants/app_colors.dart';
 import '../../services/training_service.dart';
+import '../../services/api_service.dart';
 import 'system_exercise_group_screen.dart';
-import 'package:provider/provider.dart';
-import '../../providers/auth_provider.dart';
 
 class ActiveSystemTrainingScreen extends StatefulWidget {
   final Map<String, dynamic> userTraining;
@@ -20,26 +20,53 @@ class _ActiveSystemTrainingScreenState
   List<Map<String, dynamic>> _exerciseGroups = [];
   bool _isLoadingGroups = false;
   bool _showCongrats = false;
+  String? _authToken;
 
   @override
   void initState() {
     super.initState();
+    print('🚀 initState() вызван');
+    print('🚀 userTraining данные: ${widget.userTraining}');
+    print('🚀 training данные: ${widget.userTraining['training']}');
+    print('🚀 training UUID: ${widget.userTraining['training']?['uuid']}');
+    _loadAuthToken();
+    print('🚀 Вызываем _loadExerciseGroups...');
     _loadExerciseGroups();
+    print('🚀 initState() завершен');
+  }
+
+  Future<void> _loadAuthToken() async {
+    print('🔐 Начинаем загрузку токена...');
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _authToken = prefs.getString('user_token');
+    });
+    print('🔐 Токен загружен: ${_authToken != null ? "есть" : "нет"}');
   }
 
   Future<void> _loadExerciseGroups() async {
+    print('🔥 Начинаем загрузку групп упражнений...');
     setState(() {
       _isLoadingGroups = true;
     });
     try {
-      final groups = await TrainingService.getExerciseGroups(
-        widget.userTraining['training']['uuid'],
-      );
+      final trainingUuid = widget.userTraining['training']['uuid'];
+      print('🔥 Training UUID: $trainingUuid');
+
+      // Очищаем кеш для принудительного обновления данных
+      print('🗑️ Очищаем кеш групп упражнений...');
+      TrainingService.clearExerciseGroupsCache(trainingUuid);
+
+      final groups = await TrainingService.getExerciseGroups(trainingUuid);
+      print('🔥 Получено групп упражнений: ${groups.length}');
+      print('🔥 Данные групп: $groups');
+
       setState(() {
         _exerciseGroups = groups;
         _isLoadingGroups = false;
       });
     } catch (e) {
+      print('❌ Ошибка при загрузке групп упражнений: $e');
       setState(() {
         _isLoadingGroups = false;
       });
@@ -101,7 +128,11 @@ class _ActiveSystemTrainingScreenState
     final training = widget.userTraining['training'] ?? {};
     final isRestDay = widget.userTraining['is_rest_day'] ?? false;
     final status =
-        widget.userTraining['status']?.toString()?.toLowerCase() ?? '';
+        widget.userTraining['status']?.toString().toLowerCase() ?? '';
+
+    print('🏗️ Build вызван: isRestDay=$isRestDay, status=$status');
+    print('🏗️ Загружаются группы: $_isLoadingGroups');
+    print('🏗️ Количество групп: ${_exerciseGroups.length}');
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('Активная тренировка')),
@@ -175,6 +206,9 @@ class _ActiveSystemTrainingScreenState
                             const SizedBox(height: 16),
                         itemBuilder: (context, index) {
                           final group = _exerciseGroups[index];
+                          print(
+                            '🎨 Отображаем группу $index: ${group['caption']}, image_uuid: ${group['image_uuid']}',
+                          );
                           return GestureDetector(
                             onTap: () {
                               Navigator.of(context).push(
@@ -207,32 +241,93 @@ class _ActiveSystemTrainingScreenState
                               ),
                               child: Stack(
                                 children: [
+                                  // Фоновое изображение или цвет
                                   Positioned.fill(
-                                    child: Container(
-                                      color: Colors.black.withOpacity(0.05),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: group['image_uuid'] != null
+                                          ? Image.network(
+                                              '${ApiService.baseUrl}/files/file/${group['image_uuid']}',
+                                              fit: BoxFit.cover,
+                                              headers: _authToken != null
+                                                  ? {
+                                                      'Cookie':
+                                                          'users_access_token=$_authToken',
+                                                    }
+                                                  : {},
+                                              errorBuilder:
+                                                  (context, error, stackTrace) {
+                                                    return Container(
+                                                      color: Colors.black
+                                                          .withOpacity(0.05),
+                                                      child: const Center(
+                                                        child: Icon(
+                                                          Icons.fitness_center,
+                                                          size: 40,
+                                                          color: AppColors
+                                                              .textSecondary,
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                              key: ValueKey(
+                                                group['image_uuid'],
+                                              ),
+                                            )
+                                          : Container(
+                                              color: Colors.black.withOpacity(
+                                                0.05,
+                                              ),
+                                              child: const Center(
+                                                child: Icon(
+                                                  Icons.fitness_center,
+                                                  size: 40,
+                                                  color:
+                                                      AppColors.textSecondary,
+                                                ),
+                                              ),
+                                            ),
                                     ),
                                   ),
-                                  Center(
+                                  // Градиент для читаемости текста
+                                  Positioned.fill(
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 8,
-                                      ),
                                       decoration: BoxDecoration(
-                                        color: Colors.black.withOpacity(0.5),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        group['caption'] ?? '',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
+                                        borderRadius: BorderRadius.circular(16),
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topCenter,
+                                          end: Alignment.bottomCenter,
+                                          colors: [
+                                            Colors.transparent,
+                                            Colors.black.withOpacity(0.7),
+                                          ],
+                                          stops: const [0.4, 1.0],
                                         ),
-                                        textAlign: TextAlign.center,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
                                       ),
+                                    ),
+                                  ),
+                                  // Текст с названием группы
+                                  Positioned(
+                                    bottom: 12,
+                                    left: 12,
+                                    right: 12,
+                                    child: Text(
+                                      group['caption'] ?? '',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        shadows: [
+                                          Shadow(
+                                            offset: Offset(0, 1),
+                                            blurRadius: 2,
+                                            color: Colors.black54,
+                                          ),
+                                        ],
+                                      ),
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ],
