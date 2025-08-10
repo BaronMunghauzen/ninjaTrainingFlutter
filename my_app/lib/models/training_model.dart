@@ -12,6 +12,7 @@ class Training {
   final int stage;
   final Program program;
   final dynamic user;
+  final String? imageUuid;
 
   Training({
     required this.uuid,
@@ -25,6 +26,7 @@ class Training {
     required this.stage,
     required this.program,
     this.user,
+    this.imageUuid,
   });
 
   factory Training.fromJson(Map<String, dynamic> json) {
@@ -58,6 +60,7 @@ class Training {
               order: 0,
             ),
       user: json['user'],
+      imageUuid: json['image_uuid'],
     );
   }
 
@@ -74,6 +77,7 @@ class Training {
       'stage': stage,
       'program': program.toJson(),
       'user': user,
+      'image_uuid': imageUuid,
     };
   }
 }

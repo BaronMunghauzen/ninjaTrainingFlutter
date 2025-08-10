@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_service.dart';
+import '../../constants/app_colors.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../system_training/system_training_detail_screen.dart';
@@ -16,11 +18,18 @@ class SystemTrainingListWidget extends StatefulWidget {
 class _SystemTrainingListWidgetState extends State<SystemTrainingListWidget> {
   List<Map<String, dynamic>> trainings = [];
   bool isLoading = true;
+  String? _authToken;
 
   @override
   void initState() {
     super.initState();
+    _loadAuthToken();
     _loadTrainings();
+  }
+
+  Future<void> _loadAuthToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    _authToken = prefs.getString('user_token');
   }
 
   Future<void> _loadTrainings() async {
@@ -111,23 +120,81 @@ class _SystemTrainingListWidgetState extends State<SystemTrainingListWidget> {
             width: 140,
             height: 140,
             decoration: BoxDecoration(
-              color: Colors.grey[300],
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey[400]!),
+              border: Border.all(color: AppColors.inputBorder),
             ),
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(
-                  training['caption'] ?? '',
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Картинка тренировки
+                if (training['image_uuid'] != null)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      '${ApiService.baseUrl}/files/file/${training['image_uuid']}',
+                      width: 140,
+                      height: 140,
+                      fit: BoxFit.cover,
+                      headers: _authToken != null
+                          ? {'Cookie': 'users_access_token=$_authToken'}
+                          : {},
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: AppColors.surface,
+                          child: const Icon(
+                            Icons.fitness_center,
+                            size: 60,
+                            color: AppColors.textSecondary,
+                          ),
+                        );
+                      },
+                      key: ValueKey(training['image_uuid']),
+                    ),
                   ),
-                  textAlign: TextAlign.center,
+                // Полупрозрачный оверлей для лучшей читаемости текста
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withOpacity(0.7),
+                      ],
+                      stops: const [0.4, 1.0],
+                    ),
+                  ),
                 ),
-              ),
+                // Текст поверх картинки
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      training['caption'] ?? '',
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        shadows: [
+                          Shadow(
+                            offset: Offset(0, 1),
+                            blurRadius: 2,
+                            color: Colors.black54,
+                          ),
+                        ],
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         );

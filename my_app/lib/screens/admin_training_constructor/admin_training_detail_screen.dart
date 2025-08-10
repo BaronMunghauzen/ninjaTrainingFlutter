@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import '../../services/api_service.dart';
+import '../../widgets/avatar_modal.dart';
+import '../../constants/app_colors.dart';
 import 'admin_training_edit_screen.dart';
 import 'admin_exercise_group_detail_screen.dart';
 import 'admin_exercise_group_create_screen.dart';
@@ -19,12 +25,19 @@ class _AdminTrainingDetailScreenState extends State<AdminTrainingDetailScreen> {
   bool isLoading = true;
   List<Map<String, dynamic>> exerciseGroups = [];
   bool isLoadingGroups = false;
+  String? _authToken;
 
   @override
   void initState() {
     super.initState();
+    _loadAuthToken();
     _fetchTraining();
     _fetchExerciseGroups();
+  }
+
+  Future<void> _loadAuthToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    _authToken = prefs.getString('user_token');
   }
 
   @override
@@ -134,6 +147,54 @@ class _AdminTrainingDetailScreenState extends State<AdminTrainingDetailScreen> {
               padding: const EdgeInsets.all(16),
               child: ListView(
                 children: [
+                  // Картинка тренировки
+                  Center(
+                    child: GestureDetector(
+                      onTap: () => _showImageModal(
+                        context,
+                        training!['image_uuid'] != null,
+                      ),
+                      child: Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          color: AppColors.surface,
+                          border: Border.all(color: AppColors.inputBorder),
+                        ),
+                        child: training!['image_uuid'] != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.network(
+                                  '${ApiService.baseUrl}/files/file/${training!['image_uuid']}',
+                                  width: 120,
+                                  height: 120,
+                                  fit: BoxFit.cover,
+                                  headers: _authToken != null
+                                      ? {
+                                          'Cookie':
+                                              'users_access_token=$_authToken',
+                                        }
+                                      : {},
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return const Icon(
+                                      Icons.fitness_center,
+                                      size: 60,
+                                      color: AppColors.textSecondary,
+                                    );
+                                  },
+                                  key: ValueKey(training!['image_uuid']),
+                                ),
+                              )
+                            : const Icon(
+                                Icons.fitness_center,
+                                size: 60,
+                                color: AppColors.textSecondary,
+                              ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
                   Text(
                     'Название: ${training!['caption'] ?? ''}',
                     style: const TextStyle(
@@ -224,5 +285,129 @@ class _AdminTrainingDetailScreenState extends State<AdminTrainingDetailScreen> {
               ),
             ),
     );
+  }
+
+  // Метод для показа модального окна управления картинкой
+  void _showImageModal(BuildContext context, bool hasImage) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => AvatarModal(
+        hasAvatar: hasImage,
+        onUploadPhoto: _handleTrainingImageUpload,
+        onDeletePhoto: hasImage ? _handleTrainingImageDelete : null,
+      ),
+    );
+  }
+
+  Future<void> _handleTrainingImageUpload() async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    final result = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 100,
+    );
+    if (result != null) {
+      final fileBytes = await result.readAsBytes();
+      final fileName = result.name;
+      final error = await _uploadTrainingImage(fileBytes, fileName);
+
+      if (mounted) {
+        if (error == null) {
+          setState(() {});
+          scaffoldMessenger.showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Картинка успешно загружена',
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
+              backgroundColor: AppColors.surface,
+            ),
+          );
+        } else {
+          scaffoldMessenger.showSnackBar(
+            SnackBar(content: Text(error), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _handleTrainingImageDelete() async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final error = await _deleteTrainingImage();
+
+    if (mounted) {
+      if (error == null) {
+        setState(() {});
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Картинка успешно удалена',
+              style: TextStyle(color: AppColors.textPrimary),
+            ),
+            backgroundColor: AppColors.surface,
+          ),
+        );
+      } else {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(content: Text(error), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  // Загрузка картинки тренировки
+  Future<String?> _uploadTrainingImage(
+    List<int> fileBytes,
+    String fileName,
+  ) async {
+    try {
+      // Создаем временный файл
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File('${tempDir.path}/$fileName');
+      await tempFile.writeAsBytes(fileBytes);
+
+      final response = await ApiService.uploadFile(
+        '/trainings/${widget.trainingUuid}/upload-image',
+        tempFile,
+        'file',
+      );
+
+      // Удаляем временный файл
+      await tempFile.delete();
+
+      if (response.statusCode == 200) {
+        // Обновляем данные тренировки
+        await _fetchTraining();
+        return null;
+      } else {
+        final data = ApiService.decodeJson(response.body);
+        return data['detail']?.toString() ?? 'Ошибка загрузки картинки';
+      }
+    } catch (e) {
+      return 'Ошибка загрузки картинки: $e';
+    }
+  }
+
+  // Удаление картинки тренировки
+  Future<String?> _deleteTrainingImage() async {
+    try {
+      final response = await ApiService.delete(
+        '/trainings/${widget.trainingUuid}/delete-image',
+      );
+
+      if (response.statusCode == 200) {
+        // Обновляем данные тренировки
+        await _fetchTraining();
+        return null;
+      } else {
+        final data = ApiService.decodeJson(response.body);
+        return data['detail']?.toString() ?? 'Ошибка удаления картинки';
+      }
+    } catch (e) {
+      return 'Ошибка удаления картинки: $e';
+    }
   }
 }

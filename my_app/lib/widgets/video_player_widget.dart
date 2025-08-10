@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
 import '../constants/app_colors.dart';
 import '../services/api_service.dart';
 
@@ -229,7 +227,15 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
             borderRadius: BorderRadius.circular(12),
             child: Stack(
               children: [
-                Image(image: snapshot.data!, fit: BoxFit.cover),
+                // Превью изображение растягивается во всю ширину
+                Positioned.fill(
+                  child: Image(
+                    image: snapshot.data!,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                  ),
+                ),
                 if (widget.videoUuid != null)
                   Positioned.fill(
                     child: GestureDetector(
@@ -237,17 +243,17 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
                         setState(() {
                           _showVideo = true;
                           _showVideoControls =
-                              false; // Скрываем кнопки управления
+                              true; // Показываем кнопки управления сразу
                         });
                         // Сразу начинаем воспроизведение видео
                         if (_controller != null && _isInitialized) {
                           _controller!.play();
                         }
-                        // Показываем кнопки управления через 2 секунды
-                        Future.delayed(const Duration(seconds: 2), () {
+                        // Автоматически скрываем контролы через 3 секунды
+                        Future.delayed(const Duration(seconds: 3), () {
                           if (mounted) {
                             setState(() {
-                              _showVideoControls = true;
+                              _showVideoControls = false;
                             });
                           }
                         });
@@ -315,79 +321,26 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
         borderRadius: BorderRadius.circular(12),
         child: Stack(
           children: [
-            Center(
-              child: AspectRatio(
-                aspectRatio: _controller!.value.aspectRatio,
-                child: VideoPlayer(_controller!),
-              ),
-            ),
-            if (widget.showControls && _showVideoControls)
-              Positioned.fill(
-                child: GestureDetector(
-                  onTap: () {
-                    try {
-                      setState(() {
-                        if (_controller!.value.isPlaying) {
-                          _controller!.pause();
-                        } else {
-                          _controller!.play();
-                        }
-                      });
-                      // Скрываем кнопки управления при воспроизведении
-                      if (_controller!.value.isPlaying) {
-                        Future.delayed(const Duration(seconds: 3), () {
-                          if (mounted && _controller!.value.isPlaying) {
-                            setState(() {
-                              _showVideoControls = false;
-                            });
-                          }
-                        });
-                      }
-                    } catch (e) {
-                      print('Error toggling video playback: $e');
-                    }
-                  },
-                  child: Container(
-                    color: Colors.transparent,
-                    child: Center(
-                      child: AnimatedOpacity(
-                        opacity: _controller!.value.isPlaying ? 0.0 : 0.8,
-                        duration: const Duration(milliseconds: 300),
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.5),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            _controller!.value.isPlaying
-                                ? Icons.pause
-                                : Icons.play_arrow,
-                            color: Colors.white,
-                            size: 32,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+            // Видео плеер занимает всю площадь
+            Positioned.fill(child: VideoPlayer(_controller!)),
+            // Контролы видео
+            if (widget.showControls) _buildVideoControls(),
             // Кнопка для возврата к превью
             Positioned(
               top: 8,
               right: 8,
               child: GestureDetector(
                 onTap: () {
+                  _controller?.pause();
                   setState(() {
                     _showVideo = false;
-                    _showVideoControls =
-                        false; // Сбрасываем состояние кнопок управления
+                    _showVideoControls = false;
                   });
                 },
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
+                    color: Colors.black.withOpacity(0.7),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(Icons.image, color: Colors.white, size: 20),
@@ -396,6 +349,227 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildVideoControls() {
+    return Positioned.fill(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _showVideoControls = !_showVideoControls;
+          });
+          // Автоматически скрываем контролы через 3 секунды только если они показаны
+          if (_showVideoControls) {
+            Future.delayed(const Duration(seconds: 3), () {
+              if (mounted && _showVideoControls) {
+                setState(() {
+                  _showVideoControls = false;
+                });
+              }
+            });
+          }
+        },
+        child: Stack(
+          children: [
+            // Прозрачная область для тапа по всему видео
+            Container(
+              color: Colors.transparent,
+              width: double.infinity,
+              height: double.infinity,
+            ),
+            // Контролы с анимацией
+            AnimatedOpacity(
+              opacity: _showVideoControls ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 300),
+              child: IgnorePointer(
+                ignoring: !_showVideoControls,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.transparent,
+                        Colors.black.withOpacity(0.7),
+                      ],
+                      stops: const [0.0, 0.7, 1.0],
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      // Ползунок прогресса
+                      _buildProgressSlider(),
+                      // Кнопки управления
+                      _buildControlButtons(),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProgressSlider() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        children: [
+          // Ползунок
+          ValueListenableBuilder<VideoPlayerValue>(
+            valueListenable: _controller!,
+            builder: (context, value, child) {
+              final duration = value.duration;
+              final position = value.position;
+
+              return SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  activeTrackColor: AppColors.primary,
+                  inactiveTrackColor: Colors.white.withOpacity(0.3),
+                  thumbColor: AppColors.primary,
+                  overlayColor: AppColors.primary.withOpacity(0.2),
+                  trackHeight: 3,
+                  thumbShape: const RoundSliderThumbShape(
+                    enabledThumbRadius: 6,
+                  ),
+                ),
+                child: Slider(
+                  value: position.inMilliseconds.toDouble(),
+                  min: 0.0,
+                  max: duration.inMilliseconds.toDouble(),
+                  onChanged: (value) {
+                    _controller?.seekTo(Duration(milliseconds: value.toInt()));
+                    // Сбрасываем таймер при взаимодействии с ползунком
+                    setState(() {
+                      _showVideoControls = true;
+                    });
+                    // Перезапускаем таймер автоскрытия
+                    Future.delayed(const Duration(seconds: 3), () {
+                      if (mounted && _showVideoControls) {
+                        setState(() {
+                          _showVideoControls = false;
+                        });
+                      }
+                    });
+                  },
+                ),
+              );
+            },
+          ),
+          // Время
+          ValueListenableBuilder<VideoPlayerValue>(
+            valueListenable: _controller!,
+            builder: (context, value, child) {
+              final duration = value.duration;
+              final position = value.position;
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _formatDuration(position),
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                    Text(
+                      _formatDuration(duration),
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildControlButtons() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Кнопка воспроизведения/паузы
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                if (_controller!.value.isPlaying) {
+                  _controller!.pause();
+                } else {
+                  _controller!.play();
+                }
+                // Сбрасываем таймер автоскрытия при взаимодействии с кнопками
+                _showVideoControls = true;
+              });
+              // Перезапускаем таймер автоскрытия
+              Future.delayed(const Duration(seconds: 3), () {
+                if (mounted && _showVideoControls) {
+                  setState(() {
+                    _showVideoControls = false;
+                  });
+                }
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                _controller!.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+          ),
+          // Кнопка полноэкранного режима
+          GestureDetector(
+            onTap: () {
+              // Сбрасываем таймер при взаимодействии
+              setState(() {
+                _showVideoControls = true;
+              });
+              _enterFullscreen();
+            },
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.fullscreen,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    return '$minutes:$seconds';
+  }
+
+  void _enterFullscreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => _FullscreenVideoPlayer(controller: _controller!),
       ),
     );
   }
@@ -471,5 +645,247 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
     // Иначе показываем превью изображение
     print('Showing preview image');
     return _buildPreviewImage();
+  }
+}
+
+// Полноэкранный видео плеер
+class _FullscreenVideoPlayer extends StatefulWidget {
+  final VideoPlayerController controller;
+
+  const _FullscreenVideoPlayer({required this.controller});
+
+  @override
+  State<_FullscreenVideoPlayer> createState() => _FullscreenVideoPlayerState();
+}
+
+class _FullscreenVideoPlayerState extends State<_FullscreenVideoPlayer> {
+  bool _showControls = true;
+
+  @override
+  void initState() {
+    super.initState();
+    // Автоматически скрываем контролы через 3 секунды
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() {
+          _showControls = false;
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: GestureDetector(
+        onTap: () {
+          setState(() {
+            _showControls = !_showControls;
+          });
+          if (_showControls) {
+            Future.delayed(const Duration(seconds: 3), () {
+              if (mounted) {
+                setState(() {
+                  _showControls = false;
+                });
+              }
+            });
+          }
+        },
+        child: Stack(
+          children: [
+            // Видео на весь экран
+            Center(
+              child: AspectRatio(
+                aspectRatio: widget.controller.value.aspectRatio,
+                child: VideoPlayer(widget.controller),
+              ),
+            ),
+            // Контролы
+            if (_showControls)
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withOpacity(0.5),
+                        Colors.transparent,
+                        Colors.transparent,
+                        Colors.black.withOpacity(0.7),
+                      ],
+                      stops: const [0.0, 0.3, 0.7, 1.0],
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      // Верхняя панель с кнопкой выхода
+                      SafeArea(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              GestureDetector(
+                                onTap: () => Navigator.of(context).pop(),
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.5),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.arrow_back,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      // Нижняя панель с контролами
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            // Ползунок прогресса
+                            ValueListenableBuilder<VideoPlayerValue>(
+                              valueListenable: widget.controller,
+                              builder: (context, value, child) {
+                                final duration = value.duration;
+                                final position = value.position;
+
+                                return SliderTheme(
+                                  data: SliderTheme.of(context).copyWith(
+                                    activeTrackColor: AppColors.primary,
+                                    inactiveTrackColor: Colors.white
+                                        .withOpacity(0.3),
+                                    thumbColor: AppColors.primary,
+                                    overlayColor: AppColors.primary.withOpacity(
+                                      0.2,
+                                    ),
+                                    trackHeight: 4,
+                                    thumbShape: const RoundSliderThumbShape(
+                                      enabledThumbRadius: 8,
+                                    ),
+                                  ),
+                                  child: Slider(
+                                    value: position.inMilliseconds.toDouble(),
+                                    min: 0.0,
+                                    max: duration.inMilliseconds.toDouble(),
+                                    onChanged: (value) {
+                                      widget.controller.seekTo(
+                                        Duration(milliseconds: value.toInt()),
+                                      );
+                                    },
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 8),
+                            // Время и кнопки
+                            Row(
+                              children: [
+                                // Кнопка воспроизведения/паузы
+                                GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      if (widget.controller.value.isPlaying) {
+                                        widget.controller.pause();
+                                      } else {
+                                        widget.controller.play();
+                                      }
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.5),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      widget.controller.value.isPlaying
+                                          ? Icons.pause
+                                          : Icons.play_arrow,
+                                      color: Colors.white,
+                                      size: 28,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                // Время
+                                Expanded(
+                                  child:
+                                      ValueListenableBuilder<VideoPlayerValue>(
+                                        valueListenable: widget.controller,
+                                        builder: (context, value, child) {
+                                          final duration = value.duration;
+                                          final position = value.position;
+
+                                          return Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                _formatDuration(position),
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                              Text(
+                                                _formatDuration(duration),
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      ),
+                                ),
+                                const SizedBox(width: 16),
+                                // Кнопка выхода из полноэкранного режима
+                                GestureDetector(
+                                  onTap: () => Navigator.of(context).pop(),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.5),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.fullscreen_exit,
+                                      color: Colors.white,
+                                      size: 28,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    return '$minutes:$seconds';
   }
 }
