@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../constants/app_colors.dart';
 import '../../models/training_model.dart';
-import '../../providers/auth_provider.dart';
 import '../../services/user_training_service.dart';
 import 'user_exercise_group_create_screen.dart';
 import 'user_exercise_group_detail_screen.dart';
+import 'user_training_edit_screen.dart';
 
 class UserTrainingDetailScreen extends StatefulWidget {
   final Training training;
 
-  const UserTrainingDetailScreen({Key? key, required this.training})
-    : super(key: key);
+  const UserTrainingDetailScreen({super.key, required this.training});
 
   @override
   State<UserTrainingDetailScreen> createState() =>
@@ -19,19 +17,21 @@ class UserTrainingDetailScreen extends StatefulWidget {
 }
 
 class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
+  late Training _training;
   List<ExerciseGroup> exerciseGroups = [];
   bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
+    _training = widget.training;
     _loadExerciseGroups();
   }
 
   Future<void> _loadExerciseGroups() async {
     try {
       final groups = await UserTrainingService.getExerciseGroupsForTraining(
-        widget.training.uuid,
+        _training.uuid,
       );
       setState(() {
         exerciseGroups = groups;
@@ -45,12 +45,30 @@ class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
     }
   }
 
+  /// Обновляет данные тренировки после редактирования
+  Future<void> _refreshTrainingData() async {
+    try {
+      final updatedTraining = await UserTrainingService.getUserTrainingByUuid(
+        _training.uuid,
+      );
+
+      if (updatedTraining != null) {
+        setState(() {
+          // Обновляем локальную переменную состояния
+          _training = updatedTraining;
+        });
+      }
+    } catch (e) {
+      print('Error refreshing training data: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          widget.training.caption,
+          _training.caption,
           style: const TextStyle(
             color: AppColors.textPrimary,
             fontWeight: FontWeight.w600,
@@ -62,8 +80,17 @@ class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
-            onPressed: () {
-              // TODO: Реализовать редактирование
+            onPressed: () async {
+              final result = await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) =>
+                      UserTrainingEditScreen(training: _training),
+                ),
+              );
+              if (result == true) {
+                // Обновляем данные тренировки
+                await _refreshTrainingData();
+              }
             },
           ),
           IconButton(
@@ -92,7 +119,7 @@ class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
 
                     if (confirmed == true) {
                       final success = await UserTrainingService.deleteTraining(
-                        widget.training.uuid,
+                        _training.uuid,
                       );
                       if (success) {
                         Navigator.of(context).pop();
@@ -115,7 +142,7 @@ class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.training.caption,
+                  _training.caption,
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -124,7 +151,7 @@ class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  widget.training.description,
+                  _training.description,
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 16,
@@ -132,7 +159,7 @@ class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Группа мышц: ${widget.training.muscleGroup}',
+                  'Группа мышц: ${_training.muscleGroup}',
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 14,
@@ -140,7 +167,7 @@ class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Уровень сложности: ${widget.training.difficultyLevel}',
+                  'Уровень сложности: ${_training.difficultyLevel}',
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 14,
@@ -229,9 +256,8 @@ class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
         onPressed: () async {
           final result = await Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => UserExerciseGroupCreateScreen(
-                trainingUuid: widget.training.uuid,
-              ),
+              builder: (context) =>
+                  UserExerciseGroupCreateScreen(trainingUuid: _training.uuid),
             ),
           );
           if (result == true) {

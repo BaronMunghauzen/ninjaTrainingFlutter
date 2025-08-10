@@ -38,12 +38,14 @@ class UserTrainingService {
     }
   }
 
-  /// Получение пользовательских упражнений
+  /// Получение доступных упражнений для пользователя
   static Future<List<ExerciseReference>> getUserExerciseReferences(
     String userUuid,
   ) async {
     try {
-      final response = await ApiService.get('/exercise_reference/');
+      final response = await ApiService.get(
+        '/exercise_reference/available/$userUuid',
+      );
 
       if (response.statusCode == 200) {
         final data = ApiService.decodeJson(response.body);
@@ -61,7 +63,7 @@ class UserTrainingService {
       }
       return [];
     } catch (e) {
-      print('Error loading user exercise references: $e');
+      print('Error loading available exercise references: $e');
       return [];
     }
   }
@@ -95,6 +97,36 @@ class UserTrainingService {
     }
   }
 
+  /// Обновление пользовательского упражнения
+  static Future<Map<String, dynamic>?> updateUserExercise({
+    required String exerciseUuid,
+    required String userUuid,
+    required String caption,
+    required String description,
+    required String muscleGroup,
+  }) async {
+    try {
+      final response = await ApiService.put(
+        '/exercise_reference/$exerciseUuid/',
+        body: {
+          'exercise_type': 'user',
+          'user_uuid': userUuid,
+          'caption': caption,
+          'description': description,
+          'muscle_group': muscleGroup,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return ApiService.decodeJson(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Error updating user exercise: $e');
+      return null;
+    }
+  }
+
   /// Создание пользовательской тренировки
   static Future<Map<String, dynamic>?> createUserTraining({
     required String userUuid,
@@ -113,6 +145,7 @@ class UserTrainingService {
           'description': description,
           'difficulty_level': difficultyLevel,
           'muscle_group': muscleGroup,
+          'actual': true,
         },
       );
 
@@ -122,6 +155,35 @@ class UserTrainingService {
       return null;
     } catch (e) {
       print('Error creating user training: $e');
+      return null;
+    }
+  }
+
+  /// Обновление пользовательской тренировки
+  static Future<Map<String, dynamic>?> updateUserTraining({
+    required String trainingUuid,
+    required String caption,
+    required String description,
+    required int difficultyLevel,
+    required String muscleGroup,
+  }) async {
+    try {
+      final response = await ApiService.put(
+        '/trainings/update/$trainingUuid',
+        body: {
+          'caption': caption,
+          'description': description,
+          'difficulty_level': difficultyLevel,
+          'muscle_group': muscleGroup,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return ApiService.decodeJson(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Error updating user training: $e');
       return null;
     }
   }
@@ -281,6 +343,24 @@ class UserTrainingService {
       return false;
     }
   }
+
+  /// Получение пользовательской тренировки по UUID
+  static Future<Training?> getUserTrainingByUuid(String trainingUuid) async {
+    try {
+      final response = await ApiService.get('/trainings/$trainingUuid');
+
+      if (response.statusCode == 200) {
+        final data = ApiService.decodeJson(response.body);
+        if (data is Map<String, dynamic>) {
+          return Training.fromJson(data);
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error loading user training: $e');
+      return null;
+    }
+  }
 }
 
 // Модели для упражнений и групп упражнений
@@ -290,7 +370,11 @@ class ExerciseReference {
   final String caption;
   final String description;
   final String muscleGroup;
-  final String userUuid;
+  final String? userUuid;
+  final String? imageUuid;
+  final String? videoUuid;
+  final String createdAt;
+  final String updatedAt;
 
   ExerciseReference({
     required this.uuid,
@@ -298,7 +382,11 @@ class ExerciseReference {
     required this.caption,
     required this.description,
     required this.muscleGroup,
-    required this.userUuid,
+    this.userUuid,
+    this.imageUuid,
+    this.videoUuid,
+    required this.createdAt,
+    required this.updatedAt,
   });
 
   factory ExerciseReference.fromJson(Map<String, dynamic> json) {
@@ -308,7 +396,11 @@ class ExerciseReference {
       caption: json['caption'] ?? '',
       description: json['description'] ?? '',
       muscleGroup: json['muscle_group'] ?? '',
-      userUuid: json['user_uuid'] ?? '',
+      userUuid: json['user_uuid'],
+      imageUuid: json['image_uuid'],
+      videoUuid: json['video_uuid'],
+      createdAt: json['created_at'] ?? '',
+      updatedAt: json['updated_at'] ?? '',
     );
   }
 }

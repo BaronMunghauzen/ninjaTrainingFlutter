@@ -36,7 +36,7 @@ class _AdminTrainingConstructorScreenState
           controller: _tabController,
           tabs: const [
             Tab(text: 'Тренировки'),
-            Tab(text: 'Упражнения'),
+            Tab(text: 'Справочник упражнений'),
           ],
         ),
       ),

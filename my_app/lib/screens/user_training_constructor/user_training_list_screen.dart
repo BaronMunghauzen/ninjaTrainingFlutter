@@ -6,9 +6,10 @@ import '../../providers/auth_provider.dart';
 import '../../services/user_training_service.dart';
 import 'user_training_create_screen.dart';
 import 'user_training_detail_screen.dart';
+import 'user_training_edit_screen.dart';
 
 class UserTrainingListScreen extends StatefulWidget {
-  const UserTrainingListScreen({Key? key}) : super(key: key);
+  const UserTrainingListScreen({super.key});
 
   @override
   State<UserTrainingListScreen> createState() => _UserTrainingListScreenState();
@@ -108,8 +109,16 @@ class _UserTrainingListScreenState extends State<UserTrainingListScreen> {
                       children: [
                         IconButton(
                           icon: const Icon(Icons.edit),
-                          onPressed: () {
-                            // TODO: Реализовать редактирование
+                          onPressed: () async {
+                            final result = await Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    UserTrainingEditScreen(training: training),
+                              ),
+                            );
+                            if (result == true) {
+                              _loadUserTrainings();
+                            }
                           },
                         ),
                         IconButton(
