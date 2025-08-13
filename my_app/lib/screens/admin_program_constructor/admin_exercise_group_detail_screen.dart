@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import '../../constants/app_colors.dart';
 import '../../services/program_service.dart';
 import '../../widgets/custom_button.dart';
@@ -6,6 +7,8 @@ import 'admin_exercise_group_edit_screen.dart';
 import 'admin_exercise_create_screen.dart';
 import 'admin_exercise_detail_screen.dart';
 import '../../services/api_service.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../widgets/avatar_modal.dart';
 
 class AdminExerciseGroupDetailScreen extends StatefulWidget {
   final String exerciseGroupUuid;
@@ -97,6 +100,123 @@ class _AdminExerciseGroupDetailScreenState
     setState(() {
       exercises = loaded;
     });
+  }
+
+  Future<ImageProvider?> _loadExerciseGroupImage(String? imageUuid) async {
+    if (imageUuid == null || imageUuid.isEmpty) return null;
+    try {
+      final response = await ApiService.get('/files/file/$imageUuid');
+      if (response.statusCode == 200) {
+        return MemoryImage(response.bodyBytes);
+      }
+      return null;
+    } catch (e) {
+      print('[API] exception: $e');
+      return null;
+    }
+  }
+
+  String? _getImageUuid() {
+    if (exerciseGroupData == null) return null;
+    final imageUuid = exerciseGroupData!['image_uuid'];
+    if (imageUuid is String && imageUuid.isNotEmpty) return imageUuid;
+    return null;
+  }
+
+  Future<void> _uploadExerciseGroupImage(String exerciseGroupUuid) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
+    if (picked == null) return;
+    try {
+      // Определяем mime-type
+      final ext = picked.path.split('.').last.toLowerCase();
+      String? mimeType;
+      switch (ext) {
+        case 'jpg':
+        case 'jpeg':
+          mimeType = 'image/jpeg';
+          break;
+        case 'png':
+          mimeType = 'image/png';
+          break;
+        case 'gif':
+          mimeType = 'image/gif';
+          break;
+        case 'webp':
+          mimeType = 'image/webp';
+          break;
+        default:
+          mimeType = null;
+      }
+      if (mimeType == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Поддерживаются только JPG, PNG, GIF, WEBP'),
+          ),
+        );
+        return;
+      }
+
+      final response = await ApiService.multipart(
+        '/exercise-groups/$exerciseGroupUuid/upload-image',
+        fileField: 'file',
+        filePath: picked.path,
+        mimeType: mimeType,
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        _loadExerciseGroupData();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка загрузки фото: ${response.statusCode}'),
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Ошибка загрузки фото: $e')));
+    }
+  }
+
+  Future<void> _deleteExerciseGroupImage(String exerciseGroupUuid) async {
+    try {
+      final response = await ApiService.delete(
+        '/exercise-groups/$exerciseGroupUuid/delete-image',
+      );
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        _loadExerciseGroupData();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка удаления фото: ${response.statusCode}'),
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Ошибка удаления фото: $e')));
+    }
+  }
+
+  void _showImageModal(String? imageUuid) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => AvatarModal(
+        hasAvatar: imageUuid != null && imageUuid.isNotEmpty,
+        onUploadPhoto: () =>
+            _uploadExerciseGroupImage(widget.exerciseGroupUuid),
+        onDeletePhoto: imageUuid != null && imageUuid.isNotEmpty
+            ? () => _deleteExerciseGroupImage(widget.exerciseGroupUuid)
+            : null,
+      ),
+    );
   }
 
   Future<void> _deleteExerciseGroup() async {
@@ -242,6 +362,44 @@ class _AdminExerciseGroupDetailScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Center(
+              child: FutureBuilder<ImageProvider?>(
+                future: _loadExerciseGroupImage(_getImageUuid()),
+                builder: (context, snapshot) {
+                  final image = snapshot.data;
+                  return GestureDetector(
+                    onTap: () => _showImageModal(_getImageUuid()),
+                    child: Container(
+                      width: 120,
+                      height: 120,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[800],
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey[700]!, width: 2),
+                        image: image != null
+                            ? DecorationImage(
+                                image: image,
+                                fit: BoxFit.cover,
+                                colorFilter: ColorFilter.mode(
+                                  Colors.black.withOpacity(0.5),
+                                  BlendMode.darken,
+                                ),
+                              )
+                            : null,
+                      ),
+                      child: image == null
+                          ? const Icon(
+                              Icons.image,
+                              color: Colors.grey,
+                              size: 48,
+                            )
+                          : null,
+                    ),
+                  );
+                },
+              ),
+            ),
             Text(
               exerciseGroupData!['caption'] ?? 'Без названия',
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),

@@ -193,8 +193,8 @@ class _ProgramAdminDetailScreenState extends State<ProgramAdminDetailScreen> {
     }
   }
 
-  Future<ImageProvider?> _loadProgramImage(int? imageUuid) async {
-    if (imageUuid == null) return null;
+  Future<ImageProvider?> _loadProgramImage(String? imageUuid) async {
+    if (imageUuid == null || imageUuid.isEmpty) return null;
     try {
       final response = await ApiService.get('/files/file/$imageUuid');
       if (response.statusCode == 200) {
@@ -205,6 +205,13 @@ class _ProgramAdminDetailScreenState extends State<ProgramAdminDetailScreen> {
       print('[API] exception: $e');
       return null;
     }
+  }
+
+  String? _getImageUuid() {
+    if (programData == null) return null;
+    final imageUuid = programData!['image_uuid'];
+    if (imageUuid is String && imageUuid.isNotEmpty) return imageUuid;
+    return null;
   }
 
   Future<void> _uploadProgramImage(String programUuid) async {
@@ -267,8 +274,8 @@ class _ProgramAdminDetailScreenState extends State<ProgramAdminDetailScreen> {
     }
   }
 
-  Future<void> _deleteProgramImage(int? imageUuid) async {
-    if (imageUuid == null) return;
+  Future<void> _deleteProgramImage(String? imageUuid) async {
+    if (imageUuid == null || imageUuid.isEmpty) return;
     try {
       final response = await ApiService.delete('/files/file/$imageUuid');
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -287,17 +294,15 @@ class _ProgramAdminDetailScreenState extends State<ProgramAdminDetailScreen> {
     }
   }
 
-  void _showImageModal(int? imageUuid) {
+  void _showImageModal(String? imageUuid) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => AvatarModal(
-        hasAvatar: imageUuid != null,
+        hasAvatar: imageUuid != null && imageUuid.isNotEmpty,
         onUploadPhoto: () => _uploadProgramImage(widget.programUuid),
-        onDeletePhoto: imageUuid != null
-            ? () => _deleteProgramImage(
-                imageUuid is int ? imageUuid as int : null,
-              )
+        onDeletePhoto: imageUuid != null && imageUuid.isNotEmpty
+            ? () => _deleteProgramImage(imageUuid)
             : null,
       ),
     );
@@ -384,19 +389,11 @@ class _ProgramAdminDetailScreenState extends State<ProgramAdminDetailScreen> {
                   children: [
                     Center(
                       child: FutureBuilder<ImageProvider?>(
-                        future: _loadProgramImage(
-                          programData?['image_uuid'] is int
-                              ? (programData?['image_uuid'] as int)
-                              : null,
-                        ),
+                        future: _loadProgramImage(_getImageUuid()),
                         builder: (context, snapshot) {
                           final image = snapshot.data;
                           return GestureDetector(
-                            onTap: () => _showImageModal(
-                              programData?['image_uuid'] is int
-                                  ? (programData?['image_uuid'] as int)
-                                  : null,
-                            ),
+                            onTap: () => _showImageModal(_getImageUuid()),
                             child: Container(
                               width: 120,
                               height: 120,

@@ -31,7 +31,7 @@ class Program {
   final int order;
   final String? scheduleType;
   final String? trainingDays;
-  final int? imageUuid;
+  final String? imageUuid;
   final Category? category;
   final dynamic user; // null в данном случае
 
@@ -50,13 +50,10 @@ class Program {
     this.user,
   });
 
-  static int? _parseImageUuid(dynamic value) {
+  static String? _parseImageUuid(dynamic value) {
     if (value == null) return null;
-    if (value is int) return value;
-    if (value is String) {
-      final parsed = int.tryParse(value);
-      if (parsed != null) return parsed;
-    }
+    if (value is String && value.isNotEmpty) return value;
+    if (value is int) return value.toString();
     print(
       'Warning: Could not parse imageUuid: $value (type: ${value.runtimeType})',
     );
