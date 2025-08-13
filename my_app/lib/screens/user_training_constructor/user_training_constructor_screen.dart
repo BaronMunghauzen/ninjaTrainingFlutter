@@ -51,7 +51,7 @@ class _UserTrainingConstructorScreenState
           indicatorColor: AppColors.buttonPrimary,
           tabs: const [
             Tab(text: 'Мои тренировки'),
-            Tab(text: 'Мои упражнения'),
+            Tab(text: 'Справочник упражнений'),
           ],
         ),
       ),

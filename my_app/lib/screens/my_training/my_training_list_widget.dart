@@ -8,6 +8,9 @@ import '../../services/api_service.dart';
 import '../../services/user_training_service.dart';
 import '../user_training_constructor/user_training_constructor_screen.dart';
 import '../system_training/system_training_list_screen.dart';
+import '../user_training_constructor/user_training_detail_screen.dart';
+import '../system_training/active_system_training_screen.dart';
+import '../system_training/system_training_detail_screen.dart';
 
 class MyTrainingListWidget extends StatefulWidget {
   const MyTrainingListWidget({Key? key}) : super(key: key);
@@ -118,12 +121,57 @@ class _MyTrainingListWidgetState extends State<MyTrainingListWidget> {
                   itemBuilder: (context, index) {
                     final training = userTrainings[index];
                     return GestureDetector(
-                      onTap: () {
-                        // Переход на экран тренировок из папки system_training
+                      onTap: () async {
+                        // Проверяем активна ли тренировка
+                        final authProvider = Provider.of<AuthProvider>(
+                          context,
+                          listen: false,
+                        );
+                        final userUuid = authProvider.userUuid;
+                        if (userUuid == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Ошибка: не найден userUuid'),
+                            ),
+                          );
+                          return;
+                        }
+
+                        final response = await ApiService.get(
+                          '/user_trainings/',
+                          queryParams: {
+                            'user_uuid': userUuid,
+                            'status': 'active',
+                            'training_uuid': training.uuid,
+                          },
+                        );
+
+                        if (response.statusCode == 200) {
+                          final data = ApiService.decodeJson(response.body);
+                          final trainingsList =
+                              (data is Map && data['data'] is List)
+                              ? data['data']
+                              : null;
+                          if (trainingsList != null &&
+                              trainingsList.isNotEmpty) {
+                            // Если есть активная тренировка - переходим на экран активной тренировки
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    ActiveSystemTrainingScreen(
+                                      userTraining: trainingsList[0],
+                                    ),
+                              ),
+                            );
+                            return;
+                          }
+                        }
+
+                        // Если нет активной тренировки — открываем карточку тренировки
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (context) => SystemTrainingListScreen(
-                              trainingUuid: training.uuid,
+                            builder: (context) => SystemTrainingDetailScreen(
+                              training: _trainingToMap(training),
                             ),
                           ),
                         );
@@ -245,5 +293,17 @@ class _MyTrainingListWidgetState extends State<MyTrainingListWidget> {
         ),
       ],
     );
+  }
+
+  Map<String, dynamic> _trainingToMap(Training training) {
+    return {
+      'uuid': training.uuid,
+      'caption': training.caption,
+      'muscle_group': training.muscleGroup,
+      'description': training.description,
+      'image_uuid': training.imageUuid,
+      'difficulty_level': training.difficultyLevel,
+      'duration': training.duration,
+    };
   }
 }

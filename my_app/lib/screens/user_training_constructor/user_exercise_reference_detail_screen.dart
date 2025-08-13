@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../constants/app_colors.dart';
-import '../../providers/auth_provider.dart';
 import '../../services/user_training_service.dart';
+import '../../widgets/video_player_widget.dart';
+import 'user_exercise_reference_edit_screen.dart';
 
 class UserExerciseReferenceDetailScreen extends StatefulWidget {
   final ExerciseReference exercise;
 
-  const UserExerciseReferenceDetailScreen({Key? key, required this.exercise})
-    : super(key: key);
+  const UserExerciseReferenceDetailScreen({super.key, required this.exercise});
 
   @override
   State<UserExerciseReferenceDetailScreen> createState() =>
@@ -32,49 +31,69 @@ class _UserExerciseReferenceDetailScreenState
         elevation: 0,
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () {
-              // TODO: Реализовать редактирование
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete),
-            onPressed: () async {
-              final confirmed = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Удаление упражнения'),
-                  content: const Text(
-                    'Вы уверены, что хотите удалить это упражнение?',
+          if (widget.exercise.exerciseType == 'user') ...[
+            IconButton(
+              icon: const Icon(Icons.edit),
+              onPressed: () async {
+                final navigator = Navigator.of(context);
+                final result = await navigator.push(
+                  MaterialPageRoute(
+                    builder: (context) => UserExerciseReferenceEditScreen(
+                      exercise: widget.exercise,
+                    ),
                   ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(false),
-                      child: const Text('Отмена'),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(true),
-                      child: const Text('Удалить'),
-                    ),
-                  ],
-                ),
-              );
+                );
 
-              if (confirmed == true) {
-                final success =
-                    await UserTrainingService.deleteExerciseReference(
-                      widget.exercise.uuid,
-                    );
-                if (success) {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Упражнение удалено')),
-                  );
+                // Если упражнение было обновлено, обновляем экран
+                if (result == true) {
+                  setState(() {
+                    // Обновляем данные упражнения
+                    // В реальном приложении здесь можно загрузить обновленные данные
+                  });
                 }
-              }
-            },
-          ),
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete),
+              onPressed: () async {
+                final navigator = Navigator.of(context);
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Удаление упражнения'),
+                    content: const Text(
+                      'Вы уверены, что хотите удалить это упражнение?',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('Отмена'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        child: const Text('Удалить'),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (confirmed == true) {
+                  final success =
+                      await UserTrainingService.deleteExerciseReference(
+                        widget.exercise.uuid,
+                      );
+                  if (success) {
+                    navigator.pop();
+                    scaffoldMessenger.showSnackBar(
+                      const SnackBar(content: Text('Упражнение удалено')),
+                    );
+                  }
+                }
+              },
+            ),
+          ],
         ],
       ),
       body: Padding(
@@ -91,7 +110,57 @@ class _UserExerciseReferenceDetailScreenState
                 color: AppColors.textPrimary,
               ),
             ),
+            const SizedBox(height: 8),
+            // Индикатор типа упражнения
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: widget.exercise.exerciseType == 'user'
+                    ? AppColors.buttonPrimary
+                    : AppColors.textSecondary,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                widget.exercise.exerciseType == 'user'
+                    ? 'Пользовательская'
+                    : 'Системная',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
             const SizedBox(height: 16),
+
+            // Видеоплеер (только для системных упражнений)
+            if (widget.exercise.exerciseType == 'system' &&
+                (widget.exercise.videoUuid != null ||
+                    widget.exercise.imageUuid != null))
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Демонстрация:',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  VideoPlayerWidget(
+                    imageUuid: widget.exercise.imageUuid,
+                    videoUuid: widget.exercise.videoUuid,
+                    exerciseReferenceUuid: widget.exercise.uuid,
+                    width: double.infinity,
+                    height: 250,
+                    showControls: true,
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+
             // Описание
             Text(
               'Описание:',

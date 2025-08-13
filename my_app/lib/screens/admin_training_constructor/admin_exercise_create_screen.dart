@@ -4,8 +4,7 @@ import 'widgets.dart';
 
 class AdminExerciseCreateScreen extends StatefulWidget {
   final String exerciseGroupUuid;
-  const AdminExerciseCreateScreen({Key? key, required this.exerciseGroupUuid})
-    : super(key: key);
+  const AdminExerciseCreateScreen({super.key, required this.exerciseGroupUuid});
 
   @override
   State<AdminExerciseCreateScreen> createState() =>
@@ -23,7 +22,6 @@ class _AdminExerciseCreateScreenState extends State<AdminExerciseCreateScreen> {
   final _setsController = TextEditingController();
   final _repsController = TextEditingController();
   final _restTimeController = TextEditingController();
-  final _weightController = TextEditingController();
   bool _withWeight = false;
   bool isLoading = false;
 
@@ -37,7 +35,6 @@ class _AdminExerciseCreateScreenState extends State<AdminExerciseCreateScreen> {
     _setsController.dispose();
     _repsController.dispose();
     _restTimeController.dispose();
-    _weightController.dispose();
     super.dispose();
   }
 
@@ -53,8 +50,9 @@ class _AdminExerciseCreateScreenState extends State<AdminExerciseCreateScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate() || _selectedExerciseRef == null)
+    if (!_formKey.currentState!.validate() || _selectedExerciseRef == null) {
       return;
+    }
     setState(() => isLoading = true);
     final body = {
       'exercise_type': 'system',
@@ -67,7 +65,6 @@ class _AdminExerciseCreateScreenState extends State<AdminExerciseCreateScreen> {
       'reps_count': int.tryParse(_repsController.text) ?? 0,
       'rest_time': int.tryParse(_restTimeController.text) ?? 0,
       'with_weight': _withWeight,
-      'weight': double.tryParse(_weightController.text) ?? 0.0,
       'exercise_reference_uuid': _selectedExerciseRef!['uuid'],
       'exercise_group_uuid': widget.exerciseGroupUuid,
     };
@@ -84,12 +81,16 @@ class _AdminExerciseCreateScreenState extends State<AdminExerciseCreateScreen> {
         );
       }
       setState(() => isLoading = false);
-      Navigator.pop(context, true);
+      if (mounted) {
+        Navigator.pop(context, true);
+      }
     } else {
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ошибка при создании упражнения')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ошибка при создании упражнения')),
+        );
+      }
     }
   }
 
@@ -176,14 +177,6 @@ class _AdminExerciseCreateScreenState extends State<AdminExerciseCreateScreen> {
                 onChanged: (v) => setState(() => _withWeight = v),
                 title: const Text('С отягощением'),
               ),
-              if (_withWeight)
-                TextFormField(
-                  controller: _weightController,
-                  decoration: const InputDecoration(labelText: 'Вес'),
-                  keyboardType: TextInputType.number,
-                  validator: (v) =>
-                      v == null || v.isEmpty ? 'Введите вес' : null,
-                ),
               const SizedBox(height: 24),
               isLoading
                   ? const Center(child: CircularProgressIndicator())

@@ -4,6 +4,7 @@ import '../../constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/user_training_service.dart';
 import '../../services/api_service.dart';
+import '../admin_training_constructor/widgets.dart';
 
 class UserExerciseGroupCreateScreen extends StatefulWidget {
   final String trainingUuid;
@@ -25,9 +26,7 @@ class _UserExerciseGroupCreateScreenState
   final _setsCountController = TextEditingController();
   final _repsCountController = TextEditingController();
   final _restTimeController = TextEditingController();
-  final _weightController = TextEditingController();
 
-  List<ExerciseReference> availableExercises = [];
   ExerciseReference? selectedExercise;
   bool withWeight = false;
   bool _isLoading = false;
@@ -35,7 +34,6 @@ class _UserExerciseGroupCreateScreenState
   @override
   void initState() {
     super.initState();
-    _loadAvailableExercises();
   }
 
   @override
@@ -46,26 +44,7 @@ class _UserExerciseGroupCreateScreenState
     _setsCountController.dispose();
     _repsCountController.dispose();
     _restTimeController.dispose();
-    _weightController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadAvailableExercises() async {
-    try {
-      final authProvider = context.read<AuthProvider>();
-      final userUuid = authProvider.userUuid;
-
-      if (userUuid == null) return;
-
-      final exercises = await UserTrainingService.getUserExerciseReferences(
-        userUuid,
-      );
-      setState(() {
-        availableExercises = exercises;
-      });
-    } catch (e) {
-      print('Error loading available exercises: $e');
-    }
   }
 
   Future<void> _createExerciseGroup() async {
@@ -102,7 +81,7 @@ class _UserExerciseGroupCreateScreenState
         repsCount: int.parse(_repsCountController.text),
         restTime: int.parse(_restTimeController.text),
         withWeight: withWeight,
-        weight: withWeight ? double.parse(_weightController.text) : 0,
+        weight: 0,
         exerciseReferenceUuid: selectedExercise!.uuid,
       );
 
@@ -168,28 +147,33 @@ class _UserExerciseGroupCreateScreenState
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Выбор упражнения из справочника
-                DropdownButtonFormField<ExerciseReference>(
-                  value: selectedExercise,
-                  decoration: const InputDecoration(
-                    labelText: 'Выберите упражнение',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: availableExercises.map((exercise) {
-                    return DropdownMenuItem(
-                      value: exercise,
-                      child: Text(exercise.caption),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
+                ExerciseReferenceSelector(
+                  onSelected: (exercise) {
                     setState(() {
-                      selectedExercise = value;
+                      if (exercise != null) {
+                        selectedExercise = ExerciseReference(
+                          uuid: exercise['uuid'],
+                          caption: exercise['caption'],
+                          description: exercise['description'],
+                          muscleGroup: exercise['muscle_group'] ?? '',
+                          exerciseType: exercise['exercise_type'] ?? 'user',
+                          createdAt:
+                              exercise['created_at'] ??
+                              DateTime.now().toIso8601String(),
+                          updatedAt:
+                              exercise['updated_at'] ??
+                              DateTime.now().toIso8601String(),
+                        );
+                      } else {
+                        selectedExercise = null;
+                      }
                     });
                   },
-                  validator: (value) {
-                    if (value == null) {
-                      return 'Пожалуйста, выберите упражнение';
-                    }
-                    return null;
+                  label: 'Выберите упражнение',
+                  endpoint:
+                      '/exercise_reference/available/${context.read<AuthProvider>().userUuid}/search/by-caption',
+                  buildQueryParams: (search) {
+                    return {'caption': search};
                   },
                 ),
                 const SizedBox(height: 16),
@@ -307,26 +291,7 @@ class _UserExerciseGroupCreateScreenState
                     });
                   },
                 ),
-                if (withWeight) ...[
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _weightController,
-                    decoration: const InputDecoration(
-                      labelText: 'Вес (кг)',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (withWeight && (value == null || value.isEmpty)) {
-                        return 'Пожалуйста, введите вес';
-                      }
-                      if (withWeight && double.tryParse(value!) == null) {
-                        return 'Должно быть числом';
-                      }
-                      return null;
-                    },
-                  ),
-                ],
+
                 const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: _isLoading ? null : _createExerciseGroup,
