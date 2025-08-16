@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import '../../constants/app_colors.dart';
 import 'weeks_days_navigation.dart'
     show WeeksDaysNavigation, WeeksDaysNavigationState;
@@ -6,6 +7,7 @@ import '../../services/training_service.dart';
 import 'exercise_group_carousel_screen.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/api_service.dart';
 
 class ActiveTrainingScreen extends StatefulWidget {
   final Map<String, dynamic> userProgramData;
@@ -466,11 +468,38 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
                       ),
                       child: Stack(
                         children: [
-                          // TODO: вставить фото группы упражнений (например, через Image.network или Image.asset)
+                          // Фото группы упражнений
                           Positioned.fill(
-                            child: Container(
-                              color: Colors.black.withOpacity(0.05),
-                              // Заглушка под фото
+                            child: FutureBuilder<ImageProvider?>(
+                              future: _loadExerciseGroupImage(
+                                _getImageUuid(group),
+                              ),
+                              builder: (context, snapshot) {
+                                final image = snapshot.data;
+                                if (image != null) {
+                                  return ClipRRect(
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: Image(
+                                      image: image,
+                                      fit: BoxFit.cover,
+                                      width: double.infinity,
+                                      height: double.infinity,
+                                    ),
+                                  );
+                                } else {
+                                  // Заглушка если нет изображения
+                                  return Container(
+                                    color: Colors.black.withOpacity(0.05),
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.image,
+                                        color: Colors.grey,
+                                        size: 48,
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
                             ),
                           ),
                           Center(
@@ -724,6 +753,26 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
       });
       print('Error loading exercise groups: $e');
     }
+  }
+
+  Future<ImageProvider?> _loadExerciseGroupImage(String? imageUuid) async {
+    if (imageUuid == null || imageUuid.isEmpty) return null;
+    try {
+      final response = await ApiService.get('/files/file/$imageUuid');
+      if (response.statusCode == 200) {
+        return MemoryImage(response.bodyBytes);
+      }
+      return null;
+    } catch (e) {
+      print('[API] exception: $e');
+      return null;
+    }
+  }
+
+  String? _getImageUuid(Map<String, dynamic> group) {
+    final imageUuid = group['image_uuid'];
+    if (imageUuid is String && imageUuid.isNotEmpty) return imageUuid;
+    return null;
   }
 
   Future<void> _skipTraining() async {

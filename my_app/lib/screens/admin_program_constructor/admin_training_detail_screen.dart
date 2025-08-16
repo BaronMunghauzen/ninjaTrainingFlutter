@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import '../../constants/app_colors.dart';
 import '../../services/program_service.dart';
 import '../../widgets/custom_button.dart';
@@ -104,6 +105,26 @@ class _AdminTrainingDetailScreenState extends State<AdminTrainingDetailScreen> {
         isLoadingGroups = false;
       });
     }
+  }
+
+  Future<ImageProvider?> _loadExerciseGroupImage(String? imageUuid) async {
+    if (imageUuid == null || imageUuid.isEmpty) return null;
+    try {
+      final response = await ApiService.get('/files/file/$imageUuid');
+      if (response.statusCode == 200) {
+        return MemoryImage(response.bodyBytes);
+      }
+      return null;
+    } catch (e) {
+      print('[API] exception: $e');
+      return null;
+    }
+  }
+
+  String? _getImageUuid(Map<String, dynamic> group) {
+    final imageUuid = group['image_uuid'];
+    if (imageUuid is String && imageUuid.isNotEmpty) return imageUuid;
+    return null;
   }
 
   Future<void> _deleteTraining() async {
@@ -281,6 +302,41 @@ class _AdminTrainingDetailScreenState extends State<AdminTrainingDetailScreen> {
                     itemBuilder: (context, idx) {
                       final group = exerciseGroups[idx];
                       return ListTile(
+                        leading: FutureBuilder<ImageProvider?>(
+                          future: _loadExerciseGroupImage(_getImageUuid(group)),
+                          builder: (context, snapshot) {
+                            final image = snapshot.data;
+                            return Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[800],
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.grey[700]!,
+                                  width: 1,
+                                ),
+                                image: image != null
+                                    ? DecorationImage(
+                                        image: image,
+                                        fit: BoxFit.cover,
+                                        colorFilter: ColorFilter.mode(
+                                          Colors.black.withOpacity(0.5),
+                                          BlendMode.darken,
+                                        ),
+                                      )
+                                    : null,
+                              ),
+                              child: image == null
+                                  ? const Icon(
+                                      Icons.image,
+                                      color: Colors.grey,
+                                      size: 24,
+                                    )
+                                  : null,
+                            );
+                          },
+                        ),
                         title: Text(group['caption'] ?? ''),
                         subtitle: Text(
                           'Порядок: ${group['order'] ?? '-'}, Мышцы: ${group['muscle_group'] ?? '-'}',

@@ -36,9 +36,79 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       false; // Новое состояние для переключения между видео и превью
   bool _showVideoControls = false; // Показывать ли кнопки управления видео
 
+  // Кэш для изображений - предотвращает повторную загрузку
+  static final Map<String, ImageProvider> _imageCache = {};
+  static const int _maxImageCacheSize =
+      10; // Максимальное количество изображений в кэше
+
+  // Кэш для видео - предотвращает повторную загрузку
+  static final Map<String, VideoPlayerController> _videoCache = {};
+  static const int _maxVideoCacheSize =
+      5; // Максимальное количество видео в кэше
+
+  // Ограничение на количество одновременно загружаемых изображений
+  static int _activeImageLoads = 0;
+  static const int _maxActiveImageLoads = 3;
+
+  // Ограничение на количество одновременно загружаемых видео
+  static int _activeVideoLoads = 0;
+  static const int _maxActiveVideoLoads = 2;
+
+  /// Очищает кэш изображений для освобождения памяти
+  static void clearImageCache() {
+    _imageCache.clear();
+    _activeImageLoads = 0;
+    print('Image cache cleared and active loads reset');
+  }
+
+  /// Очищает кэш видео для освобождения памяти
+  static void clearVideoCache() {
+    for (final controller in _videoCache.values) {
+      controller.dispose();
+    }
+    _videoCache.clear();
+    _activeVideoLoads = 0;
+    print('Video cache cleared and active loads reset');
+  }
+
+  /// Принудительно очищает память и сбрасывает все состояния
+  static void forceMemoryCleanup() {
+    _imageCache.clear();
+    _activeImageLoads = 0;
+    clearVideoCache();
+    print('Force memory cleanup completed');
+  }
+
+  /// Очищает кэш для конкретного упражнения (при смене упражнения)
+  static void clearExerciseCache(String? exerciseReferenceUuid) {
+    if (exerciseReferenceUuid != null) {
+      // Удаляем видео, связанные с этим упражнением
+      final keysToRemove = <String>[];
+      for (final entry in _videoCache.entries) {
+        // Здесь можно добавить логику для определения связи между видео и упражнением
+        // Пока просто очищаем весь кэш видео
+        keysToRemove.add(entry.key);
+      }
+
+      for (final key in keysToRemove) {
+        final controller = _videoCache.remove(key);
+        controller?.dispose();
+      }
+
+      print('Exercise cache cleared for: $exerciseReferenceUuid');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+
+    // Очищаем кэш предыдущего упражнения при инициализации нового
+    if (widget.exerciseReferenceUuid != null) {
+      // Можно добавить логику для определения, нужно ли очищать кэш
+      // Например, если это новое упражнение
+    }
+
     _initializeVideo();
   }
 
@@ -51,48 +121,96 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       return;
     }
 
-    try {
-      setState(() {
-        _isLoading = true;
-        _hasError = false;
-      });
-
-      // Создаем URL для стриминга видео
-      final videoUrl = '${ApiService.baseUrl}/files/file/${widget.videoUuid}';
-      print('Streaming video from: $videoUrl');
-
-      // Создаем контроллер для стриминга с кастомными заголовками и оптимизацией буфера
-      _controller = VideoPlayerController.network(
-        videoUrl,
-        httpHeaders: {'Cookie': 'users_access_token=${await _getAuthToken()}'},
-        videoPlayerOptions: VideoPlayerOptions(
-          mixWithOthers: false, // Отключаем смешивание для стабильности
-          allowBackgroundPlayback: false,
-        ),
-      );
-
-      // Инициализируем контроллер с увеличенным таймаутом
-      await _controller!.initialize().timeout(
-        const Duration(seconds: 60), // Увеличиваем таймаут
-        onTimeout: () {
-          throw Exception('Timeout initializing video controller');
-        },
-      );
-
-      // Устанавливаем зацикливание
-      _controller!.setLooping(true);
-
-      // Устанавливаем громкость на 0.3 для лучшей производительности
-      _controller!.setVolume(0.3);
-
-      // Оптимизация буферизации для больших файлов
-      _controller!.setPlaybackSpeed(1.0);
+    // Проверяем кэш видео
+    if (_videoCache.containsKey(widget.videoUuid)) {
+      print('Video found in cache: ${widget.videoUuid}');
+      _controller = _videoCache[widget.videoUuid];
 
       if (mounted) {
         setState(() {
           _isInitialized = true;
           _isLoading = false;
         });
+      }
+      return;
+    }
+
+    try {
+      setState(() {
+        _isLoading = true;
+        _hasError = false;
+      });
+
+      // Проверяем ограничение на количество активных загрузок видео
+      if (_activeVideoLoads >= _maxActiveVideoLoads) {
+        print('Too many active video loads, waiting...');
+        await Future.delayed(const Duration(milliseconds: 1000));
+        if (_activeVideoLoads >= _maxActiveVideoLoads) {
+          print('Still too many active video loads, skipping this video');
+          setState(() {
+            _isLoading = false;
+            _hasError = false; // Показываем превью вместо ошибки
+          });
+          return;
+        }
+      }
+
+      // Увеличиваем счетчик активных загрузок видео
+      _activeVideoLoads++;
+
+      try {
+        // Очищаем кэш видео если он слишком большой
+        if (_videoCache.length >= _maxVideoCacheSize) {
+          print('Clearing video cache due to size limit');
+          clearVideoCache();
+        }
+
+        // Создаем URL для стриминга видео
+        final videoUrl = '${ApiService.baseUrl}/files/file/${widget.videoUuid}';
+        print('Streaming video from: $videoUrl');
+
+        // Создаем контроллер для стриминга с кастомными заголовками и оптимизацией буфера
+        _controller = VideoPlayerController.network(
+          videoUrl,
+          httpHeaders: {
+            'Cookie': 'users_access_token=${await _getAuthToken()}',
+          },
+          videoPlayerOptions: VideoPlayerOptions(
+            mixWithOthers: false, // Отключаем смешивание для стабильности
+            allowBackgroundPlayback: false,
+          ),
+        );
+
+        // Инициализируем контроллер с увеличенным таймаутом
+        await _controller!.initialize().timeout(
+          const Duration(seconds: 60), // Увеличиваем таймаут
+          onTimeout: () {
+            throw Exception('Timeout initializing video controller');
+          },
+        );
+
+        // Устанавливаем зацикливание
+        _controller!.setLooping(true);
+
+        // Устанавливаем громкость на 0.3 для лучшей производительности
+        _controller!.setVolume(0.3);
+
+        // Оптимизация буферизации для больших файлов
+        _controller!.setPlaybackSpeed(1.0);
+
+        // Добавляем в кэш
+        _videoCache[widget.videoUuid!] = _controller!;
+        print('Video added to cache: ${widget.videoUuid}');
+
+        if (mounted) {
+          setState(() {
+            _isInitialized = true;
+            _isLoading = false;
+          });
+        }
+      } finally {
+        // Уменьшаем счетчик активных загрузок видео
+        _activeVideoLoads--;
       }
     } catch (e) {
       print('Video loading error: $e');
@@ -132,6 +250,10 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       _controller!.setVolume(0.2); // Уменьшаем громкость еще больше
       _controller!.setPlaybackSpeed(1.0);
 
+      // Добавляем в кэш даже при повторной попытке
+      _videoCache[widget.videoUuid!] = _controller!;
+      print('Video added to cache after retry: ${widget.videoUuid}');
+
       if (mounted) {
         setState(() {
           _isInitialized = true;
@@ -156,7 +278,15 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
 
   @override
   void dispose() {
-    _controller?.dispose();
+    // Не удаляем контроллер из кэша, так как он может использоваться другими экземплярами
+    // Просто сбрасываем ссылку
+    _controller = null;
+
+    // Очищаем кэш изображений если он слишком большой
+    if (_imageCache.length > _maxImageCacheSize) {
+      _imageCache.clear();
+    }
+
     super.dispose();
   }
 
@@ -198,6 +328,8 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
         }
 
         if (snapshot.hasError || snapshot.data == null) {
+          // Если произошла ошибка загрузки изображения, показываем fallback
+          print('Image loading failed, showing fallback');
           return Container(
             width: widget.width ?? double.infinity,
             height: widget.height ?? 200,
@@ -288,19 +420,66 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   Future<ImageProvider?> _loadImage(String imageUuid) async {
     try {
       print('Loading image: $imageUuid');
-      // Загружаем изображение через ApiService с авторизацией
-      final response = await ApiService.get('/files/file/$imageUuid');
 
-      if (response.statusCode == 200) {
-        print('Image loaded successfully: ${response.bodyBytes.length} bytes');
-        return MemoryImage(response.bodyBytes);
-      } else {
-        print('Image loading failed: ${response.statusCode}');
-        print('Response body: ${response.body}');
+      // Проверяем кэш
+      if (_imageCache.containsKey(imageUuid)) {
+        print('Image found in cache: $imageUuid');
+        return _imageCache[imageUuid];
       }
-      return null;
+
+      // Проверяем ограничение на количество активных загрузок
+      if (_activeImageLoads >= _maxActiveImageLoads) {
+        print('Too many active image loads, waiting...');
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (_activeImageLoads >= _maxActiveImageLoads) {
+          print('Still too many active loads, skipping this image');
+          return null;
+        }
+      }
+
+      // Увеличиваем счетчик активных загрузок
+      _activeImageLoads++;
+
+      try {
+        // Очищаем кэш если он слишком большой
+        if (_imageCache.length >= _maxImageCacheSize) {
+          print('Clearing image cache due to size limit');
+          _imageCache.clear();
+        }
+
+        // Загружаем изображение через ApiService с авторизацией
+        final response = await ApiService.get('/files/file/$imageUuid');
+
+        if (response.statusCode == 200) {
+          print(
+            'Image loaded successfully: ${response.bodyBytes.length} bytes',
+          );
+
+          // Создаем MemoryImage и добавляем в кэш
+          final imageProvider = MemoryImage(response.bodyBytes);
+          _imageCache[imageUuid] = imageProvider;
+
+          return imageProvider;
+        } else {
+          print('Image loading failed: ${response.statusCode}');
+          print('Response body: ${response.body}');
+        }
+        return null;
+      } finally {
+        // Уменьшаем счетчик активных загрузок
+        _activeImageLoads--;
+      }
     } catch (e) {
       print('Error loading image: $e');
+
+      // Если произошла ошибка памяти, очищаем кэш
+      if (e.toString().contains('OutOfMemory') ||
+          e.toString().contains('memory')) {
+        print('Memory error detected, clearing cache');
+        _imageCache.clear();
+        _activeImageLoads = 0;
+      }
+
       return null;
     }
   }

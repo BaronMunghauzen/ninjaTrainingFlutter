@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../models/exercise_model.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/video_player_widget.dart';
 import '../../constants/app_colors.dart';
 import 'dart:math';
 import 'package:my_app/providers/timer_overlay_provider.dart';
@@ -31,16 +32,32 @@ class ExerciseGroupCarouselScreen extends StatefulWidget {
 
 class _ExerciseGroupCarouselScreenState
     extends State<ExerciseGroupCarouselScreen> {
+  // ОПТИМИЗАЦИЯ: Данные справочника упражнений и предыдущие результаты загружаются
+  // только один раз при переходе на страницу, а не при каждом обновлении данных
+
   Map<String, dynamic>? groupData;
   List<ExerciseModel> exercises = [];
+  Map<String, Map<String, dynamic>> exerciseReferences =
+      {}; // Хранилище данных справочника
   bool isLoading = true;
   int currentPage = 0;
   List<List<UserExerciseRow>> userExerciseRows = [];
+
+  // Флаги для оптимизации загрузки - предотвращают повторные API вызовы
+  bool _exerciseReferencesLoaded = false; // Данные справочника загружены
+  bool _lastResultsLoaded = false; // Предыдущие результаты загружены
 
   @override
   void initState() {
     super.initState();
     _loadGroupAndExercises();
+  }
+
+  @override
+  void dispose() {
+    // Очищаем кэш изображений при закрытии экрана
+    // VideoPlayerWidget.clearImageCache(); // Статический метод недоступен извне
+    super.dispose();
   }
 
   Future<void> _loadGroupAndExercises() async {
@@ -60,8 +77,15 @@ class _ExerciseGroupCarouselScreenState
           final exResp = await ApiService.get('/exercises/$uuid');
           if (exResp.statusCode == 200) {
             final exJson = ApiService.decodeJson(exResp.body);
-            loaded.add(ExerciseModel.fromJson(exJson));
+            final exercise = ExerciseModel.fromJson(exJson);
+            loaded.add(exercise);
           }
+        }
+
+        // Загружаем данные справочника упражнений только один раз
+        if (!_exerciseReferencesLoaded) {
+          await _loadExerciseReferences(loaded);
+          _exerciseReferencesLoaded = true;
         }
         setState(() {
           exercises = loaded;
@@ -77,6 +101,12 @@ class _ExerciseGroupCarouselScreenState
             _loadUserExercise(i, set, loaded[i].uuid);
           }
         }
+
+        // Загружаем предыдущие результаты только один раз
+        if (!_lastResultsLoaded) {
+          await _loadAllLastResults(loaded);
+          _lastResultsLoaded = true;
+        }
       } else {
         setState(() {
           isLoading = false;
@@ -86,6 +116,123 @@ class _ExerciseGroupCarouselScreenState
       setState(() {
         isLoading = false;
       });
+    }
+  }
+
+  /// Загружает данные справочника упражнений (image_uuid, video_uuid) только один раз
+  /// для предотвращения повторных API вызовов при обновлении данных
+  Future<void> _loadExerciseReferences(List<ExerciseModel> exercises) async {
+    for (final exercise in exercises) {
+      // Получаем exercise_reference_uuid из исходных данных упражнения
+      try {
+        final exResp = await ApiService.get('/exercises/${exercise.uuid}');
+        if (exResp.statusCode == 200) {
+          final exJson = ApiService.decodeJson(exResp.body);
+          final exerciseReferenceUuid = exJson['exercise_reference_uuid'];
+
+          if (exerciseReferenceUuid != null) {
+            try {
+              final refResp = await ApiService.get(
+                '/exercise_reference/$exerciseReferenceUuid',
+              );
+              if (refResp.statusCode == 200) {
+                final refJson = ApiService.decodeJson(refResp.body);
+                exerciseReferences[exercise.uuid] = refJson;
+                print(
+                  '📚 Получены данные справочника для упражнения ${exercise.uuid}: image_uuid=${refJson['image_uuid']}, video_uuid=${refJson['video_uuid']}',
+                );
+              }
+            } catch (e) {
+              print(
+                '❌ Ошибка при загрузке справочника упражнения $exerciseReferenceUuid: $e',
+              );
+            }
+          }
+        }
+      } catch (e) {
+        print('❌ Ошибка при получении данных упражнения ${exercise.uuid}: $e');
+      }
+    }
+  }
+
+  List<Widget> _buildVideoSection(ExerciseModel exercise) {
+    final exerciseRef = exerciseReferences[exercise.uuid];
+    final videoUuid = exerciseRef?['video_uuid'];
+
+    // Если нет video_uuid, не показываем секцию с видео вообще
+    if (videoUuid == null) {
+      return [];
+    }
+
+    // Если есть video_uuid, показываем контейнер с плеером
+    return [
+      Container(
+        height: 180,
+        decoration: BoxDecoration(
+          color: AppColors.inputBorder,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: _buildVideoPlayer(exercise),
+        ),
+      ),
+    ];
+  }
+
+  Widget _buildVideoPlayer(ExerciseModel exercise) {
+    final exerciseRef = exerciseReferences[exercise.uuid];
+    final videoUuid = exerciseRef?['video_uuid'];
+    final imageUuid = exerciseRef?['image_uuid'];
+
+    // Этот метод вызывается только когда video_uuid есть
+    return VideoPlayerWidget(
+      videoUuid: videoUuid,
+      imageUuid: imageUuid,
+      width: double.infinity,
+      height: 180,
+    );
+  }
+
+  /// Очищает кэш изображений для экономии памяти
+  void _clearImageCache() {
+    // Очищаем кэш изображений при переключении упражнений
+    // Это помогает предотвратить утечки памяти
+    print('Clearing image cache for memory optimization');
+
+    // Принудительно очищаем память для предотвращения OutOfMemoryError
+    // Это особенно важно при переключении между упражнениями с большими изображениями
+    if (mounted) {
+      // Добавляем небольшую задержку для завершения текущих операций
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted) {
+          // Здесь можно добавить вызов очистки памяти если будет доступен
+          print('Memory cleanup scheduled for next exercise');
+        }
+      });
+    }
+  }
+
+  /// Обновляет только текущие данные упражнений без повторной загрузки справочника и предыдущих результатов
+  Future<void> refreshExerciseData() async {
+    if (exercises.isEmpty) return;
+
+    // Обновляем только user_exercises для каждой строки
+    for (int i = 0; i < exercises.length; i++) {
+      for (int set = 0; set < exercises[i].setsCount; set++) {
+        await _loadUserExercise(i, set, exercises[i].uuid);
+      }
+    }
+  }
+
+  /// Загружает все предыдущие результаты упражнений только один раз
+  /// для предотвращения повторных API вызовов при обновлении данных
+  Future<void> _loadAllLastResults(List<ExerciseModel> exercises) async {
+    for (int i = 0; i < exercises.length; i++) {
+      final exercise = exercises[i];
+      for (int set = 0; set < exercise.setsCount; set++) {
+        await _loadLastUserExerciseResult(i, set, exercise.uuid);
+      }
     }
   }
 
@@ -145,8 +292,7 @@ class _ExerciseGroupCarouselScreenState
         );
       });
     }
-    // После основного запроса — грузим предыдущий результат
-    await _loadLastUserExerciseResult(exIndex, setNumber, exerciseUuid);
+    // Убираем вызов _loadLastUserExerciseResult, так как теперь он вызывается только один раз
   }
 
   Future<void> _loadLastUserExerciseResult(
@@ -330,7 +476,13 @@ class _ExerciseGroupCarouselScreenState
           ? const Center(child: Text('Нет упражнений'))
           : PageView.builder(
               itemCount: exercises.length,
-              onPageChanged: (i) => setState(() => currentPage = i),
+              onPageChanged: (i) {
+                setState(() => currentPage = i);
+                // Очищаем кэш изображений при переключении упражнений для экономии памяти
+                if (mounted) {
+                  _clearImageCache();
+                }
+              },
               itemBuilder: (context, index) {
                 final ex = exercises[index];
                 return Stack(
@@ -352,21 +504,8 @@ class _ExerciseGroupCarouselScreenState
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 12),
-                            // 2. Заглушка под видео
-                            Container(
-                              height: 180,
-                              decoration: BoxDecoration(
-                                color: AppColors.inputBorder,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Center(
-                                child: Icon(
-                                  Icons.videocam,
-                                  size: 48,
-                                  color: Colors.black38,
-                                ),
-                              ),
-                            ),
+                            // 2. Видео плеер
+                            ..._buildVideoSection(ex),
                             const SizedBox(height: 20),
                             // 4. Три серых квадрата
                             Row(

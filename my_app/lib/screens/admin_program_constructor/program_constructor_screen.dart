@@ -49,8 +49,8 @@ class _ProgramConstructorScreenState extends State<ProgramConstructorScreen> {
     }
   }
 
-  Future<ImageProvider?> _loadProgramImage(int? imageUuid) async {
-    if (imageUuid == null) return null;
+  Future<ImageProvider?> _loadProgramImage(String? imageUuid) async {
+    if (imageUuid == null || imageUuid.isEmpty) return null;
     try {
       final response = await ApiService.get('/files/file/$imageUuid');
       if (response.statusCode == 200) {
@@ -61,6 +61,11 @@ class _ProgramConstructorScreenState extends State<ProgramConstructorScreen> {
       print('[API] exception: $e');
       return null;
     }
+  }
+
+  String? _getImageUuid(String? imageUuid) {
+    if (imageUuid == null || imageUuid.isEmpty) return null;
+    return imageUuid;
   }
 
   @override
@@ -105,7 +110,9 @@ class _ProgramConstructorScreenState extends State<ProgramConstructorScreen> {
                     title: Row(
                       children: [
                         FutureBuilder<ImageProvider?>(
-                          future: _loadProgramImage(program.imageUuid),
+                          future: _loadProgramImage(
+                            _getImageUuid(program.imageUuid),
+                          ),
                           builder: (context, snapshot) {
                             final image = snapshot.data;
                             return Container(
