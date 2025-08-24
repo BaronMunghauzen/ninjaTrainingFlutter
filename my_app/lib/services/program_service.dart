@@ -462,7 +462,7 @@ class ProgramService {
       if (scheduleType != null) body['schedule_type'] = scheduleType;
       if (trainingDays != null) body['training_days'] = trainingDays;
 
-      final response = await ApiService.post('/programs/', body: body);
+      final response = await ApiService.post('/programs/add/', body: body);
       return response.statusCode == 201;
     } catch (e) {
       print('Error creating program: $e');
