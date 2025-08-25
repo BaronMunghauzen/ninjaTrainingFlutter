@@ -4,6 +4,7 @@ import '../../services/program_service.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
 import '../../services/api_service.dart';
+import '../admin_training_constructor/widgets.dart';
 
 class ExerciseCreateScreen extends StatefulWidget {
   final String exerciseGroupUuid;
@@ -17,6 +18,7 @@ class ExerciseCreateScreen extends StatefulWidget {
 
 class _ExerciseCreateScreenState extends State<ExerciseCreateScreen> {
   final _formKey = GlobalKey<FormState>();
+  Map<String, dynamic>? _selectedExerciseRef;
   final _captionController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _difficultyController = TextEditingController();
@@ -25,10 +27,30 @@ class _ExerciseCreateScreenState extends State<ExerciseCreateScreen> {
   final _muscleGroupController = TextEditingController();
   final _repsController = TextEditingController();
   final _setsController = TextEditingController();
+  bool _withWeight = false;
   bool _isLoading = false;
 
+  void _onExerciseSelected(Map<String, dynamic>? ex) {
+    setState(() {
+      _selectedExerciseRef = ex;
+      if (ex != null) {
+        _captionController.text = ex['caption'] ?? '';
+        _descriptionController.text = ex['description'] ?? '';
+        _muscleGroupController.text = ex['muscle_group'] ?? '';
+      }
+    });
+  }
+
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate() || _selectedExerciseRef == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Пожалуйста, выберите упражнение из справочника'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -41,12 +63,14 @@ class _ExerciseCreateScreenState extends State<ExerciseCreateScreen> {
         'description': _descriptionController.text.trim(),
         'difficulty_level':
             int.tryParse(_difficultyController.text.trim()) ?? 1,
-        'duration': int.tryParse(_durationController.text.trim()) ?? 1,
+        'rest_time': int.tryParse(_durationController.text.trim()) ?? 1,
         'order': int.tryParse(_orderController.text.trim()) ?? 0,
         'muscle_group': _muscleGroupController.text.trim(),
-        'reps': int.tryParse(_repsController.text.trim()) ?? 10,
-        'sets': int.tryParse(_setsController.text.trim()) ?? 3,
+        'reps_count': int.tryParse(_repsController.text.trim()) ?? 10,
+        'sets_count': int.tryParse(_setsController.text.trim()) ?? 3,
         'exercise_type': 'system',
+        'exercise_reference_uuid': _selectedExerciseRef!['uuid'],
+        'with_weight': _withWeight,
       };
 
       final response = await ApiService.post('/exercises/add/', body: body);
@@ -104,6 +128,15 @@ class _ExerciseCreateScreenState extends State<ExerciseCreateScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              ExerciseReferenceSelector(
+                onSelected: _onExerciseSelected,
+                label: 'Выбрать упражнение из справочника',
+                buildQueryParams: (search) => {
+                  'caption': search,
+                  'exercise_type': 'system',
+                },
+              ),
+              const SizedBox(height: 16),
               CustomTextField(
                 label: 'Название',
                 controller: _captionController,
@@ -128,7 +161,7 @@ class _ExerciseCreateScreenState extends State<ExerciseCreateScreen> {
               ),
               const SizedBox(height: 16),
               CustomTextField(
-                label: 'Продолжительность (в минутах)',
+                label: 'Время отдыха (в секундах)',
                 controller: _durationController,
                 keyboardType: TextInputType.number,
                 validator: (v) =>
@@ -166,6 +199,13 @@ class _ExerciseCreateScreenState extends State<ExerciseCreateScreen> {
                 validator: (v) => v == null || v.isEmpty
                     ? 'Введите количество подходов'
                     : null,
+              ),
+              const SizedBox(height: 16),
+              SwitchListTile(
+                value: _withWeight,
+                onChanged: (v) => setState(() => _withWeight = v),
+                title: const Text('С отягощением'),
+                contentPadding: EdgeInsets.zero,
               ),
               const SizedBox(height: 24),
               CustomButton(

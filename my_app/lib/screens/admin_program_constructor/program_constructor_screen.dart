@@ -58,7 +58,6 @@ class _ProgramConstructorScreenState extends State<ProgramConstructorScreen> {
       }
       return null;
     } catch (e) {
-      print('[API] exception: $e');
       return null;
     }
   }
@@ -70,141 +69,144 @@ class _ProgramConstructorScreenState extends State<ProgramConstructorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text('Конструктор программ'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: 'Добавить программу',
-            onPressed: () async {
-              final result = await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const ProgramCreateScreen(),
-                ),
-              );
-              if (result == true) {
-                _loadPrograms();
-              }
-            },
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.of(context).pop(true);
+        return false;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pop(true),
           ),
-        ],
-      ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : programs.isEmpty
-          ? const Center(child: Text('Нет программ'))
-          : RefreshIndicator(
-              onRefresh: _loadPrograms,
-              child: ListView.separated(
-                physics: const AlwaysScrollableScrollPhysics(),
-                itemCount: programs.length,
-                separatorBuilder: (_, __) => const Divider(),
-                itemBuilder: (context, index) {
-                  final program = programs[index];
-                  return ListTile(
-                    title: Row(
-                      children: [
-                        FutureBuilder<ImageProvider?>(
-                          future: _loadProgramImage(
-                            _getImageUuid(program.imageUuid),
-                          ),
-                          builder: (context, snapshot) {
-                            final image = snapshot.data;
-                            return Container(
-                              width: 44,
-                              height: 44,
-                              margin: const EdgeInsets.only(right: 12),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[800],
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: Colors.grey[700]!,
-                                  width: 1,
+          title: Text(
+            'Конструктор программ${programs.isNotEmpty ? ' (${programs.length})' : ''}',
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.add),
+              tooltip: 'Добавить программу',
+              onPressed: () async {
+                final result = await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const ProgramCreateScreen(),
+                  ),
+                );
+                if (result == true) {
+                  _loadPrograms();
+                  // Показываем сообщение об успешном создании программы
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Программа успешно создана!'),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+        body: isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : programs.isEmpty
+            ? const Center(child: Text('Нет программ'))
+            : RefreshIndicator(
+                onRefresh: _loadPrograms,
+                child: ListView.separated(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: programs.length,
+                  separatorBuilder: (_, __) => const Divider(),
+                  itemBuilder: (context, index) {
+                    final program = programs[index];
+                    return ListTile(
+                      title: Row(
+                        children: [
+                          FutureBuilder<ImageProvider?>(
+                            future: _loadProgramImage(
+                              _getImageUuid(program.imageUuid),
+                            ),
+                            builder: (context, snapshot) {
+                              final image = snapshot.data;
+                              return Container(
+                                width: 44,
+                                height: 44,
+                                margin: const EdgeInsets.only(right: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[800],
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.grey[700]!,
+                                    width: 1,
+                                  ),
+                                  image: image != null
+                                      ? DecorationImage(
+                                          image: image,
+                                          fit: BoxFit.cover,
+                                          colorFilter: ColorFilter.mode(
+                                            Colors.black.withOpacity(0.5),
+                                            BlendMode.darken,
+                                          ),
+                                        )
+                                      : null,
                                 ),
-                                image: image != null
-                                    ? DecorationImage(
-                                        image: image,
-                                        fit: BoxFit.cover,
-                                        colorFilter: ColorFilter.mode(
-                                          Colors.black.withOpacity(0.5),
-                                          BlendMode.darken,
-                                        ),
+                                child: image == null
+                                    ? const Icon(
+                                        Icons.image,
+                                        color: Colors.grey,
+                                        size: 24,
                                       )
                                     : null,
-                              ),
-                              child: image == null
-                                  ? const Icon(
-                                      Icons.image,
-                                      color: Colors.grey,
-                                      size: 24,
-                                    )
-                                  : null,
-                            );
-                          },
-                        ),
-                        Expanded(child: Text(program.caption)),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
+                              );
+                            },
                           ),
-                          decoration: BoxDecoration(
-                            color: program.actual
-                                ? Colors.green.withOpacity(0.2)
-                                : Colors.grey.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            program.actual ? 'Активна' : 'Неактивна',
-                            style: TextStyle(
-                              fontSize: 12,
+                          Expanded(child: Text(program.caption)),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
                               color: program.actual
-                                  ? Colors.green
-                                  : Colors.grey,
-                              fontWeight: FontWeight.w500,
+                                  ? Colors.green.withOpacity(0.2)
+                                  : Colors.grey.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(program.description),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Сложность: ${program.difficultyLevel}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ],
-                    ),
-                    onTap: () {
-                      Navigator.of(context)
-                          .push(
-                            MaterialPageRoute(
-                              builder: (context) => ProgramAdminDetailScreen(
-                                programUuid: program.uuid,
+                            child: Text(
+                              program.actual ? 'Активна' : 'Неактивна',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: program.actual
+                                    ? Colors.green
+                                    : Colors.grey,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
-                          )
-                          .then((result) {
-                            if (result == true) {
-                              _loadPrograms();
-                            }
-                          });
-                    },
-                  );
-                },
+                          ),
+                        ],
+                      ),
+
+                      onTap: () {
+                        Navigator.of(context)
+                            .push(
+                              MaterialPageRoute(
+                                builder: (context) => ProgramAdminDetailScreen(
+                                  programUuid: program.uuid,
+                                ),
+                              ),
+                            )
+                            .then((result) {
+                              if (result == true) {
+                                _loadPrograms();
+                              }
+                            });
+                      },
+                    );
+                  },
+                ),
               ),
-            ),
+      ),
     );
   }
 }

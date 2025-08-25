@@ -30,6 +30,7 @@ class _AdminExerciseEditScreenState extends State<AdminExerciseEditScreen> {
   final _muscleGroupController = TextEditingController();
   final _repsController = TextEditingController();
   final _setsController = TextEditingController();
+  bool _withWeight = false;
   bool _isLoading = false;
 
   @override
@@ -43,11 +44,13 @@ class _AdminExerciseEditScreenState extends State<AdminExerciseEditScreen> {
     _descriptionController.text = widget.initialData['description'] ?? '';
     _difficultyController.text = (widget.initialData['difficulty_level'] ?? 1)
         .toString();
-    _durationController.text = (widget.initialData['duration'] ?? 1).toString();
+    _durationController.text = (widget.initialData['rest_time'] ?? 1)
+        .toString();
     _orderController.text = (widget.initialData['order'] ?? 0).toString();
     _muscleGroupController.text = widget.initialData['muscle_group'] ?? '';
-    _repsController.text = (widget.initialData['reps'] ?? 10).toString();
-    _setsController.text = (widget.initialData['sets'] ?? 3).toString();
+    _repsController.text = (widget.initialData['reps_count'] ?? 10).toString();
+    _setsController.text = (widget.initialData['sets_count'] ?? 3).toString();
+    _withWeight = widget.initialData['with_weight'] ?? false;
   }
 
   Future<void> _submit() async {
@@ -63,15 +66,16 @@ class _AdminExerciseEditScreenState extends State<AdminExerciseEditScreen> {
         'description': _descriptionController.text.trim(),
         'difficulty_level':
             int.tryParse(_difficultyController.text.trim()) ?? 1,
-        'duration': int.tryParse(_durationController.text.trim()) ?? 1,
+        'rest_time': int.tryParse(_durationController.text.trim()) ?? 1,
         'order': int.tryParse(_orderController.text.trim()) ?? 0,
         'muscle_group': _muscleGroupController.text.trim(),
-        'reps': int.tryParse(_repsController.text.trim()) ?? 10,
-        'sets': int.tryParse(_setsController.text.trim()) ?? 3,
+        'reps_count': int.tryParse(_repsController.text.trim()) ?? 10,
+        'sets_count': int.tryParse(_setsController.text.trim()) ?? 3,
+        'with_weight': _withWeight,
       };
 
       final response = await ApiService.put(
-        '/exercises/${widget.exerciseUuid}',
+        '/exercises/update/${widget.exerciseUuid}',
         body: body,
       );
 
@@ -152,7 +156,7 @@ class _AdminExerciseEditScreenState extends State<AdminExerciseEditScreen> {
               ),
               const SizedBox(height: 16),
               CustomTextField(
-                label: 'Продолжительность (в минутах)',
+                label: 'Время отдыха (в секундах)',
                 controller: _durationController,
                 keyboardType: TextInputType.number,
                 validator: (v) =>
@@ -190,6 +194,13 @@ class _AdminExerciseEditScreenState extends State<AdminExerciseEditScreen> {
                 validator: (v) => v == null || v.isEmpty
                     ? 'Введите количество подходов'
                     : null,
+              ),
+              const SizedBox(height: 16),
+              SwitchListTile(
+                value: _withWeight,
+                onChanged: (v) => setState(() => _withWeight = v),
+                title: const Text('С отягощением'),
+                contentPadding: EdgeInsets.zero,
               ),
               const SizedBox(height: 24),
               CustomButton(

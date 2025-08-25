@@ -1,43 +1,103 @@
 import 'program_model.dart';
 
+export 'exercise_model.dart';
+
 class SearchResult {
-  final List<ExerciseReference> exerciseReferences;
-  final List<Program> programs;
-  final List<Training> trainings;
-  final int totalResults;
+  final List<dynamic> items;
+  final int total;
+  final int page;
+  final int size;
+  final int pages;
 
   SearchResult({
-    required this.exerciseReferences,
-    required this.programs,
-    required this.trainings,
-    required this.totalResults,
+    required this.items,
+    required this.total,
+    required this.page,
+    required this.size,
+    required this.pages,
   });
 
+  // Геттер для упражнений
+  List<ExerciseReference> get exerciseReferences {
+    return items.whereType<ExerciseReference>().toList();
+  }
+
+  // Геттер для программ
+  List<Program> get programs {
+    return items.whereType<Program>().toList();
+  }
+
+  // Геттер для тренировок
+  List<Training> get trainings {
+    return items.whereType<Training>().toList();
+  }
+
   factory SearchResult.fromJson(Map<String, dynamic> json) {
+    List<dynamic> parsedItems = [];
+
+    if (json['items'] != null) {
+      for (var item in json['items']) {
+        if (item is Map<String, dynamic>) {
+          // Определяем тип элемента по полю type или другим признакам
+          if (item.containsKey('exercise_type')) {
+            parsedItems.add(ExerciseReference.fromJson(item));
+          } else if (item.containsKey('program_type')) {
+            parsedItems.add(Program.fromJson(item));
+          } else if (item.containsKey('training_type')) {
+            parsedItems.add(Training.fromJson(item));
+          } else {
+            // Если тип не определен, добавляем как есть
+            parsedItems.add(item);
+          }
+        } else {
+          parsedItems.add(item);
+        }
+      }
+    }
+
     return SearchResult(
-      exerciseReferences:
-          (json['exercise_references'] as List?)
-              ?.map((e) => ExerciseReference.fromJson(e))
+      items: parsedItems,
+      total: json['total'] ?? 0,
+      page: json['page'] ?? 1,
+      size: json['size'] ?? 10,
+      pages: json['pages'] ?? 0,
+    );
+  }
+}
+
+class ExerciseReferenceSearchResult {
+  final List<ExerciseReference> items;
+  final int total;
+  final int page;
+  final int size;
+  final int pages;
+
+  ExerciseReferenceSearchResult({
+    required this.items,
+    required this.total,
+    required this.page,
+    required this.size,
+    required this.pages,
+  });
+
+  factory ExerciseReferenceSearchResult.fromJson(Map<String, dynamic> json) {
+    return ExerciseReferenceSearchResult(
+      items:
+          (json['items'] as List<dynamic>?)
+              ?.map((item) => ExerciseReference.fromJson(item))
               .toList() ??
           [],
-      programs:
-          (json['programs'] as List?)
-              ?.map((e) => Program.fromJson(e))
-              .toList() ??
-          [],
-      trainings:
-          (json['trainings'] as List?)
-              ?.map((e) => Training.fromJson(e))
-              .toList() ??
-          [],
-      totalResults: json['total_results'] ?? 0,
+      total: json['total'] ?? 0,
+      page: json['page'] ?? 1,
+      size: json['size'] ?? 10,
+      pages: json['pages'] ?? 0,
     );
   }
 }
 
 class ExerciseReference {
   final String exerciseType;
-  final int id;
+  final int? id; // Делаем id опциональным, так как API не возвращает это поле
   final String caption;
   final int? imageId;
   final String uuid;
@@ -52,7 +112,7 @@ class ExerciseReference {
 
   ExerciseReference({
     required this.exerciseType,
-    required this.id,
+    this.id, // Теперь id опциональный
     required this.caption,
     this.imageId,
     required this.uuid,
@@ -72,21 +132,13 @@ class ExerciseReference {
       final parsed = int.tryParse(value);
       if (parsed != null) return parsed;
     }
-    print(
-      'Warning: Could not parse imageId: $value (type: ${value.runtimeType})',
-    );
     return null;
   }
 
   factory ExerciseReference.fromJson(Map<String, dynamic> json) {
-    // Отладочная информация
-    print(
-      'ExerciseReference.fromJson - image field: ${json['image']} (type: ${json['image']?.runtimeType})',
-    );
-
     return ExerciseReference(
       exerciseType: json['exercise_type'] ?? '',
-      id: json['id'] ?? 0,
+      id: json['id'], // Теперь id может быть null
       caption: json['caption'] ?? '',
       imageId: _parseImageId(json['image_id']),
       uuid: json['uuid'] ?? '',
@@ -103,7 +155,8 @@ class ExerciseReference {
 
 class Training {
   final String trainingType;
-  final int id;
+  final int?
+  id; // Делаем id опциональным, так как API может не возвращать это поле
   final String caption;
   final int? imageId;
   final String uuid;
@@ -117,7 +170,7 @@ class Training {
 
   Training({
     required this.trainingType,
-    required this.id,
+    this.id, // Теперь id опциональный
     required this.caption,
     this.imageId,
     required this.uuid,
@@ -136,21 +189,13 @@ class Training {
       final parsed = int.tryParse(value);
       if (parsed != null) return parsed;
     }
-    print(
-      'Warning: Could not parse imageId: $value (type: ${value.runtimeType})',
-    );
     return null;
   }
 
   factory Training.fromJson(Map<String, dynamic> json) {
-    // Отладочная информация
-    print(
-      'Training.fromJson - image field: ${json['image']} (type: ${json['image']?.runtimeType})',
-    );
-
     return Training(
       trainingType: json['training_type'] ?? '',
-      id: json['id'] ?? 0,
+      id: json['id'], // Теперь id может быть null
       caption: json['caption'] ?? '',
       imageId: _parseImageId(json['image_id']),
       uuid: json['uuid'] ?? '',

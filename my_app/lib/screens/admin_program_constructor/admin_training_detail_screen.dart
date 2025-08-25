@@ -154,7 +154,7 @@ class _AdminTrainingDetailScreenState extends State<AdminTrainingDetailScreen> {
 
     try {
       final response = await ApiService.delete(
-        '/trainings/${widget.trainingUuid}',
+        '/trainings/delete/${widget.trainingUuid}',
       );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {

@@ -42,13 +42,16 @@ class ProgramService {
     try {
       final response = await ApiService.get(
         '/programs/',
-        queryParams: {'program_type': 'system', 'actual': 'true'},
+        queryParams: {'program_type': 'system'},
       );
 
       if (response.statusCode == 200) {
         final data = ApiService.decodeJson(response.body);
         if (data is List) {
-          return data.map((json) => Program.fromJson(json)).toList();
+          final programs = data.map((json) => Program.fromJson(json)).toList();
+          // Сортируем по полю order
+          programs.sort((a, b) => a.order.compareTo(b.order));
+          return programs;
         }
       }
       return [];
@@ -316,7 +319,8 @@ class ProgramService {
       if (response.statusCode == 200) {
         final data = ApiService.decodeJson(response.body);
         if (data is List) {
-          return data.cast<Map<String, dynamic>>();
+          final groups = data.cast<Map<String, dynamic>>();
+          return groups;
         }
       }
       return [];
@@ -411,32 +415,10 @@ class ProgramService {
     }
   }
 
-  // Старые методы для совместимости
-  static Future<String?> getCategoryUuidByCaption(String caption) async {
-    try {
-      final queryParams = {'caption': caption};
-      final response = await ApiService.get(
-        '/categories/',
-        queryParams: queryParams,
-      );
-
-      if (response.statusCode == 200) {
-        final data = ApiService.decodeJson(response.body);
-        if (data is List && data.isNotEmpty) {
-          return data[0]['uuid'];
-        }
-      }
-      return null;
-    } catch (e) {
-      print('Error getting category UUID by caption: $e');
-      return null;
-    }
-  }
-
   static Future<bool> createProgram({
     required String caption,
     required String description,
-    required String categoryUuid,
+    String? categoryUuid,
     required int weeksCount,
     required String imageUrl,
     bool? actual,
@@ -447,13 +429,20 @@ class ProgramService {
     String? trainingDays,
   }) async {
     try {
-      final body = {
+      final body = <String, dynamic>{
         'caption': caption,
         'description': description,
-        'category_uuid': categoryUuid,
         'weeks_count': weeksCount,
-        'image_url': imageUrl,
       };
+
+      // Добавляем image_url только если он не пустой
+      if (imageUrl.isNotEmpty) {
+        body['image_url'] = imageUrl;
+      }
+
+      if (categoryUuid != null && categoryUuid.isNotEmpty) {
+        body['category_uuid'] = categoryUuid;
+      }
 
       if (actual != null) body['actual'] = actual;
       if (programType != null) body['program_type'] = programType;
@@ -462,8 +451,26 @@ class ProgramService {
       if (scheduleType != null) body['schedule_type'] = scheduleType;
       if (trainingDays != null) body['training_days'] = trainingDays;
 
+
+      print('Creating program with body: $body');
+      print('Body type: ${body.runtimeType}');
+      print('Body keys: ${body.keys.toList()}');
+
       final response = await ApiService.post('/programs/add/', body: body);
-      return response.statusCode == 201;
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+      print('Response headers: ${response.headers}');
+
+      // Проверяем различные успешные статусы
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return true;
+      } else {
+        print(
+          'Failed to create program. Status: ${response.statusCode}, Body: ${response.body}',
+        );
+        return false;
+      }
+
     } catch (e) {
       print('Error creating program: $e');
       return false;
@@ -492,8 +499,8 @@ class ProgramService {
         if (imageUrl != null) body['image_url'] = imageUrl;
       }
 
-      final response = await ApiService.patch(
-        '/programs/$programUuid',
+      final response = await ApiService.put(
+        '/programs/update/$programUuid',
         body: body,
       );
       return response.statusCode == 200;

@@ -40,54 +40,88 @@ class _ProgramCreateScreenState extends State<ProgramCreateScreen> {
         selectedDayNumbers.add(i + 1); // Дни недели с 1 до 7
       }
     }
-    return selectedDayNumbers.isEmpty ? '[]' : selectedDayNumbers.toString();
+    // Возвращаем JSON-совместимую строку
+    if (selectedDayNumbers.isEmpty) {
+      return '[]';
+    } else {
+      return '[' + selectedDayNumbers.join(',') + ']';
+    }
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      print('Form validation failed');
+      return;
+    }
+
+    // Дополнительная проверка данных
+    final caption = _captionController.text.trim();
+    final description = _descriptionController.text.trim();
+    final difficultyLevel =
+        int.tryParse(_difficultyController.text.trim()) ?? 1;
+    final order = int.tryParse(_orderController.text.trim()) ?? 0;
+
+    if (caption.isEmpty || description.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Заполните все обязательные поля')),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
     try {
-      // Получаем uuid категории
-      final categoryUuid = await ProgramService.getCategoryUuidByCaption(
-        'system_program',
-      );
-      if (categoryUuid == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Не удалось получить категорию system_program'),
-          ),
-        );
-        setState(() {
-          _isLoading = false;
-        });
-        return;
-      }
+      // Логируем данные перед отправкой
+      print('Creating program with data:');
+      print('  caption: $caption');
+      print('  description: $description');
+      print('  difficultyLevel: $difficultyLevel');
+      print('  order: $order');
+      print('  actual: $_actual');
+      print('  programType: system');
+      print('  scheduleType: weekly');
+      print('  trainingDays: ${_generateTrainingDaysString()}');
+      print('  weeksCount: 1');
+      print('  imageUrl: (empty)');
+
       final success = await ProgramService.createProgram(
         actual: _actual,
-        categoryUuid: categoryUuid,
         programType: 'system',
-        caption: _captionController.text.trim(),
-        description: _descriptionController.text.trim(),
-        difficultyLevel: int.tryParse(_difficultyController.text.trim()) ?? 1,
-        order: int.tryParse(_orderController.text.trim()) ?? 0,
+        caption: caption,
+        description: description,
+        difficultyLevel: difficultyLevel,
+        order: order,
         scheduleType: 'weekly',
         trainingDays: _generateTrainingDaysString(),
         weeksCount: 1, // Добавляем обязательный параметр
         imageUrl: '', // Добавляем обязательный параметр
       );
       if (success) {
+        // Возвращаемся к списку программ и обновляем его
         Navigator.of(context).pop(true);
       } else {
+        print('Program creation failed - success returned false');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ошибка при создании программы')),
+          const SnackBar(
+            content: Text(
+              'Ошибка при создании программы. Проверьте логи для деталей.',
+            ),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      print('Exception during program creation: $e');
+      print('Exception type: ${e.runtimeType}');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Исключение при создании программы: $e'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
+      );
     } finally {
       setState(() {
         _isLoading = false;

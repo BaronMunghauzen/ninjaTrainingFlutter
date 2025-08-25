@@ -439,7 +439,6 @@ class _AdminExerciseGroupDetailScreenState
                           child: ListTile(
                             onTap: () => _openExerciseDetail(exercise),
                             title: Text(exercise['caption'] ?? ''),
-                            subtitle: Text(exercise['description'] ?? ''),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -448,7 +447,7 @@ class _AdminExerciseGroupDetailScreenState
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
                                     Text(
-                                      '${exercise['sets'] ?? 0} x ${exercise['reps'] ?? 0}',
+                                      '${exercise['sets_count'] ?? 0} x ${exercise['reps_count'] ?? 0}',
                                       style: const TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
