@@ -135,7 +135,15 @@ class ApiService {
     }
 
     // Формируем URI с query параметрами
-    String uri = '${ApiConstants.baseUrl}$endpoint';
+    String uri;
+    if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
+      // Если endpoint уже содержит полный URL, используем его как есть
+      uri = endpoint;
+    } else {
+      // Иначе добавляем базовый URL
+      uri = '${ApiConstants.baseUrl}$endpoint';
+    }
+    
     if (queryParams != null && queryParams.isNotEmpty) {
       final queryString = queryParams.entries
           .map((e) => '${e.key}=${Uri.encodeComponent(e.value.toString())}')
@@ -211,7 +219,15 @@ class ApiService {
     }
 
     // Формируем URI с query параметрами
-    String uri = '${ApiConstants.baseUrl}$endpoint';
+    String uri;
+    if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
+      // Если endpoint уже содержит полный URL, используем его как есть
+      uri = endpoint;
+    } else {
+      // Иначе добавляем базовый URL
+      uri = '${ApiConstants.baseUrl}$endpoint';
+    }
+    
     if (queryParams != null && queryParams.isNotEmpty) {
       final queryString = queryParams.entries
           .map((e) => '${e.key}=${Uri.encodeComponent(e.value.toString())}')

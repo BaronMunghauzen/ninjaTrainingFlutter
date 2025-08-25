@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'constants/app_colors.dart';
 import 'providers/auth_provider.dart';
 import 'providers/timer_overlay_provider.dart';
+import 'providers/achievement_provider.dart';
+
 import 'screens/profile/auth_screen.dart';
 import 'screens/main_screen_wrapper.dart';
 import 'widgets/global_timer_overlay.dart';
@@ -28,6 +30,7 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => TimerOverlayProvider()),
+        ChangeNotifierProvider(create: (_) => AchievementProvider()),
       ],
       child: MaterialApp(
         navigatorKey: navigatorKey,

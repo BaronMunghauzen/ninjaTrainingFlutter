@@ -451,6 +451,7 @@ class ProgramService {
       if (scheduleType != null) body['schedule_type'] = scheduleType;
       if (trainingDays != null) body['training_days'] = trainingDays;
 
+
       print('Creating program with body: $body');
       print('Body type: ${body.runtimeType}');
       print('Body keys: ${body.keys.toList()}');
@@ -469,6 +470,7 @@ class ProgramService {
         );
         return false;
       }
+
     } catch (e) {
       print('Error creating program: $e');
       return false;
