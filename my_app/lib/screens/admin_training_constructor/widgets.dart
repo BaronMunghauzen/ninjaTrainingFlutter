@@ -96,14 +96,6 @@ class _ExerciseReferenceSelectorState extends State<ExerciseReferenceSelector> {
                         color: Colors.white,
                       ), // Белый текст
                     ),
-                    subtitle: Text(
-                      ex['description'] ?? '',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.grey[300],
-                      ), // Светло-серый подзаголовок
-                    ),
                     onTap: () {
                       setState(() {
                         _selected = ex;
@@ -169,37 +161,35 @@ class _ExerciseReferenceSelectorState extends State<ExerciseReferenceSelector> {
         );
         print('🔍 ExerciseReferenceSelector: Содержимое: $data');
 
+        List<Map<String, dynamic>> options = [];
+
         if (data is List) {
-          final options = List<Map<String, dynamic>>.from(
-            data,
-          ).take(5).toList();
-          print(
-            '🔍 ExerciseReferenceSelector: Создано ${options.length} опций',
-          );
-
-          setState(() {
-            _options = options;
-            _showDropdown = options.isNotEmpty;
-            _isLoading = false;
-          });
-
-          print(
-            '🔍 ExerciseReferenceSelector: Состояние обновлено, _options.length = ${_options.length}, _showDropdown = $_showDropdown',
-          );
-
-          // Показываем overlay если есть опции
-          if (options.isNotEmpty) {
-            _showOverlay();
-          } else {
-            _removeOverlay();
+          // Если данные пришли как прямой список
+          options = List<Map<String, dynamic>>.from(data).take(5).toList();
+        } else if (data is Map && data.containsKey('items')) {
+          // Если данные пришли как объект с полем items
+          final items = data['items'] as List?;
+          if (items != null) {
+            options = List<Map<String, dynamic>>.from(items).take(5).toList();
           }
+        }
+
+        print('🔍 ExerciseReferenceSelector: Создано ${options.length} опций');
+
+        setState(() {
+          _options = options;
+          _showDropdown = options.isNotEmpty;
+          _isLoading = false;
+        });
+
+        print(
+          '🔍 ExerciseReferenceSelector: Состояние обновлено, _options.length = ${_options.length}, _showDropdown = $_showDropdown',
+        );
+
+        // Показываем overlay если есть опции
+        if (options.isNotEmpty) {
+          _showOverlay();
         } else {
-          print('🔍 ExerciseReferenceSelector: Данные не являются списком');
-          setState(() {
-            _options = [];
-            _showDropdown = false;
-            _isLoading = false;
-          });
           _removeOverlay();
         }
       } else {

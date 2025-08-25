@@ -67,7 +67,7 @@ class _TrainingEditScreenState extends State<TrainingEditScreen> {
       };
 
       final response = await ApiService.put(
-        '/trainings/${widget.trainingUuid}',
+        '/trainings/update/${widget.trainingUuid}',
         body: body,
       );
 

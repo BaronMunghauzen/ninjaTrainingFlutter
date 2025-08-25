@@ -24,56 +24,82 @@ class SearchService {
   }
 
   /// Поиск упражнений по названию
-  static Future<List<ExerciseReference>> searchExerciseReferencesByCaption(
+  static Future<search_models.ExerciseReferenceSearchResult>
+  searchExerciseReferencesByCaption(
     String userUuid,
-    String caption,
-  ) async {
+    String caption, {
+    int page = 1,
+    int size = 10,
+  }) async {
     try {
       final response = await ApiService.get(
-        '/exercise_reference/available/$userUuid/search/by-caption?caption=$caption',
+        '/exercise_reference/available/$userUuid/search/by-caption',
+        queryParams: {'caption': caption, 'page': page, 'size': size},
       );
 
       if (response.statusCode == 200) {
         final data = ApiService.decodeJson(response.body);
-        if (data is List) {
-          return data.map((json) => ExerciseReference.fromJson(json)).toList();
-        }
-        return [];
+        return search_models.ExerciseReferenceSearchResult.fromJson(data);
       }
-      return [];
+      return search_models.ExerciseReferenceSearchResult(
+        items: [],
+        total: 0,
+        page: page,
+        size: size,
+        pages: 0,
+      );
     } catch (e) {
       print('Error searching exercise references by caption: $e');
-      return [];
+      return search_models.ExerciseReferenceSearchResult(
+        items: [],
+        total: 0,
+        page: page,
+        size: size,
+        pages: 0,
+      );
     }
   }
 
   /// Поиск упражнений по названию для админов
-  static Future<List<ExerciseReference>> searchAdminExerciseReferencesByCaption(
-    String caption,
-  ) async {
+  static Future<search_models.ExerciseReferenceSearchResult>
+  searchAdminExerciseReferencesByCaption(
+    String caption, {
+    int page = 1,
+    int size = 10,
+  }) async {
     try {
       final response = await ApiService.get(
         '/exercise_reference/search/by-caption',
-        queryParams: {'caption': caption, 'exercise_type': 'system'},
+        queryParams: {
+          'caption': caption,
+          'exercise_type': 'system',
+          'page': page,
+          'size': size,
+        },
       );
 
       if (response.statusCode == 200) {
         final data = ApiService.decodeJson(response.body);
-
-        if (data is List) {
-          final results = data
-              .map((json) => ExerciseReference.fromJson(json))
-              .toList();
-          return results;
-        }
-        return [];
+        return search_models.ExerciseReferenceSearchResult.fromJson(data);
       }
-      return [];
+      return search_models.ExerciseReferenceSearchResult(
+        items: [],
+        total: 0,
+        page: page,
+        size: size,
+        pages: 0,
+      );
     } catch (e) {
       print(
         '❌ SearchService: Ошибка поиска админских упражнений по названию: $e',
       );
-      return [];
+      return search_models.ExerciseReferenceSearchResult(
+        items: [],
+        total: 0,
+        page: page,
+        size: size,
+        pages: 0,
+      );
     }
   }
 }

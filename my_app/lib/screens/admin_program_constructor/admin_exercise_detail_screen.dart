@@ -97,7 +97,7 @@ class _AdminExerciseDetailScreenState extends State<AdminExerciseDetailScreen> {
 
     try {
       final response = await ApiService.delete(
-        '/exercises/${widget.exerciseUuid}',
+        '/exercises/delete/${widget.exerciseUuid}',
       );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -192,12 +192,19 @@ class _AdminExerciseDetailScreenState extends State<AdminExerciseDetailScreen> {
             ),
             _buildInfoRow(
               'Продолжительность',
-              '${exerciseData!['duration'] ?? '-'} мин',
+              '${exerciseData!['rest_time'] ?? '-'} сек',
             ),
             _buildInfoRow('Порядок', '${exerciseData!['order'] ?? '-'}'),
             _buildInfoRow('Группа мышц', exerciseData!['muscle_group'] ?? '-'),
-            _buildInfoRow('Повторения', '${exerciseData!['reps'] ?? '-'}'),
-            _buildInfoRow('Подходы', '${exerciseData!['sets'] ?? '-'}'),
+            _buildInfoRow(
+              'Повторения',
+              '${exerciseData!['reps_count'] ?? '-'}',
+            ),
+            _buildInfoRow('Подходы', '${exerciseData!['sets_count'] ?? '-'}'),
+            _buildInfoRow(
+              'С отягощением',
+              exerciseData!['with_weight'] == true ? 'Да' : 'Нет',
+            ),
             const Spacer(),
             CustomButton(text: 'Редактировать', onPressed: _editExercise),
             const SizedBox(height: 8),

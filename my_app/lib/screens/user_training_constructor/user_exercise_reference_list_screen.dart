@@ -19,13 +19,20 @@ class UserExerciseReferenceListScreen extends StatefulWidget {
 
 class _UserExerciseReferenceListScreenState
     extends State<UserExerciseReferenceListScreen> {
-  List<ExerciseReference> userExercises = [];
-  List<ExerciseReference> searchResults = [];
+  List<dynamic> userExercises = [];
+  List<dynamic> searchResults = [];
   bool isLoading = true;
   bool isSearching = false;
   bool hasSearched = false;
   Timer? _searchDebounce;
   final TextEditingController _searchController = TextEditingController();
+
+  // Пагинация
+  int currentPage = 1;
+  int pageSize = 10;
+  int totalItems = 0;
+  int totalPages = 0;
+  final List<int> availablePageSizes = [10, 20, 50, 75];
 
   @override
   void initState() {
@@ -54,9 +61,14 @@ class _UserExerciseReferenceListScreenState
 
       final exercises = await UserTrainingService.getUserExerciseReferences(
         userUuid,
+        page: currentPage,
+        size: pageSize,
       );
       setState(() {
-        userExercises = exercises;
+        userExercises = exercises.items;
+        totalItems = exercises.total;
+        totalPages = exercises.pages;
+        currentPage = exercises.page;
         isLoading = false;
       });
     } catch (e) {
@@ -97,13 +109,18 @@ class _UserExerciseReferenceListScreenState
       final results = await SearchService.searchExerciseReferencesByCaption(
         userUuid,
         query,
+        page: currentPage,
+        size: pageSize,
       );
       setState(() {
-        searchResults = results;
+        searchResults = results.items;
+        totalItems = results.total;
+        totalPages = results.pages;
+        currentPage = results.page;
         isSearching = false;
       });
     } catch (e) {
-      print('Error searching exercises: $e');
+      print('Error searching user exercises: $e');
       setState(() {
         searchResults.clear();
         isSearching = false;
@@ -114,15 +131,95 @@ class _UserExerciseReferenceListScreenState
   void _onSearchChanged(String query) {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(seconds: 1), () {
+      currentPage = 1; // Сброс на первую страницу при поиске
       _performSearch(query);
     });
   }
 
-  List<ExerciseReference> get _displayedExercises {
+  void _onPageChanged(int page) {
+    setState(() {
+      currentPage = page;
+    });
     if (hasSearched) {
-      return searchResults;
+      _performSearch(_searchController.text);
+    } else {
+      _loadUserExercises();
     }
-    return userExercises;
+  }
+
+  void _onPageSizeChanged(int newSize) {
+    setState(() {
+      pageSize = newSize;
+      currentPage = 1; // Сброс на первую страницу при изменении размера
+    });
+    if (hasSearched) {
+      _performSearch(_searchController.text);
+    } else {
+      _loadUserExercises();
+    }
+  }
+
+  Widget _buildPaginationControls() {
+    // Показываем элементы пагинации всегда, когда есть элементы
+    if (_displayedExercises.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          // Выбор размера страницы
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('Элементов на странице: '),
+              DropdownButton<int>(
+                value: pageSize,
+                items: availablePageSizes.map((size) {
+                  return DropdownMenuItem<int>(
+                    value: size,
+                    child: Text('$size'),
+                  );
+                }).toList(),
+                onChanged: (newSize) {
+                  if (newSize != null) {
+                    _onPageSizeChanged(newSize);
+                  }
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Навигация по страницам (показываем только если есть несколько страниц)
+          if (totalPages > 1) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  onPressed: currentPage > 1
+                      ? () => _onPageChanged(currentPage - 1)
+                      : null,
+                  icon: const Icon(Icons.chevron_left),
+                ),
+                Text('Страница $currentPage из $totalPages'),
+                IconButton(
+                  onPressed: currentPage < totalPages
+                      ? () => _onPageChanged(currentPage + 1)
+                      : null,
+                  icon: const Icon(Icons.chevron_right),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
+          Text('Всего элементов: $totalItems'),
+        ],
+      ),
+    );
+  }
+
+  List<dynamic> get _displayedExercises {
+    final result = hasSearched ? searchResults : userExercises;
+    return result;
   }
 
   @override
@@ -198,13 +295,30 @@ class _UserExerciseReferenceListScreenState
                       ],
                     ),
                   )
-                : ListView.builder(
+                : ListView.separated(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: _displayedExercises.length,
+                    itemCount:
+                        _displayedExercises.length +
+                        1, // +1 для элементов пагинации
+                    separatorBuilder: (context, index) {
+                      // Не показываем разделитель перед элементами пагинации
+                      if (index == _displayedExercises.length - 1) {
+                        return const SizedBox.shrink();
+                      }
+                      return const SizedBox(
+                        height: 12,
+                      ); // Заменяем Card margin на separator
+                    },
                     itemBuilder: (context, index) {
+                      // Если это последний элемент, показываем пагинацию
+                      if (index == _displayedExercises.length) {
+                        return _buildPaginationControls();
+                      }
+
                       final exercise = _displayedExercises[index];
                       return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
+                        margin: EdgeInsets
+                            .zero, // Убираем margin, так как используем separator
                         child: ListTile(
                           leading: const Icon(
                             Icons.fitness_center,
@@ -354,6 +468,8 @@ class _UserExerciseReferenceListScreenState
                     },
                   ),
           ),
+          // Элементы управления пагинацией
+          // _buildPaginationControls(), // Перемещен в конец списка
         ],
       ),
       floatingActionButton: FloatingActionButton(

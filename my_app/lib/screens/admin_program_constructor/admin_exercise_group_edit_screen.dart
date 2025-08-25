@@ -54,7 +54,7 @@ class _ExerciseGroupEditScreenState extends State<ExerciseGroupEditScreen> {
       };
 
       final response = await ApiService.put(
-        '/exercise-groups/${widget.exerciseGroupUuid}',
+        '/exercise-groups/update/${widget.exerciseGroupUuid}',
         body: body,
       );
 

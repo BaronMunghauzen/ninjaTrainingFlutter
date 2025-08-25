@@ -2,6 +2,7 @@ import '../constants/api_constants.dart';
 import 'api_service.dart';
 import '../models/training_model.dart';
 import '../models/exercise_model.dart';
+import '../models/search_result_model.dart' as search_models;
 
 class UserTrainingService {
   /// Получение пользовательских тренировок
@@ -39,32 +40,59 @@ class UserTrainingService {
   }
 
   /// Получение доступных упражнений для пользователя
-  static Future<List<ExerciseReference>> getUserExerciseReferences(
-    String userUuid,
-  ) async {
+  static Future<search_models.ExerciseReferenceSearchResult>
+  getUserExerciseReferences(
+    String userUuid, {
+    int page = 1,
+    int size = 10,
+  }) async {
     try {
       final response = await ApiService.get(
         '/exercise_reference/available/$userUuid',
+        queryParams: {'page': page, 'size': size},
       );
 
       if (response.statusCode == 200) {
         final data = ApiService.decodeJson(response.body);
-        // API возвращает данные напрямую как массив
-        if (data is List) {
-          return data.map((json) => ExerciseReference.fromJson(json)).toList();
-        }
-        // Альтернативный формат с полем data
-        if (data is Map && data['status'] == 200 && data['data'] != null) {
-          final List<dynamic> exercisesJson = data['data'];
-          return exercisesJson
-              .map((json) => ExerciseReference.fromJson(json))
+
+        // Проверяем, есть ли пагинация в ответе
+        if (data is Map && data['items'] != null) {
+          // Новый формат с пагинацией
+          return search_models.ExerciseReferenceSearchResult.fromJson(
+            Map<String, dynamic>.from(data),
+          );
+        } else if (data is List) {
+          // Старый формат без пагинации (для обратной совместимости)
+          final items = data
+              .map((json) => search_models.ExerciseReference.fromJson(json))
               .toList();
+          return search_models.ExerciseReferenceSearchResult(
+            items: items,
+            total: items.length,
+            page: page,
+            size: size,
+            pages: 1,
+          );
         }
       }
-      return [];
+
+      // Возвращаем пустой результат в случае ошибки
+      return search_models.ExerciseReferenceSearchResult(
+        items: [],
+        total: 0,
+        page: page,
+        size: size,
+        pages: 0,
+      );
     } catch (e) {
       print('Error loading available exercise references: $e');
-      return [];
+      return search_models.ExerciseReferenceSearchResult(
+        items: [],
+        total: 0,
+        page: page,
+        size: size,
+        pages: 0,
+      );
     }
   }
 

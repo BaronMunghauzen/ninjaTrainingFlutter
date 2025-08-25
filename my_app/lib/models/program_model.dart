@@ -54,9 +54,6 @@ class Program {
     if (value == null) return null;
     if (value is String && value.isNotEmpty) return value;
     if (value is int) return value.toString();
-    print(
-      'Warning: Could not parse imageUuid: $value (type: ${value.runtimeType})',
-    );
     return null;
   }
 
