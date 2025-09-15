@@ -145,11 +145,8 @@ class _AdminExerciseReferenceListScreenState
   Future<ImageProvider?> _loadExerciseImage(String? imageUuid) async {
     if (imageUuid == null || imageUuid.isEmpty) return null;
     try {
-      final response = await ApiService.get('/files/file/$imageUuid');
-      if (response.statusCode == 200) {
-        return MemoryImage(response.bodyBytes);
-      }
-      return null;
+      // Используем новый метод кэширования
+      return await ApiService.getImageProvider(imageUuid);
     } catch (e) {
       print('[API] exception: $e');
       return null;

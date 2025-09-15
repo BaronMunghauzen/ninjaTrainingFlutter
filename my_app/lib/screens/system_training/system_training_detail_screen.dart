@@ -49,7 +49,8 @@ class _SystemTrainingDetailScreenState
       'training_uuid': widget.training['uuid'],
       'user_uuid': userUuid,
       'training_date': dateStr,
-      'status': 'active',
+      'status': 'ACTIVE',
+      'is_rest_day': false,
     };
     try {
       final response = await ApiService.post(

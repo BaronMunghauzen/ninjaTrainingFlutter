@@ -35,10 +35,10 @@ class SearchResult {
   factory SearchResult.fromJson(Map<String, dynamic> json) {
     List<dynamic> parsedItems = [];
 
-    if (json['items'] != null) {
-      for (var item in json['items']) {
+    // Вариант 1: универсальный массив items
+    if (json['items'] is List) {
+      for (final item in (json['items'] as List)) {
         if (item is Map<String, dynamic>) {
-          // Определяем тип элемента по полю type или другим признакам
           if (item.containsKey('exercise_type')) {
             parsedItems.add(ExerciseReference.fromJson(item));
           } else if (item.containsKey('program_type')) {
@@ -46,7 +46,6 @@ class SearchResult {
           } else if (item.containsKey('training_type')) {
             parsedItems.add(Training.fromJson(item));
           } else {
-            // Если тип не определен, добавляем как есть
             parsedItems.add(item);
           }
         } else {
@@ -55,12 +54,49 @@ class SearchResult {
       }
     }
 
+    // Вариант 2: раздельные коллекции по типам
+    if (json['exercise_references'] is List) {
+      for (final item in (json['exercise_references'] as List)) {
+        if (item is Map<String, dynamic>) {
+          parsedItems.add(ExerciseReference.fromJson(item));
+        }
+      }
+    }
+
+    if (json['programs'] is List) {
+      for (final item in (json['programs'] as List)) {
+        if (item is Map<String, dynamic>) {
+          parsedItems.add(Program.fromJson(item));
+        }
+      }
+    }
+
+    if (json['trainings'] is List) {
+      for (final item in (json['trainings'] as List)) {
+        if (item is Map<String, dynamic>) {
+          parsedItems.add(Training.fromJson(item));
+        }
+      }
+    }
+
+    final int computedTotal = parsedItems.length;
+    final int total = (json['total'] is int)
+        ? json['total'] as int
+        : computedTotal;
+    final int size = (json['size'] is int)
+        ? json['size'] as int
+        : computedTotal;
+    final int page = (json['page'] is int) ? json['page'] as int : 1;
+    final int pages = (json['pages'] is int)
+        ? json['pages'] as int
+        : (size == 0 ? 0 : 1);
+
     return SearchResult(
       items: parsedItems,
-      total: json['total'] ?? 0,
-      page: json['page'] ?? 1,
-      size: json['size'] ?? 10,
-      pages: json['pages'] ?? 0,
+      total: total,
+      page: page,
+      size: size,
+      pages: pages,
     );
   }
 }
@@ -104,11 +140,13 @@ class ExerciseReference {
   final dynamic userId;
   final String description;
   final String muscleGroup;
+  final String? techniqueDescription;
   final DateTime createdAt;
   final DateTime updatedAt;
   final dynamic user;
-  final dynamic
-  image; // Changed from String? to dynamic to handle both String and Map
+  final dynamic image; // Может быть строкой, Map или null
+  final dynamic video; // Может быть строкой, Map или null
+  final dynamic gif; // Может быть строкой, Map или null
 
   ExerciseReference({
     required this.exerciseType,
@@ -119,10 +157,13 @@ class ExerciseReference {
     this.userId,
     required this.description,
     required this.muscleGroup,
+    this.techniqueDescription,
     required this.createdAt,
     required this.updatedAt,
     this.user,
     this.image,
+    this.video,
+    this.gif,
   });
 
   static int? _parseImageId(dynamic value) {
@@ -145,10 +186,13 @@ class ExerciseReference {
       userId: json['user_id'],
       description: json['description'] ?? '',
       muscleGroup: json['muscle_group'] ?? '',
+      techniqueDescription: json['technique_description']?.toString(),
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
       user: json['user'],
       image: json['image'],
+      video: json['video'],
+      gif: json['gif_uuid'],
     );
   }
 }

@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../constants/app_colors.dart';
-import '../../providers/auth_provider.dart';
 import 'user_training_list_screen.dart';
 import 'user_exercise_reference_list_screen.dart';
 
 class UserTrainingConstructorScreen extends StatefulWidget {
-  const UserTrainingConstructorScreen({Key? key}) : super(key: key);
+  final VoidCallback? onDataChanged;
+
+  const UserTrainingConstructorScreen({Key? key, this.onDataChanged})
+    : super(key: key);
 
   @override
   State<UserTrainingConstructorScreen> createState() =>
@@ -57,9 +58,9 @@ class _UserTrainingConstructorScreenState
       ),
       body: TabBarView(
         controller: _tabController,
-        children: const [
-          UserTrainingListScreen(),
-          UserExerciseReferenceListScreen(),
+        children: [
+          UserTrainingListScreen(onDataChanged: widget.onDataChanged),
+          const UserExerciseReferenceListScreen(),
         ],
       ),
     );

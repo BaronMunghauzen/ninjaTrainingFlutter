@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../services/api_service.dart';
-import '../../widgets/video_player_widget.dart';
+import '../../widgets/gif_widget.dart';
 import 'admin_exercise_reference_edit_screen.dart';
 
 class AdminExerciseReferenceDetailScreen extends StatefulWidget {
@@ -69,51 +69,8 @@ class _AdminExerciseReferenceDetailScreenState
     }
   }
 
-  // Функция для загрузки видео
-  Future<void> _uploadVideo() async {
-    try {
-      final ImagePicker picker = ImagePicker();
-      final XFile? video = await picker.pickVideo(source: ImageSource.gallery);
-
-      if (video != null) {
-        final File videoFile = File(video.path);
-        final response = await ApiService.uploadFile(
-          '/exercise_reference/${widget.exerciseReferenceUuid}/upload-video',
-          videoFile,
-          'file',
-        );
-
-        if (response.statusCode == 200) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Видео успешно загружено')),
-          );
-          _fetchExercise(); // Обновляем данные
-        } else {
-          // Пытаемся получить детали ошибки из ответа
-          String errorMessage = 'Ошибка загрузки видео: ${response.statusCode}';
-          try {
-            final errorData = ApiService.decodeJson(response.body);
-            if (errorData is Map && errorData.containsKey('detail')) {
-              errorMessage = errorData['detail'];
-            }
-          } catch (e) {
-            // Если не удалось распарсить JSON, используем стандартное сообщение
-          }
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
-          );
-        }
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
-    }
-  }
-
-  // Функция для загрузки изображения
-  Future<void> _uploadImage() async {
+  // Функция для загрузки гифки
+  Future<void> _uploadGif() async {
     try {
       final ImagePicker picker = ImagePicker();
       final XFile? image = await picker.pickImage(source: ImageSource.gallery);
@@ -121,20 +78,19 @@ class _AdminExerciseReferenceDetailScreenState
       if (image != null) {
         final File imageFile = File(image.path);
         final response = await ApiService.uploadFile(
-          '/exercise_reference/${widget.exerciseReferenceUuid}/upload-image',
+          '/exercise_reference/${widget.exerciseReferenceUuid}/upload-gif',
           imageFile,
           'file',
         );
 
         if (response.statusCode == 200) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Изображение успешно загружено')),
+            const SnackBar(content: Text('Гифка успешно загружена')),
           );
           _fetchExercise(); // Обновляем данные
         } else {
           // Пытаемся получить детали ошибки из ответа
-          String errorMessage =
-              'Ошибка загрузки изображения: ${response.statusCode}';
+          String errorMessage = 'Ошибка загрузки гифки: ${response.statusCode}';
           try {
             final errorData = ApiService.decodeJson(response.body);
             if (errorData is Map && errorData.containsKey('detail')) {
@@ -156,13 +112,13 @@ class _AdminExerciseReferenceDetailScreenState
     }
   }
 
-  // Функция для удаления видео
-  Future<void> _deleteVideo() async {
+  // Функция для удаления гифки
+  Future<void> _deleteGif() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Удалить видео?'),
-        content: const Text('Вы уверены, что хотите удалить видео?'),
+        title: const Text('Удалить гифку?'),
+        content: const Text('Вы уверены, что хотите удалить гифку?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -179,66 +135,18 @@ class _AdminExerciseReferenceDetailScreenState
     if (confirmed == true) {
       try {
         final response = await ApiService.delete(
-          '/exercise_reference/${widget.exerciseReferenceUuid}/delete-video',
+          '/exercise_reference/${widget.exerciseReferenceUuid}/delete-gif',
         );
 
         if (response.statusCode == 200) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Видео успешно удалено')),
+            const SnackBar(content: Text('Гифка успешно удалена')),
           );
           _fetchExercise(); // Обновляем данные
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Ошибка удаления видео: ${response.statusCode}'),
-            ),
-          );
-        }
-      } catch (e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
-      }
-    }
-  }
-
-  // Функция для удаления изображения
-  Future<void> _deleteImage() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Удалить изображение?'),
-        content: const Text('Вы уверены, что хотите удалить изображение?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Удалить'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      try {
-        final response = await ApiService.delete(
-          '/exercise_reference/${widget.exerciseReferenceUuid}/delete-image',
-        );
-
-        if (response.statusCode == 200) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Изображение успешно удалено')),
-          );
-          _fetchExercise(); // Обновляем данные
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Ошибка удаления изображения: ${response.statusCode}',
-              ),
+              content: Text('Ошибка удаления гифки: ${response.statusCode}'),
             ),
           );
         }
@@ -255,7 +163,7 @@ class _AdminExerciseReferenceDetailScreenState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Управление файлами',
+          'Управление гифкой',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
@@ -263,9 +171,9 @@ class _AdminExerciseReferenceDetailScreenState
           children: [
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: _uploadVideo,
-                icon: const Icon(Icons.video_library),
-                label: const Text('Загрузить видео'),
+                onPressed: _uploadGif,
+                icon: const Icon(Icons.gif),
+                label: const Text('Загрузить гифку'),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
@@ -273,40 +181,10 @@ class _AdminExerciseReferenceDetailScreenState
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: ElevatedButton.icon(
-                onPressed: _uploadImage,
-                icon: const Icon(Icons.image),
-                label: const Text('Загрузить фото'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
               child: OutlinedButton.icon(
-                onPressed: exercise!['video_uuid'] != null
-                    ? _deleteVideo
-                    : null,
+                onPressed: exercise!['gif_uuid'] != null ? _deleteGif : null,
                 icon: const Icon(Icons.delete),
-                label: const Text('Удалить видео'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: exercise!['image_uuid'] != null
-                    ? _deleteImage
-                    : null,
-                icon: const Icon(Icons.delete),
-                label: const Text('Удалить фото'),
+                label: const Text('Удалить гифку'),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
@@ -367,15 +245,28 @@ class _AdminExerciseReferenceDetailScreenState
                   Text('Описание: ${exercise!['description'] ?? ''}'),
                   const SizedBox(height: 8),
                   Text('Мышечная группа: ${exercise!['muscle_group'] ?? ''}'),
+                  if (exercise!['technique_description'] != null &&
+                      exercise!['technique_description']
+                          .toString()
+                          .isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Техника выполнения:',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(exercise!['technique_description']),
+                  ],
                   const SizedBox(height: 24),
-                  // Видеоплеер
-                  VideoPlayerWidget(
-                    imageUuid: exercise!['image_uuid'],
-                    videoUuid: exercise!['video_uuid'],
-                    height: 250,
-                  ),
-                  const SizedBox(height: 24),
-                  // Кнопки управления файлами
+                  // Гифка (отображаем только если есть gif_uuid)
+                  if (exercise!['gif_uuid'] != null) ...[
+                    GifWidget(gifUuid: exercise!['gif_uuid'], height: 250),
+                    const SizedBox(height: 24),
+                  ],
+                  // Кнопки управления гифкой
                   _buildFileManagementButtons(),
                 ],
               ),

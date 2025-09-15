@@ -12,8 +12,13 @@ import 'admin_exercise_group_create_screen.dart';
 
 class AdminTrainingDetailScreen extends StatefulWidget {
   final String trainingUuid;
-  const AdminTrainingDetailScreen({Key? key, required this.trainingUuid})
-    : super(key: key);
+  final VoidCallback? onDataChanged;
+
+  const AdminTrainingDetailScreen({
+    Key? key,
+    required this.trainingUuid,
+    this.onDataChanged,
+  }) : super(key: key);
 
   @override
   State<AdminTrainingDetailScreen> createState() =>
@@ -125,11 +130,18 @@ class _AdminTrainingDetailScreenState extends State<AdminTrainingDetailScreen> {
                     await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) =>
-                            AdminTrainingEditScreen(training: training!),
+                        builder: (_) => AdminTrainingEditScreen(
+                          training: training!,
+                          onDataChanged: widget.onDataChanged,
+                        ),
                       ),
                     );
                     _fetchTraining();
+                    // Вызываем callback для обновления данных на родительской странице
+                    print(
+                      'AdminTrainingDetailScreen: Вызываем callback onDataChanged после редактирования',
+                    );
+                    widget.onDataChanged?.call();
                   },
           ),
           IconButton(

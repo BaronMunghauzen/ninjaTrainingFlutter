@@ -3,8 +3,13 @@ import '../../services/api_service.dart';
 
 class AdminTrainingEditScreen extends StatefulWidget {
   final Map<String, dynamic> training;
-  const AdminTrainingEditScreen({Key? key, required this.training})
-    : super(key: key);
+  final VoidCallback? onDataChanged;
+
+  const AdminTrainingEditScreen({
+    Key? key,
+    required this.training,
+    this.onDataChanged,
+  }) : super(key: key);
 
   @override
   State<AdminTrainingEditScreen> createState() =>
@@ -74,6 +79,9 @@ class _AdminTrainingEditScreenState extends State<AdminTrainingEditScreen> {
     );
     setState(() => isLoading = false);
     if (response.statusCode == 200) {
+      // Вызываем callback для обновления данных на родительской странице
+      print('AdminTrainingEditScreen: Вызываем callback onDataChanged');
+      widget.onDataChanged?.call();
       Navigator.pop(context);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

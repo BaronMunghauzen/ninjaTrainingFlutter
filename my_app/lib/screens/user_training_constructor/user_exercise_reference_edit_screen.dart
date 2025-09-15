@@ -3,9 +3,10 @@ import 'package:provider/provider.dart';
 import '../../constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/user_training_service.dart';
+import '../../models/search_result_model.dart' as search_models;
 
 class UserExerciseReferenceEditScreen extends StatefulWidget {
-  final ExerciseReference exercise;
+  final search_models.ExerciseReference exercise;
 
   const UserExerciseReferenceEditScreen({super.key, required this.exercise});
 

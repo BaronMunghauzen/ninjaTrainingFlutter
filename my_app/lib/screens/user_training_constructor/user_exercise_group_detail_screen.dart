@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../constants/app_colors.dart';
-import '../../providers/auth_provider.dart';
 import '../../services/user_training_service.dart';
+import '../../services/api_service.dart';
+import 'user_exercise_edit_screen.dart';
 
 class UserExerciseGroupDetailScreen extends StatefulWidget {
   final ExerciseGroup exerciseGroup;
+  final VoidCallback? onDataChanged;
 
-  const UserExerciseGroupDetailScreen({Key? key, required this.exerciseGroup})
-    : super(key: key);
+  const UserExerciseGroupDetailScreen({
+    Key? key,
+    required this.exerciseGroup,
+    this.onDataChanged,
+  }) : super(key: key);
 
   @override
   State<UserExerciseGroupDetailScreen> createState() =>
@@ -17,6 +21,121 @@ class UserExerciseGroupDetailScreen extends StatefulWidget {
 
 class _UserExerciseGroupDetailScreenState
     extends State<UserExerciseGroupDetailScreen> {
+  String exerciseName = '';
+  int? setsCount;
+  int? repsCount;
+  int? restTime;
+  bool? withWeight;
+  bool _isLoading = true;
+  String? exerciseReferenceName;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExerciseData();
+  }
+
+  Future<void> _loadExerciseData() async {
+    if (widget.exerciseGroup.exercises.isNotEmpty) {
+      try {
+        final response = await ApiService.get(
+          '/exercises/${widget.exerciseGroup.exercises.first}',
+        );
+        if (response.statusCode == 200) {
+          final data = ApiService.decodeJson(response.body);
+          setState(() {
+            exerciseName = data['caption'] ?? 'Упражнение';
+            setsCount = data['sets_count'];
+            repsCount = data['reps_count'];
+            restTime = data['rest_time'];
+            withWeight = data['with_weight'];
+            _isLoading = false;
+          });
+
+          // Загружаем данные упражнения из справочника
+          final exerciseReferenceUuid = data['exercise_reference_uuid'];
+          if (exerciseReferenceUuid != null) {
+            await _loadExerciseReferenceData(exerciseReferenceUuid);
+          }
+        } else {
+          setState(() {
+            exerciseName = 'Упражнение';
+            setsCount = 3;
+            repsCount = 12;
+            restTime = 60;
+            withWeight = true;
+            _isLoading = false;
+          });
+        }
+      } catch (e) {
+        setState(() {
+          exerciseName = 'Упражнение';
+          setsCount = 3;
+          repsCount = 12;
+          restTime = 60;
+          withWeight = true;
+          _isLoading = false;
+        });
+      }
+    } else {
+      setState(() {
+        exerciseName = 'Упражнение';
+        setsCount = 3;
+        repsCount = 12;
+        restTime = 60;
+        withWeight = true;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadExerciseReferenceData(String exerciseReferenceUuid) async {
+    try {
+      final response = await ApiService.get(
+        '/exercise_reference/$exerciseReferenceUuid',
+      );
+      if (response.statusCode == 200) {
+        final data = ApiService.decodeJson(response.body);
+        setState(() {
+          exerciseReferenceName = data['caption'] ?? 'Неизвестное упражнение';
+        });
+      }
+    } catch (e) {
+      print('Error loading exercise reference data: $e');
+      setState(() {
+        exerciseReferenceName = 'Ошибка загрузки';
+      });
+    }
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$label:',
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -34,8 +153,22 @@ class _UserExerciseGroupDetailScreenState
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
-            onPressed: () {
-              // TODO: Реализовать редактирование
+            onPressed: () async {
+              if (widget.exerciseGroup.exercises.isNotEmpty) {
+                final exerciseUuid = widget.exerciseGroup.exercises.first;
+                final result = await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        UserExerciseEditScreen(exerciseUuid: exerciseUuid),
+                  ),
+                );
+                if (result == true) {
+                  // Обновляем данные после редактирования
+                  _loadExerciseData();
+                  // Вызываем callback для обновления родительской страницы
+                  widget.onDataChanged?.call();
+                }
+              }
             },
           ),
           IconButton(
@@ -44,9 +177,9 @@ class _UserExerciseGroupDetailScreenState
               final confirmed = await showDialog<bool>(
                 context: context,
                 builder: (context) => AlertDialog(
-                  title: const Text('Удаление группы упражнений'),
+                  title: const Text('Удаление упражнения'),
                   content: const Text(
-                    'Вы уверены, что хотите удалить эту группу упражнений?',
+                    'Вы уверены, что хотите удалить это упражнение?',
                   ),
                   actions: [
                     TextButton(
@@ -62,35 +195,22 @@ class _UserExerciseGroupDetailScreenState
               );
 
               if (confirmed == true) {
-                // Удаляем все упражнения в группе
-                bool allDeleted = true;
-                for (final exerciseUuid in widget.exerciseGroup.exercises) {
-                  final success = await UserTrainingService.deleteExercise(
-                    exerciseUuid,
-                  );
-                  if (!success) {
-                    allDeleted = false;
-                  }
-                }
-
-                // Удаляем группу упражнений
-                if (allDeleted) {
-                  final groupSuccess =
-                      await UserTrainingService.deleteExerciseGroup(
-                        widget.exerciseGroup.uuid,
-                      );
-                  if (groupSuccess) {
-                    Navigator.of(context).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Группа упражнений удалена'),
-                      ),
+                // Удаляем только группу упражнений
+                final groupSuccess =
+                    await UserTrainingService.deleteExerciseGroup(
+                      widget.exerciseGroup.uuid,
                     );
-                  }
+                if (groupSuccess) {
+                  // Вызываем callback для обновления данных на родительской странице
+                  widget.onDataChanged?.call();
+                  Navigator.of(context).pop(true);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Упражнение удалено')),
+                  );
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Ошибка при удалении упражнений'),
+                      content: Text('Ошибка при удалении упражнения'),
                     ),
                   );
                 }
@@ -99,81 +219,55 @@ class _UserExerciseGroupDetailScreenState
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Информация о группе упражнений
-            Text(
-              widget.exerciseGroup.caption,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              widget.exerciseGroup.description,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 16,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Группа мышц: ${widget.exerciseGroup.muscleGroup}',
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 14,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Упражнения (${widget.exerciseGroup.exercises.length}):',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            // Список упражнений
-            Expanded(
-              child: ListView.builder(
-                itemCount: widget.exerciseGroup.exercises.length,
-                itemBuilder: (context, index) {
-                  final exerciseUuid = widget.exerciseGroup.exercises[index];
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: const Icon(
-                        Icons.fitness_center,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Название упражнения
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: Text(
+                      exerciseName,
+                      style: const TextStyle(
                         color: AppColors.textPrimary,
-                      ),
-                      title: Text(
-                        'Упражнение ${index + 1}',
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      subtitle: Text(
-                        'UUID: $exerciseUuid',
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                        ),
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                  );
-                },
+                  ),
+
+                  // Упражнение из справочника
+                  if (exerciseReferenceName != null) ...[
+                    const SizedBox(height: 16),
+                    _buildInfoRow(
+                      'Упражнение из справочника',
+                      exerciseReferenceName!,
+                    ),
+                  ],
+
+                  // Информация о тренировке
+                  const SizedBox(height: 16),
+                  _buildInfoRow('Подходы', setsCount?.toString() ?? '3'),
+                  const SizedBox(height: 16),
+                  _buildInfoRow('Повторения', repsCount?.toString() ?? '12'),
+                  const SizedBox(height: 16),
+                  _buildInfoRow(
+                    'Группа мышц',
+                    widget.exerciseGroup.muscleGroup,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInfoRow('Время отдыха', '${restTime ?? 60}с'),
+                  const SizedBox(height: 16),
+                  _buildInfoRow(
+                    'Вес',
+                    (withWeight ?? true) ? 'С весом' : 'Без веса',
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
     );
   }
 }

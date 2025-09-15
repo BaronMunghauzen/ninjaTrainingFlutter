@@ -13,6 +13,7 @@ class Training {
   final Program program;
   final dynamic user;
   final String? imageUuid;
+  final bool actual;
 
   Training({
     required this.uuid,
@@ -27,6 +28,7 @@ class Training {
     required this.program,
     this.user,
     this.imageUuid,
+    this.actual = true,
   });
 
   factory Training.fromJson(Map<String, dynamic> json) {
@@ -61,6 +63,7 @@ class Training {
             ),
       user: json['user'],
       imageUuid: json['image_uuid'],
+      actual: json['actual'] ?? true,
     );
   }
 
@@ -78,6 +81,7 @@ class Training {
       'program': program.toJson(),
       'user': user,
       'image_uuid': imageUuid,
+      'actual': actual,
     };
   }
 }

@@ -15,6 +15,7 @@ class _AdminExerciseReferenceCreateScreenState
   final _captionController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _muscleGroupController = TextEditingController();
+  final _techniqueDescriptionController = TextEditingController();
   bool isLoading = false;
 
   @override
@@ -22,6 +23,7 @@ class _AdminExerciseReferenceCreateScreenState
     _captionController.dispose();
     _descriptionController.dispose();
     _muscleGroupController.dispose();
+    _techniqueDescriptionController.dispose();
     super.dispose();
   }
 
@@ -33,6 +35,9 @@ class _AdminExerciseReferenceCreateScreenState
       'caption': _captionController.text,
       'description': _descriptionController.text,
       'muscle_group': _muscleGroupController.text,
+      'technique_description': _techniqueDescriptionController.text.isEmpty
+          ? null
+          : _techniqueDescriptionController.text,
     };
     final response = await ApiService.post(
       '/exercise_reference/add/',
@@ -75,6 +80,13 @@ class _AdminExerciseReferenceCreateScreenState
                 decoration: const InputDecoration(labelText: 'Мышечная группа'),
                 validator: (v) =>
                     v == null || v.isEmpty ? 'Введите мышечную группу' : null,
+              ),
+              TextFormField(
+                controller: _techniqueDescriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Техника выполнения (необязательно)',
+                ),
+                maxLines: 3,
               ),
               const SizedBox(height: 24),
               isLoading

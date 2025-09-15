@@ -9,7 +9,9 @@ import 'user_training_detail_screen.dart';
 import 'user_training_edit_screen.dart';
 
 class UserTrainingListScreen extends StatefulWidget {
-  const UserTrainingListScreen({super.key});
+  final VoidCallback? onDataChanged;
+
+  const UserTrainingListScreen({super.key, this.onDataChanged});
 
   @override
   State<UserTrainingListScreen> createState() => _UserTrainingListScreenState();
@@ -37,11 +39,17 @@ class _UserTrainingListScreenState extends State<UserTrainingListScreen> {
         return;
       }
 
-      final trainings = await UserTrainingService.getUserTrainings(userUuid);
+      final trainings = await UserTrainingService.getUserTrainings(
+        userUuid,
+        actual: false,
+      );
       setState(() {
         userTrainings = trainings;
         isLoading = false;
       });
+
+      // Вызываем callback для обновления данных на родительской странице
+      widget.onDataChanged?.call();
     } catch (e) {
       print('Error loading user trainings: $e');
       setState(() {
@@ -72,10 +80,6 @@ class _UserTrainingListScreenState extends State<UserTrainingListScreen> {
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
                   child: ListTile(
-                    leading: const Icon(
-                      Icons.fitness_center,
-                      color: AppColors.textPrimary,
-                    ),
                     title: Text(
                       training.caption,
                       style: const TextStyle(
@@ -95,12 +99,45 @@ class _UserTrainingListScreenState extends State<UserTrainingListScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          'Группа мышц: ${training.muscleGroup}',
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              'Группа мышц: ${training.muscleGroup}',
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: training.actual
+                                    ? Colors.green.withOpacity(0.2)
+                                    : Colors.orange.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: training.actual
+                                      ? Colors.green
+                                      : Colors.orange,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Text(
+                                training.actual ? 'Активна' : 'Архив',
+                                style: TextStyle(
+                                  color: training.actual
+                                      ? Colors.green[700]
+                                      : Colors.orange[700],
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -121,56 +158,95 @@ class _UserTrainingListScreenState extends State<UserTrainingListScreen> {
                             }
                           },
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.delete),
-                          onPressed: () async {
-                            final confirmed = await showDialog<bool>(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: const Text('Удаление тренировки'),
-                                content: const Text(
-                                  'Вы уверены, что хотите удалить эту тренировку?',
+                        if (training.actual)
+                          IconButton(
+                            icon: const Icon(Icons.archive),
+                            onPressed: () async {
+                              final confirmed = await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('Архивирование тренировки'),
+                                  content: const Text(
+                                    'Вы уверены, что хотите архивировать эту тренировку?',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(false),
+                                      child: const Text('Отмена'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(true),
+                                      child: const Text('Архивировать'),
+                                    ),
+                                  ],
                                 ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.of(context).pop(false),
-                                    child: const Text('Отмена'),
-                                  ),
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.of(context).pop(true),
-                                    child: const Text('Удалить'),
-                                  ),
-                                ],
-                              ),
-                            );
+                              );
 
-                            if (confirmed == true) {
-                              final success =
-                                  await UserTrainingService.deleteTraining(
-                                    training.uuid,
-                                  );
-                              if (success) {
-                                _loadUserTrainings();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Тренировка удалена'),
-                                  ),
-                                );
+                              if (confirmed == true) {
+                                final success =
+                                    await UserTrainingService.archiveTraining(
+                                      training.uuid,
+                                    );
+                                if (success) {
+                                  _loadUserTrainings();
+                                }
                               }
-                            }
-                          },
-                        ),
+                            },
+                          )
+                        else
+                          IconButton(
+                            icon: const Icon(Icons.unarchive),
+                            onPressed: () async {
+                              final confirmed = await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text(
+                                    'Восстановление тренировки',
+                                  ),
+                                  content: const Text(
+                                    'Вы уверены, что хотите восстановить эту тренировку из архива?',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(false),
+                                      child: const Text('Отмена'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(true),
+                                      child: const Text('Восстановить'),
+                                    ),
+                                  ],
+                                ),
+                              );
+
+                              if (confirmed == true) {
+                                final success =
+                                    await UserTrainingService.restoreTraining(
+                                      training.uuid,
+                                    );
+                                if (success) {
+                                  _loadUserTrainings();
+                                }
+                              }
+                            },
+                          ),
                       ],
                     ),
-                    onTap: () {
-                      Navigator.of(context).push(
+                    onTap: () async {
+                      await Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (context) =>
-                              UserTrainingDetailScreen(training: training),
+                          builder: (context) => UserTrainingDetailScreen(
+                            training: training,
+                            onDataChanged: widget.onDataChanged,
+                          ),
                         ),
                       );
+                      // Обновляем данные после возврата
+                      _loadUserTrainings();
                     },
                   ),
                 );

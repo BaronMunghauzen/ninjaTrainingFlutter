@@ -2,14 +2,20 @@ import 'package:flutter/material.dart';
 import '../../constants/app_colors.dart';
 import '../../models/training_model.dart';
 import '../../services/user_training_service.dart';
+import '../../services/api_service.dart';
 import 'user_exercise_group_create_screen.dart';
 import 'user_exercise_group_detail_screen.dart';
 import 'user_training_edit_screen.dart';
 
 class UserTrainingDetailScreen extends StatefulWidget {
   final Training training;
+  final VoidCallback? onDataChanged;
 
-  const UserTrainingDetailScreen({super.key, required this.training});
+  const UserTrainingDetailScreen({
+    super.key,
+    required this.training,
+    this.onDataChanged,
+  });
 
   @override
   State<UserTrainingDetailScreen> createState() =>
@@ -19,6 +25,8 @@ class UserTrainingDetailScreen extends StatefulWidget {
 class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
   late Training _training;
   List<ExerciseGroup> exerciseGroups = [];
+  Map<String, Map<String, dynamic>> exerciseData =
+      {}; // UUID группы -> данные упражнения
   bool isLoading = true;
 
   @override
@@ -33,8 +41,35 @@ class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
       final groups = await UserTrainingService.getExerciseGroupsForTraining(
         _training.uuid,
       );
+
+      // Загружаем данные для каждого упражнения в группах
+      Map<String, Map<String, dynamic>> exerciseDataMap = {};
+      for (final group in groups) {
+        if (group.exercises.isNotEmpty) {
+          try {
+            final response = await ApiService.get(
+              '/exercises/${group.exercises.first}',
+            );
+            if (response.statusCode == 200) {
+              final data = ApiService.decodeJson(response.body);
+              exerciseDataMap[group.uuid] = data;
+            }
+          } catch (e) {
+            print('Error loading exercise data for group ${group.uuid}: $e');
+            // Устанавливаем значения по умолчанию
+            exerciseDataMap[group.uuid] = {
+              'sets_count': 3,
+              'reps_count': 12,
+              'rest_time': 60,
+              'with_weight': true,
+            };
+          }
+        }
+      }
+
       setState(() {
         exerciseGroups = groups;
+        exerciseData = exerciseDataMap;
         isLoading = false;
       });
     } catch (e) {
@@ -61,6 +96,28 @@ class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
     } catch (e) {
       print('Error refreshing training data: $e');
     }
+  }
+
+  Widget _buildInfoChip(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.textSecondary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.textSecondary.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Text(
+        '$label: $value',
+        style: const TextStyle(
+          color: AppColors.textSecondary,
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
   }
 
   @override
@@ -90,93 +147,154 @@ class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
               if (result == true) {
                 // Обновляем данные тренировки
                 await _refreshTrainingData();
+                // Обновляем список групп упражнений
+                _loadExerciseGroups();
               }
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.delete),
-            onPressed: exerciseGroups.isEmpty
-                ? () async {
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Удаление тренировки'),
-                        content: const Text(
-                          'Вы уверены, что хотите удалить эту тренировку?',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(false),
-                            child: const Text('Отмена'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(true),
-                            child: const Text('Удалить'),
-                          ),
-                        ],
+          if (_training.actual)
+            IconButton(
+              icon: const Icon(Icons.archive),
+              onPressed: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Архивирование тренировки'),
+                    content: const Text(
+                      'Вы уверены, что хотите архивировать эту тренировку?',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('Отмена'),
                       ),
-                    );
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        child: const Text('Архивировать'),
+                      ),
+                    ],
+                  ),
+                );
 
-                    if (confirmed == true) {
-                      final success = await UserTrainingService.deleteTraining(
-                        _training.uuid,
-                      );
-                      if (success) {
-                        Navigator.of(context).pop();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Тренировка удалена')),
-                        );
-                      }
-                    }
+                if (confirmed == true) {
+                  final success = await UserTrainingService.archiveTraining(
+                    _training.uuid,
+                  );
+                  if (success) {
+                    // Вызываем callback для обновления данных на родительской странице
+                    print(
+                      'UserTrainingDetailScreen: Вызываем callback после архивации',
+                    );
+                    widget.onDataChanged?.call();
+                    Navigator.of(context).pop();
                   }
-                : null,
-          ),
+                }
+              },
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.unarchive),
+              onPressed: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Восстановление тренировки'),
+                    content: const Text(
+                      'Вы уверены, что хотите восстановить эту тренировку из архива?',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('Отмена'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        child: const Text('Восстановить'),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (confirmed == true) {
+                  final success = await UserTrainingService.restoreTraining(
+                    _training.uuid,
+                  );
+                  if (success) {
+                    // Вызываем callback для обновления данных на родительской странице
+                    print(
+                      'UserTrainingDetailScreen: Вызываем callback после восстановления',
+                    );
+                    widget.onDataChanged?.call();
+                    Navigator.of(context).pop();
+                  }
+                }
+              },
+            ),
         ],
       ),
       body: Column(
         children: [
           // Информация о тренировке
-          Container(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _training.caption,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(30, 8, 16, 16),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _training.caption,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _training.description,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 16,
+                  const SizedBox(height: 8),
+                  Text(
+                    _training.description,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 16,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Группа мышц: ${_training.muscleGroup}',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 14,
+                  const SizedBox(height: 8),
+                  Text(
+                    'Группа мышц: ${_training.muscleGroup}',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 14,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Уровень сложности: ${_training.difficultyLevel}',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 14,
+                  const SizedBox(height: 8),
+                  Text(
+                    'Уровень сложности: ${_training.difficultyLevel}',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 14,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           const Divider(),
+          // Заголовок списка упражнений
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Упражнения',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ),
           // Список групп упражнений
           Expanded(
             child: isLoading
@@ -203,10 +321,6 @@ class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
                         child: ListTile(
-                          leading: const Icon(
-                            Icons.fitness_center,
-                            color: AppColors.textPrimary,
-                          ),
                           title: Text(
                             group.caption,
                             style: const TextStyle(
@@ -225,25 +339,63 @@ class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
+                              const SizedBox(height: 8),
+                              // Информация о подходах, повторениях, времени отдыха и весе
+                              Row(
+                                children: [
+                                  _buildInfoChip(
+                                    'Подходы',
+                                    exerciseData[group.uuid]?['sets_count']
+                                            ?.toString() ??
+                                        '3',
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _buildInfoChip(
+                                    'Повторения',
+                                    exerciseData[group.uuid]?['reps_count']
+                                            ?.toString() ??
+                                        '12',
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _buildInfoChip(
+                                    'Отдых',
+                                    '${exerciseData[group.uuid]?['rest_time'] ?? 60}с',
+                                  ),
+                                ],
+                              ),
                               const SizedBox(height: 4),
-                              Text(
-                                'Упражнений: ${group.exercises.length}',
-                                style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 12,
-                                ),
+                              Row(
+                                children: [
+                                  _buildInfoChip(
+                                    'Вес',
+                                    (exerciseData[group.uuid]?['with_weight'] ??
+                                            true)
+                                        ? 'С весом'
+                                        : 'Без веса',
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                          onTap: () {
-                            Navigator.of(context).push(
+                          onTap: () async {
+                            final result = await Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (context) =>
                                     UserExerciseGroupDetailScreen(
                                       exerciseGroup: group,
+                                      onDataChanged: () {
+                                        // Обновляем данные на этой странице
+                                        _loadExerciseGroups();
+                                        // Вызываем callback родительской страницы
+                                        widget.onDataChanged?.call();
+                                      },
                                     ),
                               ),
                             );
+                            // Обновляем данные после возврата (на случай если не было удаления)
+                            if (result == true) {
+                              _loadExerciseGroups();
+                            }
                           },
                         ),
                       );

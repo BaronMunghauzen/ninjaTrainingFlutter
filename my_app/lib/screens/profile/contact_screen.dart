@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../constants/app_colors.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/api_service.dart';
 
 class ContactScreen extends StatefulWidget {
   const ContactScreen({super.key});
@@ -37,26 +40,79 @@ class _ContactScreenState extends State<ContactScreen> {
       });
     }
 
-    // Имитация отправки
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      // Получаем AuthProvider для получения user_uuid
+      final authProvider = context.read<AuthProvider>();
+      final userUuid = authProvider.userUuid;
 
-    if (mounted) {
-      setState(() {
-        _isSending = false;
-      });
-    }
+      if (userUuid == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Ошибка: пользователь не найден'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Сообщение отправлено',
-            style: TextStyle(color: AppColors.textPrimary),
-          ),
-          backgroundColor: const Color(0xFF1F2121),
-        ),
+      // Подготавливаем данные для отправки
+      final body = {
+        'request_type': _selectedType,
+        'message': _messageController.text.trim(),
+        'user_uuid': userUuid,
+      };
+
+      // Отправляем POST запрос
+      final response = await ApiService.post(
+        '/service/support-request/',
+        body: body,
       );
-      Navigator.pop(context);
+
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+        });
+      }
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Сообщение успешно отправлено',
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
+              backgroundColor: const Color(0xFF1F2121),
+            ),
+          );
+          Navigator.pop(context);
+        }
+      } else {
+        final data = ApiService.decodeJson(response.body);
+        final errorMessage =
+            data['detail']?.toString() ?? 'Ошибка отправки сообщения';
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка сети: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -156,11 +212,12 @@ class _ContactScreenState extends State<ContactScreen> {
               ),
               const SizedBox(height: 32),
 
-              // Кнопка отправки
+              // Кнопка отправки с увеличенной высотой
               SizedBox(
                 width: double.infinity,
                 child: CustomButton(
                   text: _isSending ? 'Отправка...' : 'Отправить',
+                  height: 64, // Увеличиваем высоту с 56 до 64
                   onPressed: _isSending ? null : _sendMessage,
                 ),
               ),

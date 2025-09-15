@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async'; // Added for Timer
 import '../utils/global_ticker_provider.dart';
-import 'package:audioplayers/audioplayers.dart';
+import '../services/notification_service.dart';
 
 class TimerOverlayProvider extends ChangeNotifier {
   bool _isVisible = false;
@@ -43,7 +43,7 @@ class TimerOverlayProvider extends ChangeNotifier {
       updateSecondsLeft(left.ceil());
       if (left <= 0) {
         timer.cancel();
-        _playEndSound();
+        _showEndNotification();
         hide(); // only call hide, do not dispose controller here
       }
     });
@@ -75,10 +75,9 @@ class TimerOverlayProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _playEndSound() async {
+  Future<void> _showEndNotification() async {
     try {
-      final player = AudioPlayer();
-      await player.play(AssetSource('sounds/timer_end.mp3'));
+      await NotificationService.showTimerEndNotification();
     } catch (e) {
       // ignore errors
     }

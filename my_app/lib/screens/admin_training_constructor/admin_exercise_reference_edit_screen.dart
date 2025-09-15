@@ -17,6 +17,7 @@ class _AdminExerciseReferenceEditScreenState
   late TextEditingController _captionController;
   late TextEditingController _descriptionController;
   late TextEditingController _muscleGroupController;
+  late TextEditingController _techniqueDescriptionController;
   bool isLoading = false;
 
   @override
@@ -30,6 +31,9 @@ class _AdminExerciseReferenceEditScreenState
     _muscleGroupController = TextEditingController(
       text: e['muscle_group'] ?? '',
     );
+    _techniqueDescriptionController = TextEditingController(
+      text: e['technique_description'] ?? '',
+    );
   }
 
   @override
@@ -37,6 +41,7 @@ class _AdminExerciseReferenceEditScreenState
     _captionController.dispose();
     _descriptionController.dispose();
     _muscleGroupController.dispose();
+    _techniqueDescriptionController.dispose();
     super.dispose();
   }
 
@@ -47,6 +52,9 @@ class _AdminExerciseReferenceEditScreenState
       'caption': _captionController.text,
       'description': _descriptionController.text,
       'muscle_group': _muscleGroupController.text,
+      'technique_description': _techniqueDescriptionController.text.isEmpty
+          ? null
+          : _techniqueDescriptionController.text,
     };
     final response = await ApiService.put(
       '/exercise_reference/update/${widget.exercise['uuid']}',
@@ -89,6 +97,13 @@ class _AdminExerciseReferenceEditScreenState
                 decoration: const InputDecoration(labelText: 'Мышечная группа'),
                 validator: (v) =>
                     v == null || v.isEmpty ? 'Введите мышечную группу' : null,
+              ),
+              TextFormField(
+                controller: _techniqueDescriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Техника выполнения (необязательно)',
+                ),
+                maxLines: 3,
               ),
               const SizedBox(height: 24),
               isLoading

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import '../constants/api_constants.dart';
 import '../models/user_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
@@ -158,8 +157,6 @@ class AuthProvider extends ChangeNotifier {
           // Оптимизация: обновляем токен в API сервисе
           ApiService.updateToken(userToken);
 
-          notifyListeners();
-
           // Загружаем профиль пользователя для получения UUID
           await fetchUserProfile();
           return true;
@@ -204,6 +201,10 @@ class AuthProvider extends ChangeNotifier {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('user_uuid', data['uuid']);
         }
+        // Устанавливаем флаг аутентификации при успешном получении профиля
+        _isAuthenticated = true;
+        print('User profile loaded successfully, user is now authenticated');
+        notifyListeners();
       } else if (response.statusCode == 401) {
         // Если токен недействителен, выходим из системы
         await logout();
@@ -408,6 +409,48 @@ class AuthProvider extends ChangeNotifier {
     } catch (e) {
       print('Error refreshing profile silently: $e');
       return false;
+    }
+  }
+
+  /// Отправить email для сброса пароля
+  Future<String?> sendPasswordResetEmail(String email) async {
+    try {
+      final response = await ApiService.post(
+        '/auth/forgot-password/',
+        body: {'email': email},
+      );
+
+      if (response.statusCode == 200) {
+        return null; // Успешно отправлено
+      } else {
+        final data = ApiService.decodeJson(response.body);
+        return data['detail']?.toString() ?? 'Ошибка отправки письма';
+      }
+    } catch (e) {
+      return 'Ошибка отправки письма: $e';
+    }
+  }
+
+  /// Сбросить пароль по коду
+  Future<String?> resetPassword(
+    String email,
+    String code,
+    String newPassword,
+  ) async {
+    try {
+      final response = await ApiService.post(
+        '/auth/reset-password/',
+        body: {'email': email, 'code': code, 'new_password': newPassword},
+      );
+
+      if (response.statusCode == 200) {
+        return null; // Успешно сброшен
+      } else {
+        final data = ApiService.decodeJson(response.body);
+        return data['detail']?.toString() ?? 'Ошибка сброса пароля';
+      }
+    } catch (e) {
+      return 'Ошибка сброса пароля: $e';
     }
   }
 }

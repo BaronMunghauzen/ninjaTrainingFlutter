@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/notification_service.dart';
 import 'system_program/training_screen.dart';
-import 'achievements/achievements_screen.dart';
+import 'achievements_and_statistics/achievements_and_statistics_screen.dart';
 import 'profile/profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -18,7 +19,7 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<Widget> _screens = [
     const TrainingScreen(),
-    const AchievementsScreen(),
+    const AchievementsAndStatisticsScreen(),
     const ProfileScreen(),
   ];
 
@@ -33,7 +34,18 @@ class _MainScreenState extends State<MainScreen> {
           !authProvider.isLoadingProfile) {
         authProvider.fetchUserProfile();
       }
+
+      // Запрашиваем разрешения на уведомления при первом запуске главного экрана
+      _requestNotificationPermissions();
     });
+  }
+
+  Future<void> _requestNotificationPermissions() async {
+    try {
+      await NotificationService.requestPermissions();
+    } catch (e) {
+      // ignore errors
+    }
   }
 
   @override
@@ -53,13 +65,13 @@ class _MainScreenState extends State<MainScreen> {
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildNavItem(0, Icons.fitness_center, 'Тренировки'),
-                _buildNavItem(1, Icons.emoji_events, 'Достижения'),
-                _buildNavItem(2, Icons.person, 'Профиль'),
+                _buildNavItem(0, 'assets/images/training.png', ''),
+                _buildNavItem(1, 'assets/images/achivandstat.png', ''),
+                _buildNavItem(2, 'assets/images/profile.png', ''),
               ],
             ),
           ),
@@ -68,7 +80,7 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  Widget _buildNavItem(int index, IconData icon, String label) {
+  Widget _buildNavItem(int index, String iconPath, String label) {
     final isSelected = _currentIndex == index;
 
     return GestureDetector(
@@ -78,7 +90,7 @@ class _MainScreenState extends State<MainScreen> {
         });
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.textPrimary.withOpacity(0.1)
@@ -88,24 +100,27 @@ class _MainScreenState extends State<MainScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
+            Image.asset(
+              iconPath,
+              width: 28,
+              height: 28,
               color: isSelected
                   ? AppColors.textPrimary
                   : AppColors.textSecondary,
-              size: 24,
             ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected
-                    ? AppColors.textPrimary
-                    : AppColors.textSecondary,
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+            if (label.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected
+                      ? AppColors.textPrimary
+                      : AppColors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),

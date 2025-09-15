@@ -7,7 +7,6 @@ import '../../services/user_training_service.dart';
 import '../../services/search_service.dart';
 import 'user_exercise_reference_create_screen.dart';
 import 'user_exercise_reference_detail_screen.dart';
-import 'user_exercise_reference_edit_screen.dart';
 
 class UserExerciseReferenceListScreen extends StatefulWidget {
   const UserExerciseReferenceListScreen({Key? key}) : super(key: key);
@@ -319,54 +318,29 @@ class _UserExerciseReferenceListScreenState
                       return Card(
                         margin: EdgeInsets
                             .zero, // Убираем margin, так как используем separator
-                        child: ListTile(
-                          leading: const Icon(
-                            Icons.fitness_center,
-                            color: AppColors.textPrimary,
-                          ),
-                          title: Text(
-                            exercise.caption,
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                exercise.description,
-                                style: const TextStyle(
-                                  color: AppColors.textSecondary,
+                        child: Stack(
+                          children: [
+                            ListTile(
+                              title: Padding(
+                                padding: const EdgeInsets.only(right: 80),
+                                child: Text(
+                                  exercise.caption,
+                                  style: const TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
                               ),
-                              const SizedBox(height: 4),
-                              Column(
+                              subtitle: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 2,
+                                  Text(
+                                    exercise.description,
+                                    style: const TextStyle(
+                                      color: AppColors.textSecondary,
                                     ),
-                                    decoration: BoxDecoration(
-                                      color: exercise.exerciseType == 'user'
-                                          ? AppColors.buttonPrimary
-                                          : AppColors.textSecondary,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      exercise.exerciseType == 'user'
-                                          ? 'Пользовательская'
-                                          : 'Системная',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
@@ -378,91 +352,51 @@ class _UserExerciseReferenceListScreenState
                                   ),
                                 ],
                               ),
-                            ],
-                          ),
-                          trailing: exercise.exerciseType == 'user'
-                              ? Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.edit),
-                                      onPressed: () async {
-                                        final result =
-                                            await Navigator.of(context).push(
-                                              MaterialPageRoute(
-                                                builder: (context) =>
-                                                    UserExerciseReferenceEditScreen(
-                                                      exercise: exercise,
-                                                    ),
-                                              ),
-                                            );
-                                        if (result == true) {
-                                          _loadUserExercises();
-                                        }
-                                      },
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        UserExerciseReferenceDetailScreen(
+                                          exercise: exercise,
+                                        ),
+                                  ),
+                                );
+                              },
+                            ),
+                            // Метка в правом верхнем углу
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.textSecondary.withOpacity(
+                                    0.2,
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: AppColors.textSecondary.withOpacity(
+                                      0.5,
                                     ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete),
-                                      onPressed: () async {
-                                        final confirmed = await showDialog<bool>(
-                                          context: context,
-                                          builder: (context) => AlertDialog(
-                                            title: const Text(
-                                              'Удаление упражнения',
-                                            ),
-                                            content: const Text(
-                                              'Вы уверены, что хотите удалить это упражнение?',
-                                            ),
-                                            actions: [
-                                              TextButton(
-                                                onPressed: () => Navigator.of(
-                                                  context,
-                                                ).pop(false),
-                                                child: const Text('Отмена'),
-                                              ),
-                                              TextButton(
-                                                onPressed: () => Navigator.of(
-                                                  context,
-                                                ).pop(true),
-                                                child: const Text('Удалить'),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-
-                                        if (confirmed == true) {
-                                          final success =
-                                              await UserTrainingService.deleteExerciseReference(
-                                                exercise.uuid,
-                                              );
-                                          if (success) {
-                                            _loadUserExercises();
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                  'Упражнение удалено',
-                                                ),
-                                              ),
-                                            );
-                                          }
-                                        }
-                                      },
-                                    ),
-                                  ],
-                                )
-                              : null,
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    UserExerciseReferenceDetailScreen(
-                                      exercise: exercise,
-                                    ),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Text(
+                                  exercise.exerciseType == 'user'
+                                      ? 'Мое'
+                                      : 'Системное',
+                                  style: const TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
-                            );
-                          },
+                            ),
+                          ],
                         ),
                       );
                     },

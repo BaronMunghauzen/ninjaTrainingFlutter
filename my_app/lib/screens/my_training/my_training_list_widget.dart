@@ -7,13 +7,13 @@ import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/user_training_service.dart';
 import '../user_training_constructor/user_training_constructor_screen.dart';
-import '../system_training/system_training_list_screen.dart';
-import '../user_training_constructor/user_training_detail_screen.dart';
 import '../system_training/active_system_training_screen.dart';
 import '../system_training/system_training_detail_screen.dart';
 
 class MyTrainingListWidget extends StatefulWidget {
-  const MyTrainingListWidget({Key? key}) : super(key: key);
+  final VoidCallback? onDataChanged;
+
+  const MyTrainingListWidget({Key? key, this.onDataChanged}) : super(key: key);
 
   @override
   State<MyTrainingListWidget> createState() => _MyTrainingListWidgetState();
@@ -48,14 +48,14 @@ class _MyTrainingListWidgetState extends State<MyTrainingListWidget> {
         return;
       }
 
-      final trainings = await UserTrainingService.getUserTrainings(
-        userUuid,
-        actual: true,
-      );
+      final trainings = await UserTrainingService.getUserTrainings(userUuid);
       setState(() {
         userTrainings = trainings;
         isLoading = false;
       });
+
+      // Вызываем callback для обновления данных на родительской странице
+      widget.onDataChanged?.call();
     } catch (e) {
       print('Error loading user trainings: $e');
       setState(() {
@@ -85,12 +85,16 @@ class _MyTrainingListWidgetState extends State<MyTrainingListWidget> {
               icon: const Icon(Icons.add),
               tooltip: 'Добавить тренировку',
               color: AppColors.textPrimary,
-              onPressed: () {
-                Navigator.of(context).push(
+              onPressed: () async {
+                await Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (context) => const UserTrainingConstructorScreen(),
+                    builder: (context) => UserTrainingConstructorScreen(
+                      onDataChanged: widget.onDataChanged,
+                    ),
                   ),
                 );
+                // Обновляем данные после возврата
+                _loadUserTrainings();
               },
             ),
           ],

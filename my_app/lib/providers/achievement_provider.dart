@@ -50,12 +50,10 @@ class AchievementProvider extends ChangeNotifier {
   Future<void> loadAchievementsFromTypesTable() async {
     _setLoading(true);
     try {
-      print('Загружаем достижения из таблицы achievement_types...');
       _achievements = await AchievementService.getAchievementsFromTypesTable();
-      print('Получено ${_achievements.length} достижений');
       _filteredAchievements = _achievements;
       _error = null;
-      
+
       // Проверяем, что достижения действительно загружены
       if (_achievements.isNotEmpty) {
         print('Достижения успешно загружены:');
@@ -65,7 +63,6 @@ class AchievementProvider extends ChangeNotifier {
       } else {
         print('Список достижений пуст!');
       }
-      
     } catch (e) {
       print('Ошибка загрузки достижений: $e');
       _error = e.toString();
@@ -83,14 +80,14 @@ class AchievementProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       print('Загружаем достижения пользователя $userUuid...');
-      final userAchievements = await AchievementService.getUserAchievementsByUuid(userUuid);
+      final userAchievements =
+          await AchievementService.getUserAchievementsByUuid(userUuid);
       print('Получено ${userAchievements.length} достижений пользователя');
-      
+
       // Обновляем статус разблокировки для достижений
       _updateAchievementsUnlockStatus(userAchievements);
-      
+
       _error = null;
-      
     } catch (e) {
       print('Ошибка загрузки достижений пользователя: $e');
       _error = e.toString();
@@ -101,25 +98,31 @@ class AchievementProvider extends ChangeNotifier {
   }
 
   // Обновить статус разблокировки достижений на основе достижений пользователя
-  void _updateAchievementsUnlockStatus(List<AchievementModel> userAchievements) {
-    print('Обновляем статус разблокировки для ${userAchievements.length} достижений пользователя');
+  void _updateAchievementsUnlockStatus(
+    List<AchievementModel> userAchievements,
+  ) {
+    print(
+      'Обновляем статус разблокировки для ${userAchievements.length} достижений пользователя',
+    );
     print('Всего достижений в системе: ${_achievements.length}');
-    
+
     // Создаем Map для быстрого поиска по UUID достижения
     final Map<String, AchievementModel> userAchievementsMap = {
-      for (var achievement in userAchievements) achievement.uuid: achievement
+      for (var achievement in userAchievements) achievement.uuid: achievement,
     };
-    
+
     print('UUID достижений пользователя: ${userAchievementsMap.keys.toList()}');
-    
+
     int unlockedCount = 0;
     int lockedCount = 0;
-    
+
     // Обновляем статус разблокировки для всех достижений
     for (int i = 0; i < _achievements.length; i++) {
       final achievement = _achievements[i];
-      print('Проверяем достижение: ${achievement.title} (UUID: ${achievement.uuid})');
-      
+      print(
+        'Проверяем достижение: ${achievement.title} (UUID: ${achievement.uuid})',
+      );
+
       if (userAchievementsMap.containsKey(achievement.uuid)) {
         // Пользователь получил это достижение
         final userAchievement = userAchievementsMap[achievement.uuid]!;
@@ -141,12 +144,14 @@ class AchievementProvider extends ChangeNotifier {
         print('🔒 Заблокировано: ${achievement.title}');
       }
     }
-    
+
     // Обновляем отфильтрованные достижения
     _filteredAchievements = _achievements;
-    
-    print('Статус разблокировки обновлен: $unlockedCount разблокировано, $lockedCount заблокировано');
-    
+
+    print(
+      'Статус разблокировки обновлен: $unlockedCount разблокировано, $lockedCount заблокировано',
+    );
+
     // Уведомляем слушателей об изменении
     notifyListeners();
   }
@@ -156,8 +161,12 @@ class AchievementProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       print('Загружаем достижения для типа с UUID: $achievementTypeUuid...');
-      _achievements = await AchievementService.getAchievementsByTypeUuid(achievementTypeUuid);
-      print('Получено ${_achievements.length} достижений для типа $achievementTypeUuid');
+      _achievements = await AchievementService.getAchievementsByTypeUuid(
+        achievementTypeUuid,
+      );
+      print(
+        'Получено ${_achievements.length} достижений для типа $achievementTypeUuid',
+      );
       _filteredAchievements = _achievements;
       _error = null;
     } catch (e) {
@@ -187,16 +196,18 @@ class AchievementProvider extends ChangeNotifier {
     }
   }
 
-  
-
   // Обновить прогресс достижения
-  Future<void> updateAchievementProgress(String achievementId, int newValue) async {
+  Future<void> updateAchievementProgress(
+    String achievementId,
+    int newValue,
+  ) async {
     try {
-      final updatedAchievement = await AchievementService.updateAchievementProgress(
-        achievementId,
-        newValue,
-      );
-      
+      final updatedAchievement =
+          await AchievementService.updateAchievementProgress(
+            achievementId,
+            newValue,
+          );
+
       final index = _achievements.indexWhere((a) => a.uuid == achievementId);
       if (index != -1) {
         _achievements[index] = updatedAchievement;
@@ -212,8 +223,10 @@ class AchievementProvider extends ChangeNotifier {
   // Разблокировать достижение
   Future<void> unlockAchievement(String achievementId) async {
     try {
-      final unlockedAchievement = await AchievementService.unlockAchievement(achievementId);
-      
+      final unlockedAchievement = await AchievementService.unlockAchievement(
+        achievementId,
+      );
+
       final index = _achievements.indexWhere((a) => a.uuid == achievementId);
       if (index != -1) {
         _achievements[index] = unlockedAchievement;
@@ -252,7 +265,9 @@ class AchievementProvider extends ChangeNotifier {
 
   // Получить достижения по типу
   List<AchievementModel> getAchievementsByType(AchievementType type) {
-    return _achievements.where((achievement) => achievement.type == type).toList();
+    return _achievements
+        .where((achievement) => achievement.type == type)
+        .toList();
   }
 
   // Получить количество достижений по типу
@@ -266,17 +281,23 @@ class AchievementProvider extends ChangeNotifier {
 
   // Получить разблокированные достижения
   List<AchievementModel> getUnlockedAchievements() {
-    return _achievements.where((achievement) => achievement.isUnlocked).toList();
+    return _achievements
+        .where((achievement) => achievement.isUnlocked)
+        .toList();
   }
 
   // Получить заблокированные достижения
   List<AchievementModel> getLockedAchievements() {
-    return _achievements.where((achievement) => !achievement.isUnlocked).toList();
+    return _achievements
+        .where((achievement) => !achievement.isUnlocked)
+        .toList();
   }
 
   // Получить достижения, близкие к завершению
   List<AchievementModel> getNearCompletionAchievements() {
-    return _achievements.where((achievement) => achievement.isNearCompletion).toList();
+    return _achievements
+        .where((achievement) => achievement.isNearCompletion)
+        .toList();
   }
 
   // Очистить ошибку
@@ -331,7 +352,7 @@ class AchievementProvider extends ChangeNotifier {
           createdAt: DateTime.now(),
           icon: '✅',
         ),
-        
+
         // Тренировки
         AchievementModel(
           uuid: '3',
@@ -361,7 +382,7 @@ class AchievementProvider extends ChangeNotifier {
           createdAt: DateTime.now(),
           icon: '📅',
         ),
-        
+
         // Упражнения
         AchievementModel(
           uuid: '5',
@@ -391,7 +412,7 @@ class AchievementProvider extends ChangeNotifier {
           createdAt: DateTime.now(),
           icon: '🎯',
         ),
-        
+
         // Стреж
         AchievementModel(
           uuid: '7',
@@ -407,7 +428,7 @@ class AchievementProvider extends ChangeNotifier {
           createdAt: DateTime.now(),
           icon: '🔥',
         ),
-        
+
         // Время
         AchievementModel(
           uuid: '8',
@@ -423,7 +444,7 @@ class AchievementProvider extends ChangeNotifier {
           createdAt: DateTime.now(),
           icon: '⏱️',
         ),
-        
+
         // Социальные
         AchievementModel(
           uuid: '9',
@@ -443,17 +464,18 @@ class AchievementProvider extends ChangeNotifier {
       print('Получено ${_achievements.length} mock достижений');
       _filteredAchievements = _achievements;
       _error = null;
-      
+
       // Проверяем, что mock достижения действительно загружены
       if (_achievements.isNotEmpty) {
         print('Mock достижения успешно загружены:');
         for (final achievement in _achievements) {
-          print('- ${achievement.title} (${achievement.icon}) - ${achievement.category}');
+          print(
+            '- ${achievement.title} (${achievement.icon}) - ${achievement.category}',
+          );
         }
       } else {
         print('Список mock достижений пуст!');
       }
-      
     } catch (e) {
       print('Ошибка загрузки mock достижений: $e');
       _error = e.toString();
@@ -465,4 +487,3 @@ class AchievementProvider extends ChangeNotifier {
     }
   }
 }
-

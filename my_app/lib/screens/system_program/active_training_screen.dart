@@ -70,13 +70,16 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
                   // Заголовок по центру
                   Expanded(
                     child: Text(
-                      'Активная тренировка',
+                      widget.userProgramData['caption'] ??
+                          'Активная тренировка',
                       style: const TextStyle(
-                        fontSize: 20,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
                       ),
                       textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const Spacer(),
@@ -360,30 +363,31 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 30),
-            // Кнопка "Завершить" для дня отдыха
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () => _passTraining(),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.green,
-                  side: const BorderSide(color: Colors.green, width: 2),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            // Кнопка "Завершить" для дня отдыха - только если день активный
+            if (status == 'ACTIVE')
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => _passTraining(),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.green,
+                    side: const BorderSide(color: Colors.green, width: 2),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                ),
-                child: const Text(
-                  'Завершить',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.green,
+                  child: const Text(
+                    'Завершить',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.green,
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 30),
+            if (status == 'ACTIVE') const SizedBox(height: 30),
           ],
         );
       }
@@ -583,7 +587,7 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
             ),
           ),
         // Кнопки управления тренировкой или статус
-        if (!isRestDay && status == 'active')
+        if (!isRestDay && status == 'ACTIVE')
           Row(
             children: [
               // Кнопка "Пропустить"
@@ -758,11 +762,8 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
   Future<ImageProvider?> _loadExerciseGroupImage(String? imageUuid) async {
     if (imageUuid == null || imageUuid.isEmpty) return null;
     try {
-      final response = await ApiService.get('/files/file/$imageUuid');
-      if (response.statusCode == 200) {
-        return MemoryImage(response.bodyBytes);
-      }
-      return null;
+      // Используем новый метод кэширования
+      return await ApiService.getImageProvider(imageUuid);
     } catch (e) {
       print('[API] exception: $e');
       return null;

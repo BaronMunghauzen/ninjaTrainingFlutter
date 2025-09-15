@@ -54,8 +54,23 @@ dependencies:
   audioplayers: ^6.5.0
   path_provider: ^2.1.2
   
+  # Crypto for file caching
+  crypto: ^3.0.3
+  
   # Video player
   video_player: ^2.8.2
+  
+  # Local notifications
+  flutter_local_notifications: ^17.2.2
+  
+  # Google Fonts
+  google_fonts: ^6.2.1
+  
+  # Charts and graphs
+  fl_chart: ^0.68.0
+  
+  # Calendar widget
+  table_calendar: ^3.1.2
   
   # File picker for image selection
 

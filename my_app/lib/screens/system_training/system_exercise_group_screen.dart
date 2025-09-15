@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../models/exercise_model.dart';
 import '../../widgets/custom_button.dart';
-import '../../widgets/video_player_widget.dart';
+import '../../widgets/gif_widget.dart';
+import '../../widgets/exercise_info_modal.dart';
 import '../../constants/app_colors.dart';
 import 'package:my_app/providers/timer_overlay_provider.dart';
 import 'package:provider/provider.dart';
@@ -58,6 +59,11 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
 
             // Получаем данные из справочника упражнений
             final exerciseReferenceUuid = exJson['exercise_reference_uuid'];
+            print('🔍 Загрузка справочника для упражнения $uuid:');
+            print(
+              '  exerciseReferenceUuid из упражнения: $exerciseReferenceUuid',
+            );
+
             if (exerciseReferenceUuid != null) {
               try {
                 final refResp = await ApiService.get(
@@ -66,15 +72,22 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
                 if (refResp.statusCode == 200) {
                   final refJson = ApiService.decodeJson(refResp.body);
                   exerciseReferences[uuid] = refJson;
+                  print('📚 Получены данные справочника для упражнения $uuid:');
+                  print('  refJson: $refJson');
+                  print('  uuid в справочнике: ${refJson['uuid']}');
                   print(
-                    '📚 Получены данные справочника для упражнения $uuid: image_uuid=${refJson['image_uuid']}, video_uuid=${refJson['video_uuid']}',
+                    '  image_uuid: ${refJson['image_uuid']}, video_uuid: ${refJson['video_uuid']}, gif_uuid: ${refJson['gif_uuid']}',
                   );
+                } else {
+                  print('❌ Ошибка загрузки справочника: ${refResp.statusCode}');
                 }
               } catch (e) {
                 print(
                   '❌ Ошибка при загрузке справочника упражнения $exerciseReferenceUuid: $e',
                 );
               }
+            } else {
+              print('❌ exercise_reference_uuid не найден в данных упражнения');
             }
           }
         }
@@ -378,42 +391,62 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
     }
   }
 
-  List<Widget> _buildVideoSection(ExerciseModel exercise) {
+  void _showExerciseInfo(ExerciseModel exercise) {
+    // Получаем exercise_reference_uuid из данных упражнения
     final exerciseRef = exerciseReferences[exercise.uuid];
-    final videoUuid = exerciseRef?['video_uuid'];
+    final exerciseReferenceUuid =
+        exerciseRef?['uuid']; // Используем uuid из справочника
+    final userUuid = widget.userTraining['user']?['uuid'] ?? '';
 
-    // Если нет video_uuid, не показываем секцию с видео вообще
-    if (videoUuid == null) {
+    print('🔍 Отладка _showExerciseInfo:');
+    print('  exercise.uuid: ${exercise.uuid}');
+    print('  exerciseRef: $exerciseRef');
+    print('  exerciseReferenceUuid: $exerciseReferenceUuid');
+    print('  userUuid: $userUuid');
+
+    if (exerciseReferenceUuid == null || userUuid.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Не удалось загрузить информацию об упражнении. exerciseReferenceUuid: $exerciseReferenceUuid, userUuid: $userUuid',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => ExerciseInfoModal(
+        exerciseReferenceUuid: exerciseReferenceUuid,
+        userUuid: userUuid,
+      ),
+    );
+  }
+
+  List<Widget> _buildGifSection(ExerciseModel exercise) {
+    final exerciseRef = exerciseReferences[exercise.uuid];
+    final gifUuid = exerciseRef?['gif_uuid'];
+
+    // Если нет gif_uuid, не показываем секцию с гифкой вообще
+    if (gifUuid == null) {
       return [];
     }
 
-    // Если есть video_uuid, показываем контейнер с плеером
-    return [
-      Container(
-        height: 180,
-        decoration: BoxDecoration(
-          color: AppColors.inputBorder,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: _buildVideoPlayer(exercise),
-        ),
-      ),
-    ];
+    // Если есть gif_uuid, показываем только гифку без рамки
+    return [_buildGifPlayer(exercise)];
   }
 
-  Widget _buildVideoPlayer(ExerciseModel exercise) {
+  Widget _buildGifPlayer(ExerciseModel exercise) {
     final exerciseRef = exerciseReferences[exercise.uuid];
-    final videoUuid = exerciseRef?['video_uuid'];
-    final imageUuid = exerciseRef?['image_uuid'];
+    final gifUuid = exerciseRef?['gif_uuid'];
 
-    // Этот метод вызывается только когда video_uuid есть
-    return VideoPlayerWidget(
-      videoUuid: videoUuid,
-      imageUuid: imageUuid,
+    // Этот метод вызывается только когда gif_uuid есть
+    return GifWidget(
+      gifUuid: gifUuid,
       width: double.infinity,
-      height: 180,
+      height: 250, // Увеличиваем высоту для лучшего отображения
     );
   }
 
@@ -444,17 +477,50 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Text(
-                              ex.caption,
-                              style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                              ),
-                              textAlign: TextAlign.center,
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    ex.caption,
+                                    style: const TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: () => _showExerciseInfo(ex),
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.inputBorder
+                                            .withOpacity(0.3),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: AppColors.inputBorder
+                                              .withOpacity(0.5),
+                                          width: 1,
+                                        ),
+                                      ),
+                                      child: const Icon(
+                                        Icons.info_outline,
+                                        color: AppColors.textPrimary,
+                                        size: 20,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 12),
-                            ..._buildVideoSection(ex),
+                            ..._buildGifSection(ex),
                             const SizedBox(height: 20),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -555,13 +621,12 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
                                                             .status ==
                                                         'passed'
                                                     ? null
-                                                    : () =>
-                                                          _showRepsWeightPicker(
-                                                            index,
-                                                            setIdx,
-                                                            ex.repsCount,
-                                                            ex.withWeight,
-                                                          ),
+                                                    : () => _showRepsWeightPicker(
+                                                        index,
+                                                        setIdx,
+                                                        100, // Фиксированное максимальное количество повторений
+                                                        ex.withWeight,
+                                                      ),
                                                 child: Center(
                                                   child: ex.withWeight
                                                       ? Row(

@@ -9,6 +9,7 @@ import 'screens/profile/auth_screen.dart';
 import 'screens/main_screen_wrapper.dart';
 import 'widgets/global_timer_overlay.dart';
 import 'services/api_service.dart';
+import 'services/notification_service.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -17,6 +18,9 @@ void main() async {
 
   // Оптимизация: инициализируем API сервис при старте
   await ApiService.initializeToken();
+
+  // Инициализируем сервис уведомлений
+  await NotificationService.initialize();
 
   runApp(const MyApp());
 }

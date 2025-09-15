@@ -16,6 +16,7 @@ import '../my_training/my_training_list_widget.dart'; // Added import for MyTrai
 import 'dart:async';
 import '../system_training/active_system_training_screen.dart'; // Added import for ActiveSystemTrainingScreen
 import '../system_training/system_training_detail_screen.dart'; // Added import for SystemTrainingDetailScreen
+import '../user_training_constructor/user_exercise_reference_detail_screen.dart';
 
 class TrainingScreen extends StatefulWidget {
   const TrainingScreen({Key? key}) : super(key: key);
@@ -35,6 +36,9 @@ class _TrainingScreenState extends State<TrainingScreen> {
   bool _isSearching = false;
   bool _showSearchResults = false;
 
+  // Счетчик для принудительного обновления SystemTrainingListWidget
+  int _systemTrainingRefreshCounter = 0;
+
   @override
   void initState() {
     super.initState();
@@ -42,6 +46,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
   }
 
   Future<void> _loadPrograms() async {
+    print('TrainingScreen: Загружаем программы...');
     try {
       final programsList = await ProgramService.getActualPrograms();
       // Отладочная информация
@@ -66,14 +71,19 @@ class _TrainingScreenState extends State<TrainingScreen> {
     }
   }
 
+  Future<void> _refreshSystemTrainings() async {
+    print('TrainingScreen: Обновляем системные тренировки...');
+    // Принудительно обновляем SystemTrainingListWidget через setState
+    setState(() {
+      _systemTrainingRefreshCounter++;
+    });
+  }
+
   Future<ImageProvider?> _loadProgramImage(String? imageUuid) async {
     if (imageUuid == null || imageUuid.isEmpty) return null;
     try {
-      final response = await ApiService.get('/files/file/$imageUuid');
-      if (response.statusCode == 200) {
-        return MemoryImage(response.bodyBytes);
-      }
-      return null;
+      // Используем новый метод кэширования
+      return await ApiService.getImageProvider(imageUuid);
     } catch (e) {
       print('[API] exception: $e');
       return null;
@@ -152,12 +162,9 @@ class _TrainingScreenState extends State<TrainingScreen> {
   void _onSearchItemTap(dynamic item, String type) {
     switch (type) {
       case 'exercise_reference':
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('В разработке'),
-            backgroundColor: Color(0xFF1F2121),
-          ),
-        );
+        if (item is ExerciseReference) {
+          _navigateToExerciseReference(item);
+        }
         break;
       case 'program':
         if (item is Program && item.programType == 'system') {
@@ -174,6 +181,15 @@ class _TrainingScreenState extends State<TrainingScreen> {
         }
         break;
     }
+  }
+
+  void _navigateToExerciseReference(ExerciseReference exercise) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            UserExerciseReferenceDetailScreen(exercise: exercise),
+      ),
+    );
   }
 
   void _navigateToProgram(Program program) async {
@@ -399,20 +415,13 @@ class _TrainingScreenState extends State<TrainingScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Ninja',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          const Text(
-                            'Training',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
+                          // Логотип "Ninja Training"
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            child: Image.asset(
+                              'assets/images/logo.png',
+                              height: 100,
+                              fit: BoxFit.contain,
                             ),
                           ),
                           SizedBox(height: 200),
@@ -483,34 +492,6 @@ class _TrainingScreenState extends State<TrainingScreen> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          // Кнопка "Разминка"
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: () {
-                                // TODO: Замокать действие разминки
-                                print('Разминка нажата');
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.buttonPrimary,
-                                foregroundColor: AppColors.textPrimary,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: const Text(
-                                'Разминка',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 30),
                           // Заголовок "Программы" с кнопкой "Конструктор" для администратора
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -685,24 +666,21 @@ class _TrainingScreenState extends State<TrainingScreen> {
                                                         ),
                                                       ),
                                                     ),
-                                                  Center(
-                                                    child: Padding(
-                                                      padding:
-                                                          const EdgeInsets.all(
-                                                            12,
-                                                          ),
-                                                      child: Text(
-                                                        program.caption,
-                                                        style: const TextStyle(
-                                                          color: AppColors
-                                                              .textPrimary,
-                                                          fontSize: 16,
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                        ),
-                                                        textAlign:
-                                                            TextAlign.center,
+                                                  Positioned(
+                                                    bottom: 15,
+                                                    left: 8,
+                                                    right: 8,
+                                                    child: Text(
+                                                      program.caption,
+                                                      style: const TextStyle(
+                                                        color: AppColors
+                                                            .textPrimary,
+                                                        fontSize: 15,
+                                                        fontWeight:
+                                                            FontWeight.w600,
                                                       ),
+                                                      textAlign:
+                                                          TextAlign.center,
                                                     ),
                                                   ),
                                                 ],
@@ -737,13 +715,23 @@ class _TrainingScreenState extends State<TrainingScreen> {
                                     icon: const Icon(Icons.build),
                                     tooltip: 'Конструктор тренировок',
                                     color: AppColors.textPrimary,
-                                    onPressed: () {
-                                      Navigator.of(context).push(
+                                    onPressed: () async {
+                                      await Navigator.of(context).push(
                                         MaterialPageRoute(
                                           builder: (context) =>
-                                              const AdminTrainingConstructorScreen(),
+                                              AdminTrainingConstructorScreen(
+                                                onDataChanged: () {
+                                                  // Обновляем данные на странице тренировок
+                                                  print(
+                                                    'TrainingScreen: Получен callback от AdminTrainingConstructorScreen',
+                                                  );
+                                                  _refreshSystemTrainings();
+                                                },
+                                              ),
                                         ),
                                       );
+                                      // Обновляем данные после возврата
+                                      _loadPrograms();
                                     },
                                   );
                                 },
@@ -753,12 +741,20 @@ class _TrainingScreenState extends State<TrainingScreen> {
                           const SizedBox(height: 20),
                           SizedBox(
                             height: 140,
-                            child:
-                                SystemTrainingListWidget(), // TODO: реализовать виджет
+                            child: SystemTrainingListWidget(
+                              key: ValueKey(_systemTrainingRefreshCounter),
+                            ),
                           ),
                           // Новый блок "Мои тренировки"
                           const SizedBox(height: 32),
-                          MyTrainingListWidget(),
+                          MyTrainingListWidget(
+                            onDataChanged: () {
+                              // Обновляем данные на странице тренировок
+                              setState(() {
+                                // Можно добавить дополнительную логику обновления
+                              });
+                            },
+                          ),
                         ],
                       ),
                     ),

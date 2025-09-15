@@ -4,7 +4,10 @@ import 'admin_training_create_screen.dart';
 import 'admin_training_detail_screen.dart';
 
 class AdminTrainingListScreen extends StatefulWidget {
-  const AdminTrainingListScreen({Key? key}) : super(key: key);
+  final VoidCallback? onDataChanged;
+
+  const AdminTrainingListScreen({Key? key, this.onDataChanged})
+    : super(key: key);
 
   @override
   State<AdminTrainingListScreen> createState() =>
@@ -33,6 +36,10 @@ class _AdminTrainingListScreenState extends State<AdminTrainingListScreen> {
         trainings = List<Map<String, dynamic>>.from(data);
         isLoading = false;
       });
+
+      // Вызываем callback для обновления данных на родительской странице
+      print('AdminTrainingListScreen: Вызываем callback onDataChanged');
+      widget.onDataChanged?.call();
     } else {
       setState(() => isLoading = false);
     }
@@ -84,13 +91,19 @@ class _AdminTrainingListScreenState extends State<AdminTrainingListScreen> {
                               ? '  |  Актуальная'
                               : '  |  Неактуальная'),
                     ),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            AdminTrainingDetailScreen(trainingUuid: t['uuid']),
-                      ),
-                    ),
+                    onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => AdminTrainingDetailScreen(
+                            trainingUuid: t['uuid'],
+                            onDataChanged: widget.onDataChanged,
+                          ),
+                        ),
+                      );
+                      // Обновляем данные после возврата
+                      _fetchTrainings();
+                    },
                     trailing: IconButton(
                       icon: const Icon(Icons.close, color: Colors.red),
                       onPressed: () => _deleteTraining(t['uuid']),
@@ -106,7 +119,9 @@ class _AdminTrainingListScreenState extends State<AdminTrainingListScreen> {
               await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const AdminTrainingCreateScreen(),
+                  builder: (_) => AdminTrainingCreateScreen(
+                    onDataChanged: widget.onDataChanged,
+                  ),
                 ),
               );
               _fetchTrainings();

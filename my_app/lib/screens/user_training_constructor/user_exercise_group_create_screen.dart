@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../../constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/user_training_service.dart';
-import '../../services/api_service.dart';
 import '../admin_training_constructor/widgets.dart';
 
 class UserExerciseGroupCreateScreen extends StatefulWidget {
@@ -282,14 +281,64 @@ class _UserExerciseGroupCreateScreenState
                   },
                 ),
                 const SizedBox(height: 16),
-                CheckboxListTile(
-                  title: const Text('С весом'),
-                  value: withWeight,
-                  onChanged: (value) {
-                    setState(() {
-                      withWeight = value ?? false;
-                    });
-                  },
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'С весом',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        print('🔄 Custom Switch tapped: ${!withWeight}');
+                        setState(() {
+                          withWeight = !withWeight;
+                        });
+                      },
+                      child: Container(
+                        width: 60,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(17),
+                          color: withWeight
+                              ? AppColors.textSecondary.withOpacity(0.3)
+                              : AppColors.buttonPrimary.withOpacity(0.3),
+                          border: Border.all(
+                            color: withWeight
+                                ? AppColors.textSecondary
+                                : AppColors.buttonPrimary,
+                            width: 2,
+                          ),
+                        ),
+                        child: AnimatedAlign(
+                          duration: const Duration(milliseconds: 200),
+                          alignment: withWeight
+                              ? Alignment.centerRight
+                              : Alignment.centerLeft,
+                          child: Container(
+                            width: 28,
+                            height: 28,
+                            margin: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: withWeight
+                                  ? AppColors.textSecondary
+                                  : AppColors.buttonPrimary,
+                              border: Border.all(
+                                color: withWeight
+                                    ? AppColors.buttonPrimary
+                                    : AppColors.textSecondary,
+                                width: 2,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
 
                 const SizedBox(height: 24),

@@ -1,9 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:crypto/crypto.dart';
 import '../constants/api_constants.dart';
 import 'package:http_parser/http_parser.dart';
+import 'package:flutter/material.dart';
 
 class ApiService {
   static const String _logPrefix = '🌐 API';
@@ -11,6 +15,191 @@ class ApiService {
   // Кэш токена для избежания повторных обращений к SharedPreferences
   static String? _cachedToken;
   static bool _tokenInitialized = false;
+
+  // Кэш файлов в памяти для быстрого доступа
+  static final Map<String, Uint8List> _fileCache = {};
+
+  // Кэш метаданных файлов (размер, время загрузки)
+  static final Map<String, Map<String, dynamic>> _fileMetadata = {};
+
+  /// Получить путь к директории кэша
+  static Future<String> get _cacheDirectory async {
+    final dir = await getApplicationDocumentsDirectory();
+    final cacheDir = Directory('${dir.path}/file_cache');
+    if (!await cacheDir.exists()) {
+      await cacheDir.create(recursive: true);
+    }
+    return cacheDir.path;
+  }
+
+  /// Создать хеш для UUID файла (для безопасного имени файла)
+  static String _createFileHash(String uuid) {
+    return sha256.convert(utf8.encode(uuid)).toString();
+  }
+
+  /// Получить путь к кэшированному файлу
+  static Future<String> _getCachedFilePath(String uuid) async {
+    final cacheDir = await _cacheDirectory;
+    final fileHash = _createFileHash(uuid);
+    return '$cacheDir/$fileHash';
+  }
+
+  /// Проверить, есть ли файл в кэше
+  static Future<bool> _isFileCached(String uuid) async {
+    // Сначала проверяем память
+    if (_fileCache.containsKey(uuid)) {
+      return true;
+    }
+
+    // Затем проверяем диск
+    final filePath = await _getCachedFilePath(uuid);
+    final file = File(filePath);
+    return await file.exists();
+  }
+
+  /// Получить файл из кэша
+  static Future<Uint8List?> _getCachedFile(String uuid) async {
+    // Сначала проверяем память
+    if (_fileCache.containsKey(uuid)) {
+      return _fileCache[uuid];
+    }
+
+    // Затем проверяем диск
+    final filePath = await _getCachedFilePath(uuid);
+    final file = File(filePath);
+    if (await file.exists()) {
+      try {
+        final bytes = await file.readAsBytes();
+        // Добавляем в память для быстрого доступа
+        _fileCache[uuid] = bytes;
+        return bytes;
+      } catch (e) {
+        print('$_logPrefix ❌ Ошибка чтения кэшированного файла: $e');
+        return null;
+      }
+    }
+
+    return null;
+  }
+
+  /// Сохранить файл в кэш
+  static Future<void> _saveFileToCache(String uuid, Uint8List bytes) async {
+    try {
+      // Сохраняем в память
+      _fileCache[uuid] = bytes;
+
+      // Сохраняем на диск
+      final filePath = await _getCachedFilePath(uuid);
+      final file = File(filePath);
+      await file.writeAsBytes(bytes);
+
+      // Обновляем метаданные
+      _fileMetadata[uuid] = {
+        'size': bytes.length,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'path': filePath,
+      };
+
+      print('$_logPrefix 💾 Файл $uuid сохранен в кэш (${bytes.length} байт)');
+    } catch (e) {
+      print('$_logPrefix ❌ Ошибка сохранения файла в кэш: $e');
+    }
+  }
+
+  /// Очистить кэш файлов
+  static Future<void> clearFileCache() async {
+    try {
+      // Очищаем память
+      _fileCache.clear();
+      _fileMetadata.clear();
+
+      // Очищаем диск
+      final cacheDir = await _cacheDirectory;
+      final dir = Directory(cacheDir);
+      if (await dir.exists()) {
+        await dir.delete(recursive: true);
+        await dir.create();
+      }
+
+      print('$_logPrefix 🗑️ Кэш файлов очищен');
+    } catch (e) {
+      print('$_logPrefix ❌ Ошибка очистки кэша: $e');
+    }
+  }
+
+  /// Получить размер кэша
+  static Future<int> getCacheSize() async {
+    try {
+      final cacheDir = await _cacheDirectory;
+      final dir = Directory(cacheDir);
+      if (!await dir.exists()) return 0;
+
+      int totalSize = 0;
+      await for (final entity in dir.list(recursive: true)) {
+        if (entity is File) {
+          totalSize += await entity.length();
+        }
+      }
+
+      return totalSize;
+    } catch (e) {
+      print('$_logPrefix ❌ Ошибка получения размера кэша: $e');
+      return 0;
+    }
+  }
+
+  /// Загрузить файл с кэшированием по UUID
+  static Future<Uint8List?> getFile(
+    String uuid, {
+    bool forceRefresh = false,
+  }) async {
+    if (uuid.isEmpty) return null;
+
+    try {
+      // Проверяем кэш, если не требуется принудительное обновление
+      if (!forceRefresh) {
+        final cachedFile = await _getCachedFile(uuid);
+        if (cachedFile != null) {
+          print('$_logPrefix 📁 Файл $uuid загружен из кэша');
+          return cachedFile;
+        }
+      }
+
+      // Загружаем файл с сервера
+      print('$_logPrefix 📥 Загружаем файл $uuid с сервера...');
+      final response = await get('/files/file/$uuid');
+
+      if (response.statusCode == 200) {
+        final bytes = response.bodyBytes;
+
+        // Сохраняем в кэш
+        await _saveFileToCache(uuid, bytes);
+
+        print('$_logPrefix ✅ Файл $uuid успешно загружен и сохранен в кэш');
+        return bytes;
+      } else {
+        print(
+          '$_logPrefix ❌ Ошибка загрузки файла $uuid: ${response.statusCode}',
+        );
+        return null;
+      }
+    } catch (e) {
+      print('$_logPrefix ❌ Ошибка при работе с файлом $uuid: $e');
+      return null;
+    }
+  }
+
+  /// Получить ImageProvider для изображения с кэшированием
+  static Future<ImageProvider?> getImageProvider(
+    String uuid, {
+    bool forceRefresh = false,
+  }) async {
+    final bytes = await getFile(uuid, forceRefresh: forceRefresh);
+    if (bytes != null) {
+      return MemoryImage(bytes);
+    }
+    return null;
+  }
 
   /// Инициализация токена (вызывается при старте приложения)
   static Future<void> initializeToken() async {
@@ -143,7 +332,7 @@ class ApiService {
       // Иначе добавляем базовый URL
       uri = '${ApiConstants.baseUrl}$endpoint';
     }
-    
+
     if (queryParams != null && queryParams.isNotEmpty) {
       final queryString = queryParams.entries
           .map((e) => '${e.key}=${Uri.encodeComponent(e.value.toString())}')
@@ -227,7 +416,7 @@ class ApiService {
       // Иначе добавляем базовый URL
       uri = '${ApiConstants.baseUrl}$endpoint';
     }
-    
+
     if (queryParams != null && queryParams.isNotEmpty) {
       final queryString = queryParams.entries
           .map((e) => '${e.key}=${Uri.encodeComponent(e.value.toString())}')
@@ -479,6 +668,49 @@ class ApiService {
         error: e.toString(),
       );
       rethrow;
+    }
+  }
+
+  /// Получить данные справочника упражнения
+  static Future<Map<String, dynamic>?> getExerciseReference(
+    String exerciseReferenceUuid,
+  ) async {
+    try {
+      final response = await get('/exercise_reference/$exerciseReferenceUuid');
+      if (response.statusCode == 200) {
+        return decodeJson(response.body);
+      } else {
+        print(
+          '$_logPrefix ❌ Ошибка получения справочника упражнения: ${response.statusCode}',
+        );
+        return null;
+      }
+    } catch (e) {
+      print('$_logPrefix ❌ Ошибка при получении справочника упражнения: $e');
+      return null;
+    }
+  }
+
+  /// Получить статистику упражнения для пользователя
+  static Future<Map<String, dynamic>?> getExerciseStatistics(
+    String exerciseReferenceUuid,
+    String userUuid,
+  ) async {
+    try {
+      final response = await get(
+        '/exercise_reference/$exerciseReferenceUuid/statistics/$userUuid',
+      );
+      if (response.statusCode == 200) {
+        return decodeJson(response.body);
+      } else {
+        print(
+          '$_logPrefix ❌ Ошибка получения статистики упражнения: ${response.statusCode}',
+        );
+        return null;
+      }
+    } catch (e) {
+      print('$_logPrefix ❌ Ошибка при получении статистики упражнения: $e');
+      return null;
     }
   }
 

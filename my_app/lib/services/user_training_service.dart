@@ -1,7 +1,5 @@
-import '../constants/api_constants.dart';
 import 'api_service.dart';
 import '../models/training_model.dart';
-import '../models/exercise_model.dart';
 import '../models/search_result_model.dart' as search_models;
 
 class UserTrainingService {
@@ -357,6 +355,32 @@ class UserTrainingService {
     }
   }
 
+  /// Архивирование тренировки
+  static Future<bool> archiveTraining(String trainingUuid) async {
+    try {
+      final response = await ApiService.post(
+        '/trainings/$trainingUuid/archive',
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error archiving training: $e');
+      return false;
+    }
+  }
+
+  /// Восстановление тренировки из архива
+  static Future<bool> restoreTraining(String trainingUuid) async {
+    try {
+      final response = await ApiService.post(
+        '/trainings/$trainingUuid/restore',
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error restoring training: $e');
+      return false;
+    }
+  }
+
   /// Удаление упражнения из справочника
   static Future<bool> deleteExerciseReference(
     String exerciseReferenceUuid,
@@ -440,6 +464,10 @@ class ExerciseGroup {
   final String description;
   final String muscleGroup;
   final List<String> exercises; // Изменено на List<String> для UUID
+  final int? setsCount;
+  final int? repsCount;
+  final int? restTime;
+  final bool? withWeight;
 
   ExerciseGroup({
     required this.uuid,
@@ -448,6 +476,10 @@ class ExerciseGroup {
     required this.description,
     required this.muscleGroup,
     required this.exercises,
+    this.setsCount,
+    this.repsCount,
+    this.restTime,
+    this.withWeight,
   });
 
   factory ExerciseGroup.fromJson(Map<String, dynamic> json) {
@@ -462,6 +494,10 @@ class ExerciseGroup {
               ?.map((e) => e.toString())
               .toList() ??
           [],
+      setsCount: json['sets_count'],
+      repsCount: json['reps_count'],
+      restTime: json['rest_time'],
+      withWeight: json['with_weight'],
     );
   }
 }

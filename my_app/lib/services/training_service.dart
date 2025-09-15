@@ -1,5 +1,4 @@
 import 'api_service.dart';
-import '../models/user_training_model.dart';
 
 class TrainingService {
   // Кэш для тренировок пользователя
@@ -40,7 +39,6 @@ class TrainingService {
       }
       return [];
     } catch (e) {
-      print('Error loading user trainings: $e');
       rethrow;
     }
   }
@@ -90,7 +88,6 @@ class TrainingService {
       }
       return [];
     } catch (e) {
-      print('Error loading exercise groups: $e');
       rethrow;
     }
   }
@@ -102,7 +99,6 @@ class TrainingService {
       );
       return response.statusCode == 200;
     } catch (e) {
-      print('Error finishing user program: $e');
       rethrow;
     }
   }
@@ -125,7 +121,6 @@ class TrainingService {
       }
       return {'success': false, 'next_stage_created': false};
     } catch (e) {
-      print('Error skipping user training: $e');
       return {'success': false, 'next_stage_created': false};
     }
   }
@@ -148,7 +143,6 @@ class TrainingService {
       }
       return {'success': false, 'next_stage_created': false};
     } catch (e) {
-      print('Error passing user training: $e');
       return {'success': false, 'next_stage_created': false};
     }
   }
@@ -173,7 +167,6 @@ class TrainingService {
       final trainings = await getUserTrainings(userProgramUuid);
       return trainings.isNotEmpty;
     } catch (e) {
-      print('Error refreshing user program and schedule: $e');
       return false;
     }
   }
@@ -199,7 +192,6 @@ class TrainingService {
       }
       return null;
     } catch (e) {
-      print('Error getting active user program: $e');
       return null;
     }
   }
@@ -278,7 +270,7 @@ class TrainingService {
 
         // Ищем активную тренировку и кэшируем результат
         for (final training in trainings) {
-          if (training['status'] == 'active') {
+          if (training['status'] == 'ACTIVE') {
             _activeTrainingCache[userProgramUuid] = training;
             return training;
           }
@@ -292,7 +284,7 @@ class TrainingService {
 
     // Fallback: обычный поиск
     for (final training in trainings) {
-      if (training['status'] == 'active') {
+      if (training['status'] == 'ACTIVE') {
         return training;
       }
     }

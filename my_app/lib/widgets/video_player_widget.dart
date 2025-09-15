@@ -447,22 +447,16 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
           _imageCache.clear();
         }
 
-        // Загружаем изображение через ApiService с авторизацией
-        final response = await ApiService.get('/files/file/$imageUuid');
+        // Используем новый метод кэширования ApiService
+        final imageProvider = await ApiService.getImageProvider(imageUuid);
 
-        if (response.statusCode == 200) {
-          print(
-            'Image loaded successfully: ${response.bodyBytes.length} bytes',
-          );
-
-          // Создаем MemoryImage и добавляем в кэш
-          final imageProvider = MemoryImage(response.bodyBytes);
+        if (imageProvider != null) {
+          // Добавляем в локальный кэш для совместимости
           _imageCache[imageUuid] = imageProvider;
-
+          print('Image loaded successfully from cache or server');
           return imageProvider;
         } else {
-          print('Image loading failed: ${response.statusCode}');
-          print('Response body: ${response.body}');
+          print('Image loading failed');
         }
         return null;
       } finally {

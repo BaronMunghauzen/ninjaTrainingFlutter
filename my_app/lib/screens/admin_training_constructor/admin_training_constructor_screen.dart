@@ -3,7 +3,10 @@ import 'admin_training_list_screen.dart';
 import 'admin_exercise_reference_list_screen.dart';
 
 class AdminTrainingConstructorScreen extends StatefulWidget {
-  const AdminTrainingConstructorScreen({Key? key}) : super(key: key);
+  final VoidCallback? onDataChanged;
+
+  const AdminTrainingConstructorScreen({Key? key, this.onDataChanged})
+    : super(key: key);
 
   @override
   State<AdminTrainingConstructorScreen> createState() =>
@@ -42,9 +45,9 @@ class _AdminTrainingConstructorScreenState
       ),
       body: TabBarView(
         controller: _tabController,
-        children: const [
-          AdminTrainingListScreen(),
-          AdminExerciseReferenceListScreen(),
+        children: [
+          AdminTrainingListScreen(onDataChanged: widget.onDataChanged),
+          const AdminExerciseReferenceListScreen(),
         ],
       ),
     );

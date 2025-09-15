@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 
 class AdminTrainingCreateScreen extends StatefulWidget {
-  const AdminTrainingCreateScreen({Key? key}) : super(key: key);
+  final VoidCallback? onDataChanged;
+
+  const AdminTrainingCreateScreen({Key? key, this.onDataChanged})
+    : super(key: key);
 
   @override
   State<AdminTrainingCreateScreen> createState() =>
@@ -49,6 +52,9 @@ class _AdminTrainingCreateScreenState extends State<AdminTrainingCreateScreen> {
     final response = await ApiService.post('/trainings/add/', body: body);
     setState(() => isLoading = false);
     if (response.statusCode == 201 || response.statusCode == 200) {
+      // Вызываем callback для обновления данных на родительской странице
+      print('AdminTrainingCreateScreen: Вызываем callback onDataChanged');
+      widget.onDataChanged?.call();
       Navigator.pop(context);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

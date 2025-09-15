@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
-import '../../widgets/logo_widget.dart';
+import 'forgot_password_screen.dart';
+import '../main_screen_wrapper.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({Key? key}) : super(key: key);
@@ -98,6 +98,30 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
       } else if (error == null && mounted) {
         // Если нет ошибки, значит авторизация/регистрация прошла успешно
         // AuthProvider автоматически обновит состояние и перенаправит пользователя
+
+        // Принудительно обновляем UI
+        if (mounted) {
+          setState(() {});
+        }
+
+        // Дополнительная задержка для обновления UI
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (mounted) {
+            setState(() {});
+          }
+        });
+
+        // Принудительно обновляем главный экран через Navigator
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            // Принудительно перезагружаем главный экран
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => const MainScreenWrapper(),
+              ),
+            );
+          }
+        });
       }
     } finally {
       if (mounted) {
@@ -120,9 +144,6 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
             ),
           ),
 
-          // Фоновый логотип ниндзя
-          const NinjaBackgroundLogo(opacity: 0.15, size: 500),
-
           // Основной контент
           SafeArea(
             child: SingleChildScrollView(
@@ -138,30 +159,13 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                       children: [
                         const SizedBox(height: 120),
 
-                        // Стильный заголовок "Ninja Training"
-                        Column(
-                          children: [
-                            const Text(
-                              'Ninja',
-                              style: TextStyle(
-                                fontSize: 48,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                                letterSpacing: 3.0,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const Text(
-                              'Training',
-                              style: TextStyle(
-                                fontSize: 48,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                                letterSpacing: 3.0,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
+                        // Логотип "Ninja Training"
+                        Center(
+                          child: Image.asset(
+                            'assets/images/logo.png',
+                            height: 200,
+                            fit: BoxFit.contain,
+                          ),
                         ),
 
                         const SizedBox(height: 40),
@@ -303,6 +307,31 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                         ),
 
                         const SizedBox(height: 24),
+
+                        // Кнопка "Забыли пароль?" (только для режима входа)
+                        if (_isLogin) ...[
+                          Center(
+                            child: TextButton(
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const ForgotPasswordScreen(),
+                                  ),
+                                );
+                              },
+                              child: const Text(
+                                'Забыли пароль?',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 14,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
 
                         // Переключение режима
                         Row(

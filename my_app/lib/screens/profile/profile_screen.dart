@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'dart:typed_data';
 import '../../constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/custom_button.dart';
-import '../../widgets/custom_switch.dart';
 import '../../widgets/avatar_modal.dart';
+import '../../services/api_service.dart';
 import 'edit_profile_screen.dart';
 import 'contact_screen.dart';
+import 'auth_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -17,8 +19,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  bool _notificationsEnabled = true;
-  bool _isDarkTheme = true;
   bool _isRefreshing = false;
 
   @override
@@ -148,24 +148,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       child: userProfile.avatarUuid != null
                           ? ClipOval(
-                              child: Image.network(
-                                'http://10.0.2.2:8000/files/file/${userProfile.avatarUuid}',
-                                width: 120,
-                                height: 120,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return const Icon(
-                                    Icons.person,
-                                    size: 60,
-                                    color: Colors.white,
+                              child: FutureBuilder<Uint8List?>(
+                                future: ApiService.getFile(
+                                  userProfile.avatarUuid!,
+                                  forceRefresh: true, // Принудительно обновляем
+                                ),
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState ==
+                                      ConnectionState.waiting) {
+                                    return const Center(
+                                      child: CircularProgressIndicator(
+                                        color: Color(0xFF1F2121),
+                                        strokeWidth: 2,
+                                      ),
+                                    );
+                                  }
+
+                                  if (snapshot.hasError || !snapshot.hasData) {
+                                    print(
+                                      'Avatar loading error: ${snapshot.error}',
+                                    );
+                                    return const Icon(
+                                      Icons.person,
+                                      size: 60,
+                                      color: Colors.white,
+                                    );
+                                  }
+
+                                  return Image.memory(
+                                    snapshot.data!,
+                                    width: 120,
+                                    height: 120,
+                                    fit: BoxFit.cover,
+                                    key: ValueKey(
+                                      '${userProfile.avatarUuid}_${DateTime.now().millisecondsSinceEpoch}',
+                                    ),
                                   );
                                 },
-                                // Добавляем кэш-бюстер для принудительного обновления изображения
-                                cacheWidth: 120,
-                                cacheHeight: 120,
-                                key: ValueKey(
-                                  userProfile.avatarUuid,
-                                ), // Уникальный ключ для принудительного обновления
                               ),
                             )
                           : const Icon(
@@ -243,9 +262,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Кнопка "Мой профиль"
+                  // Кнопка "Мой профиль" с увеличенной высотой
                   CustomButton(
                     text: 'Мой профиль',
+                    height: 72, // Увеличиваем высоту до 72
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -254,44 +274,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       );
                     },
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Настройки
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2A2A2A),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        // Уведомления
-                        CustomSwitch(
-                          label: 'Уведомления',
-                          value: _notificationsEnabled,
-                          onChanged: (value) {
-                            setState(() {
-                              _notificationsEnabled = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Тема
-                        CustomSwitch(
-                          label: 'Тема',
-                          leftText: 'Светлая',
-                          rightText: 'Темная',
-                          value: _isDarkTheme,
-                          onChanged: (value) {
-                            setState(() {
-                              _isDarkTheme = value;
-                            });
-                          },
-                        ),
-                      ],
-                    ),
                   ),
                   const SizedBox(height: 20),
 
@@ -316,46 +298,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             );
                           },
                         ),
-                        const SizedBox(height: 16),
-                        _buildMenuItem(
-                          'Конфиденциальность',
-                          Icons.security,
-                          () {
-                            // Замоканная функция
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Функция в разработке'),
-                                backgroundColor: Color(0xFF1F2121),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        _buildMenuItem(
-                          'Политика конфиденциальности',
-                          Icons.privacy_tip,
-                          () {
-                            // Замоканная функция
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Функция в разработке'),
-                                backgroundColor: Color(0xFF1F2121),
-                              ),
-                            );
-                          },
-                        ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 20),
 
-                  // Кнопка выхода
+                  // Кнопка выхода с увеличенной высотой
                   CustomButton(
                     text: 'Выйти',
+                    height: 72, // Увеличиваем высоту до 72
                     onPressed: () async {
                       await authProvider.signOut();
                       if (mounted) {
-                        Navigator.of(context).pushReplacementNamed('/auth');
+                        Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(
+                            builder: (context) => const AuthScreen(),
+                          ),
+                        );
                       }
                     },
                     isSecondary: true,
@@ -473,7 +432,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return SizedBox(
       width: double.infinity,
-      child: CustomButton(text: buttonText, onPressed: onPressed),
+      child: CustomButton(
+        text: buttonText,
+        onPressed: onPressed,
+        height: 64, // Увеличиваем высоту с 56 до 64
+      ),
     );
   }
 
@@ -504,6 +467,74 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // Метод для выбора фото с обработкой разрешений
+  Future<void> _pickImageFromGallery() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 100,
+      );
+
+      if (image != null) {
+        // Сохраняем ссылку на AuthProvider до начала асинхронной операции
+        final authProvider = context.read<AuthProvider>();
+
+        final fileBytes = await image.readAsBytes();
+        final fileName = image.name;
+        final error = await authProvider.uploadAvatar(fileBytes, fileName);
+
+        // Проверяем, что виджет все еще активен и контекст доступен
+        if (mounted && context.mounted) {
+          if (error == null) {
+            // Принудительно обновляем UI после успешной загрузки
+            setState(() {});
+
+            // Дополнительная проверка перед показом SnackBar
+            if (mounted && context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Фото успешно загружено',
+                    style: TextStyle(color: AppColors.textPrimary),
+                  ),
+                  backgroundColor: Color(0xFF1F2121),
+                ),
+              );
+            }
+          } else {
+            // Дополнительная проверка перед показом SnackBar
+            if (mounted && context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(error), backgroundColor: Colors.red),
+              );
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Обрабатываем ошибки разрешений
+      if (mounted && context.mounted) {
+        String errorMessage = 'Ошибка при выборе фото';
+
+        if (e.toString().contains('permission') ||
+            e.toString().contains('denied') ||
+            e.toString().contains('access')) {
+          errorMessage =
+              'Доступ к галерее не предоставлен. Пожалуйста, разрешите доступ в настройках приложения.';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
   // Метод для показа модального окна аватара
   void _showAvatarModal(BuildContext context, bool hasAvatar) {
     showModalBottomSheet(
@@ -513,48 +544,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (context) => AvatarModal(
         hasAvatar: hasAvatar,
         onUploadPhoto: () async {
-          // Сохраняем ссылку на AuthProvider до начала асинхронной операции
-          final authProvider = context.read<AuthProvider>();
-
-          final result = await ImagePicker().pickImage(
-            source: ImageSource.gallery,
-            imageQuality: 100,
-          );
-          if (result != null) {
-            final fileBytes = await result.readAsBytes();
-            final fileName = result.name;
-            final error = await authProvider.uploadAvatar(fileBytes, fileName);
-
-            // Проверяем, что виджет все еще активен и контекст доступен
-            if (mounted && context.mounted) {
-              if (error == null) {
-                // Принудительно обновляем UI после успешной загрузки
-                setState(() {});
-
-                // Дополнительная проверка перед показом SnackBar
-                if (mounted && context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Фото успешно загружено',
-                        style: TextStyle(color: AppColors.textPrimary),
-                      ),
-                      backgroundColor: Color(0xFF1F2121),
-                    ),
-                  );
-                }
-              } else {
-                // Дополнительная проверка перед показом SnackBar
-                if (mounted && context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(error), backgroundColor: Colors.red),
-                  );
-                }
-              }
-            }
-          } else {
-            // Пользователь отменил выбор файла
-          }
+          await _pickImageFromGallery();
         },
         onDeletePhoto: hasAvatar
             ? () async {
