@@ -364,7 +364,7 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
             ),
             const SizedBox(height: 30),
             // Кнопка "Завершить" для дня отдыха - только если день активный
-            if (status == 'ACTIVE')
+            if (status == 'active')
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
@@ -387,7 +387,7 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
                   ),
                 ),
               ),
-            if (status == 'ACTIVE') const SizedBox(height: 30),
+            if (status == 'active') const SizedBox(height: 30),
           ],
         );
       }
@@ -428,6 +428,24 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
                   final group = _exerciseGroups[index];
                   return GestureDetector(
                     onTap: () {
+                      // Проверяем статус тренировки - можно переходить только если тренировка активна
+                      final trainingStatus =
+                          _currentTraining?['status']
+                              ?.toString()
+                              .toLowerCase() ??
+                          '';
+                      if (trainingStatus != 'active') {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Тренировка не активна. Выполните тренировку в назначенное время.',
+                            ),
+                            backgroundColor: Colors.orange,
+                          ),
+                        );
+                        return;
+                      }
+
                       final userUuid = Provider.of<AuthProvider>(
                         context,
                         listen: false,
@@ -456,15 +474,33 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
                       width: double.infinity,
                       height: 100,
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
+                        color:
+                            _currentTraining?['status']
+                                    ?.toString()
+                                    .toLowerCase() ==
+                                'active'
+                            ? AppColors.surface
+                            : Colors.grey[300],
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: AppColors.inputBorder,
+                          color:
+                              _currentTraining?['status']
+                                      ?.toString()
+                                      .toLowerCase() ==
+                                  'active'
+                              ? AppColors.inputBorder
+                              : Colors.grey[400]!,
                           width: 1,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.03),
+                            color:
+                                _currentTraining?['status']
+                                        ?.toString()
+                                        .toLowerCase() ==
+                                    'active'
+                                ? Colors.black.withOpacity(0.03)
+                                : Colors.black.withOpacity(0.01),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -481,14 +517,33 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
                               builder: (context, snapshot) {
                                 final image = snapshot.data;
                                 if (image != null) {
-                                  return ClipRRect(
-                                    borderRadius: BorderRadius.circular(16),
-                                    child: Image(
-                                      image: image,
-                                      fit: BoxFit.cover,
-                                      width: double.infinity,
-                                      height: double.infinity,
-                                    ),
+                                  return Stack(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(16),
+                                        child: Image(
+                                          image: image,
+                                          fit: BoxFit.cover,
+                                          width: double.infinity,
+                                          height: double.infinity,
+                                        ),
+                                      ),
+                                      // Затемнение если тренировка неактивна
+                                      if (_currentTraining?['status']
+                                              ?.toString()
+                                              .toLowerCase() !=
+                                          'active')
+                                        Container(
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(
+                                              16,
+                                            ),
+                                            color: Colors.black.withOpacity(
+                                              0.4,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
                                   );
                                 } else {
                                   // Заглушка если нет изображения
@@ -513,13 +568,25 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
                                 vertical: 8,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.5),
+                                color:
+                                    _currentTraining?['status']
+                                            ?.toString()
+                                            .toLowerCase() ==
+                                        'active'
+                                    ? Colors.black.withOpacity(0.5)
+                                    : Colors.black.withOpacity(0.3),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
                                 group['caption'] ?? '',
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color:
+                                      _currentTraining?['status']
+                                              ?.toString()
+                                              .toLowerCase() ==
+                                          'active'
+                                      ? Colors.white
+                                      : Colors.grey[300],
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -587,7 +654,7 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
             ),
           ),
         // Кнопки управления тренировкой или статус
-        if (!isRestDay && status == 'ACTIVE')
+        if (!isRestDay && status == 'active')
           Row(
             children: [
               // Кнопка "Пропустить"

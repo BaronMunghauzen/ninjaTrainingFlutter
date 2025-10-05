@@ -202,7 +202,7 @@ class TrainingService {
   ) {
     // Сначала ищем тренировку со статусом 'active'
     for (final training in trainings) {
-      if (training['status'] == 'active') {
+      if (training['status']?.toString().toLowerCase() == 'active') {
         return training;
       }
     }
@@ -270,7 +270,7 @@ class TrainingService {
 
         // Ищем активную тренировку и кэшируем результат
         for (final training in trainings) {
-          if (training['status'] == 'ACTIVE') {
+          if (training['status']?.toString().toLowerCase() == 'active') {
             _activeTrainingCache[userProgramUuid] = training;
             return training;
           }
@@ -284,7 +284,7 @@ class TrainingService {
 
     // Fallback: обычный поиск
     for (final training in trainings) {
-      if (training['status'] == 'ACTIVE') {
+      if (training['status']?.toString().toLowerCase() == 'active') {
         return training;
       }
     }

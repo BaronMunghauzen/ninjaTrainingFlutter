@@ -191,7 +191,7 @@ class WeeksDaysNavigationState extends State<WeeksDaysNavigation> {
       result = Colors.green;
     else if (status == 'skipped')
       result = Colors.orange;
-    else if (status == 'ACTIVE')
+    else if (status == 'active')
       result = Colors.blueAccent;
     else
       result = currentDay == dayIndex ? Colors.blueAccent : Colors.grey[700]!;

@@ -1,5 +1,7 @@
 class ApiConstants {
-  static const String baseUrl = 'http://10.0.2.2:8000';
+  static const String baseUrl =
+      'http://10.0.2.2:8000'; //Локальный IP на эмуляторе
+  //static const String baseUrl = 'http://5.129.243.26:8000'; //IP сервера продакшена
 
   // Auth endpoints
   static const String loginUrl = '$baseUrl/auth/login';

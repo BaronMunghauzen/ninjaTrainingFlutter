@@ -61,6 +61,7 @@ class _ExerciseGroupCarouselScreenState
   }
 
   Future<void> _loadGroupAndExercises() async {
+    if (!mounted) return;
     setState(() {
       isLoading = true;
     });
@@ -87,6 +88,7 @@ class _ExerciseGroupCarouselScreenState
           await _loadExerciseReferences(loaded);
           _exerciseReferencesLoaded = true;
         }
+        if (!mounted) return;
         setState(() {
           exercises = loaded;
           userExerciseRows = [
@@ -108,14 +110,18 @@ class _ExerciseGroupCarouselScreenState
           _lastResultsLoaded = true;
         }
       } else {
+        if (mounted) {
+          setState(() {
+            isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
         setState(() {
           isLoading = false;
         });
       }
-    } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
     }
   }
 
@@ -281,36 +287,44 @@ class _ExerciseGroupCarouselScreenState
         final data = ApiService.decodeJson(resp.body);
         if (data is List && data.isNotEmpty) {
           final row = data[0];
-          setState(() {
-            userExerciseRows[exIndex][setNumber] = UserExerciseRow(
-              userExerciseUuid: row['uuid'],
-              reps: row['reps'] ?? 0,
-              weight: (row['weight'] ?? 0).toDouble(),
-              status: row['status'] ?? 'active',
-              lastResult: userExerciseRows[exIndex][setNumber]
-                  .lastResult, // сохраняем lastResult
-            );
-          });
+          if (mounted) {
+            setState(() {
+              userExerciseRows[exIndex][setNumber] = UserExerciseRow(
+                userExerciseUuid: row['uuid'],
+                reps: row['reps'] ?? 0,
+                weight: (row['weight'] ?? 0).toDouble(),
+                status: row['status'] ?? 'active',
+                lastResult: userExerciseRows[exIndex][setNumber]
+                    .lastResult, // сохраняем lastResult
+              );
+            });
+          }
         } else {
+          if (mounted) {
+            setState(() {
+              userExerciseRows[exIndex][setNumber] = UserExerciseRow(
+                lastResult: userExerciseRows[exIndex][setNumber].lastResult,
+              );
+            });
+          }
+        }
+      } else {
+        if (mounted) {
           setState(() {
             userExerciseRows[exIndex][setNumber] = UserExerciseRow(
               lastResult: userExerciseRows[exIndex][setNumber].lastResult,
             );
           });
         }
-      } else {
+      }
+    } catch (_) {
+      if (mounted) {
         setState(() {
           userExerciseRows[exIndex][setNumber] = UserExerciseRow(
             lastResult: userExerciseRows[exIndex][setNumber].lastResult,
           );
         });
       }
-    } catch (_) {
-      setState(() {
-        userExerciseRows[exIndex][setNumber] = UserExerciseRow(
-          lastResult: userExerciseRows[exIndex][setNumber].lastResult,
-        );
-      });
     }
     // Убираем вызов _loadLastUserExerciseResult, так как теперь он вызывается только один раз
   }
@@ -358,18 +372,24 @@ class _ExerciseGroupCarouselScreenState
             result = '${data['reps'] ?? 0}';
           }
         }
-        setState(() {
-          userExerciseRows[exIndex][setNumber].lastResult = result;
-        });
+        if (mounted) {
+          setState(() {
+            userExerciseRows[exIndex][setNumber].lastResult = result;
+          });
+        }
       } else {
+        if (mounted) {
+          setState(() {
+            userExerciseRows[exIndex][setNumber].lastResult = '0';
+          });
+        }
+      }
+    } catch (_) {
+      if (mounted) {
         setState(() {
           userExerciseRows[exIndex][setNumber].lastResult = '0';
         });
       }
-    } catch (_) {
-      setState(() {
-        userExerciseRows[exIndex][setNumber].lastResult = '0';
-      });
     }
   }
 
@@ -456,6 +476,7 @@ class _ExerciseGroupCarouselScreenState
                 alignment: Alignment.bottomCenter,
                 child: ElevatedButton(
                   onPressed: () async {
+                    if (!mounted) return;
                     setState(() {
                       userExerciseRows[exIndex][setIndex] = UserExerciseRow(
                         userExerciseUuid: userExerciseRows[exIndex][setIndex]
@@ -497,7 +518,9 @@ class _ExerciseGroupCarouselScreenState
           : PageView.builder(
               itemCount: exercises.length,
               onPageChanged: (i) {
-                setState(() => currentPage = i);
+                if (mounted) {
+                  setState(() => currentPage = i);
+                }
                 // Очищаем кэш изображений при переключении упражнений для экономии памяти
                 if (mounted) {
                   _clearImageCache();
