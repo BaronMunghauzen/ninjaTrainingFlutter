@@ -10,6 +10,8 @@ import '../../services/api_service.dart';
 import 'edit_profile_screen.dart';
 import 'contact_screen.dart';
 import 'auth_screen.dart';
+import '../subscription/subscription_plans_screen.dart';
+import '../subscription/payment_history_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -287,6 +289,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Column(
                       children: [
                         _buildMenuItem(
+                          'История платежей',
+                          Icons.receipt_long,
+                          () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const PaymentHistoryScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                        const Divider(color: Color(0xFF3A3A3A), height: 24),
+                        _buildMenuItem(
                           'Связаться с нами',
                           Icons.contact_support,
                           () {
@@ -336,22 +352,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     switch (status) {
       case 'active':
-        color = const Color(0xFF1F2121);
+        color = const Color(0xFF4CAF50); // Светло-зеленый
         text = 'Активна';
         icon = Icons.check_circle;
         break;
       case 'pending':
-        color = Colors.orange;
+        color = const Color(0xFFFF9800); // Светло-оранжевый
         text = 'Ожидает';
         icon = Icons.pending;
         break;
       case 'expired':
-        color = Colors.red;
+        color = const Color(0xFFF44336); // Светло-красный
         text = 'Истекла';
         icon = Icons.cancel;
         break;
       default:
-        color = Colors.grey;
+        color = const Color(0xFF9E9E9E); // Светло-серый
         text = 'Неизвестно';
         icon = Icons.help;
     }
@@ -395,11 +411,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       case 'pending':
         buttonText = 'Активировать';
         onPressed = () {
-          // Замоканная функция
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Функция активации подписки в разработке'),
-              backgroundColor: Color(0xFF1F2121),
+          // Переход на экран выбора тарифов
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const SubscriptionPlansScreen(),
             ),
           );
         };
@@ -408,11 +424,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       case 'expired':
         buttonText = 'Продлить';
         onPressed = () {
-          // Замоканная функция
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Функция продления подписки в разработке'),
-              backgroundColor: Color(0xFF1F2121),
+          // Переход на экран выбора тарифов
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const SubscriptionPlansScreen(),
             ),
           );
         };
@@ -420,11 +436,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       default:
         buttonText = 'Подписаться';
         onPressed = () {
-          // Замоканная функция
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Функция подписки в разработке'),
-              backgroundColor: Color(0xFF1F2121),
+          // Переход на экран выбора тарифов
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const SubscriptionPlansScreen(),
             ),
           );
         };

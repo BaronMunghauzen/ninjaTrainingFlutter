@@ -1,7 +1,8 @@
 class ApiConstants {
+  // static const String baseUrl =
+  //     'http://10.0.2.2:8000'; //Локальный IP на эмуляторе
   static const String baseUrl =
-      'http://10.0.2.2:8000'; //Локальный IP на эмуляторе
-  //static const String baseUrl = 'http://5.129.243.26:8000'; //IP сервера продакшена
+      'https://ninjatraining.ru'; //IP сервера продакшена
 
   // Auth endpoints
   static const String loginUrl = '$baseUrl/auth/login';
@@ -20,4 +21,15 @@ class ApiConstants {
 
   static String getLastUserExercisesUrl() =>
       '$baseUrl/user_exercises/utils/getLastUserExercises';
+
+  // Subscription endpoints
+  static const String subscriptionPlansUrl = '$baseUrl/api/subscriptions/plans';
+  static const String subscriptionStatusUrl =
+      '$baseUrl/api/subscriptions/status';
+  static const String activateTrialUrl =
+      '$baseUrl/api/subscriptions/activate-trial';
+  static const String createPaymentUrl = '$baseUrl/api/subscriptions/purchase';
+  static String paymentStatusUrl(String paymentUuid) =>
+      '$baseUrl/api/subscriptions/payment/$paymentUuid/status';
+  static const String paymentHistoryUrl = '$baseUrl/api/subscriptions/history';
 }

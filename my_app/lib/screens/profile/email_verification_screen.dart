@@ -314,6 +314,20 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
                           isSecondary: true,
                         ),
 
+                        const SizedBox(height: 16),
+
+                        // Кнопка разлогина
+                        CustomButton(
+                          text: 'Выйти из аккаунта',
+                          onPressed: () async {
+                            final authProvider = context.read<AuthProvider>();
+                            await authProvider.signOut();
+                          },
+                          icon: Icons.logout,
+                          height: 56,
+                          isSecondary: true,
+                        ),
+
                         const SizedBox(height: 32),
 
                         // Информация о текущем email

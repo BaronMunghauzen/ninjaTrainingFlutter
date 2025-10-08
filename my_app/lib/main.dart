@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:app_links/app_links.dart';
 import 'constants/app_colors.dart';
 import 'providers/auth_provider.dart';
 import 'providers/timer_overlay_provider.dart';
@@ -10,6 +11,7 @@ import 'screens/main_screen_wrapper.dart';
 import 'widgets/global_timer_overlay.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
+import 'utils/deep_link_handler.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -22,7 +24,27 @@ void main() async {
   // Инициализируем сервис уведомлений
   await NotificationService.initialize();
 
+  // Инициализируем обработчик Deep Links
+  _initDeepLinks();
+
   runApp(const MyApp());
+}
+
+/// Инициализация обработчика Deep Links
+void _initDeepLinks() {
+  final appLinks = AppLinks();
+
+  // Обработка deep link при запуске приложения (если оно было закрыто)
+  appLinks.getInitialLink().then((uri) {
+    if (uri != null) {
+      DeepLinkHandler.handleDeepLink(uri.toString());
+    }
+  });
+
+  // Обработка deep links когда приложение открыто
+  appLinks.uriLinkStream.listen((uri) {
+    DeepLinkHandler.handleDeepLink(uri.toString());
+  });
 }
 
 class MyApp extends StatelessWidget {

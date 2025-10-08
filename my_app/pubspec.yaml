@@ -72,6 +72,12 @@ dependencies:
   # Calendar widget
   table_calendar: ^3.1.2
   
+  # URL launcher for opening payment links in browser
+  url_launcher: ^6.2.5
+  
+  # App Links for handling deep links
+  app_links: ^6.3.2
+  
   # File picker for image selection
 
 dev_dependencies:
@@ -84,6 +90,9 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  
+  # Flutter launcher icons - автоматическая генерация иконок приложения
+  flutter_launcher_icons: ^0.13.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -99,6 +108,7 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/images/
+    - assets/images/iconsForApp/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
@@ -125,3 +135,31 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# Конфигурация для генерации иконок приложения
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/iconsForApp/icon2.png"
+  
+  # Адаптивная иконка для Android (Android 8.0+)
+  adaptive_icon_background: "#1A1A1A"  # Цвет фона (темный)
+  adaptive_icon_foreground: "assets/images/iconsForApp/icon2.png"
+  
+  # Web иконка
+  web:
+    generate: true
+    image_path: "assets/images/iconsForApp/icon2.png"
+    background_color: "#1A1A1A"
+    theme_color: "#1A1A1A"
+  
+  # Windows иконка
+  windows:
+    generate: true
+    image_path: "assets/images/iconsForApp/icon2.png"
+    icon_size: 48
+  
+  # macOS иконка
+  macos:
+    generate: true
+    image_path: "assets/images/iconsForApp/icon2.png"
