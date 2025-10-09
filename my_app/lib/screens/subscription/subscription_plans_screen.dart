@@ -6,6 +6,7 @@ import '../../models/subscription_plan_model.dart';
 import '../../models/subscription_status_model.dart';
 import '../../services/subscription_service.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/refund_info_dialog.dart';
 import 'payment_check_screen.dart';
 
 class SubscriptionPlansScreen extends StatefulWidget {
@@ -151,6 +152,19 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
         ),
         elevation: 0,
         actions: [
+          // Кнопка с информацией о возврате
+          IconButton(
+            icon: const Icon(Icons.help_outline, color: Colors.white),
+            iconSize: 26,
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => const RefundInfoDialog(),
+              );
+            },
+            tooltip: 'Правила возврата',
+            splashRadius: 24,
+          ),
           // Кнопка проверки ожидающего платежа
           Padding(
             padding: const EdgeInsets.only(right: 8),
@@ -240,8 +254,39 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
                     ],
+
+                    // Способы оплаты
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[800]?.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.payment,
+                            color: Colors.grey[500],
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Оплата: банковская карта или СБП',
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
 
                     // Список тарифных планов
                     ..._plans.map((plan) => _buildPlanCard(plan)),

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 import '../../constants/app_colors.dart';
 import '../../services/training_service.dart';
 import '../../services/api_service.dart';
 import 'system_exercise_group_screen.dart';
+import '../../widgets/subscription_error_dialog.dart';
+import '../../providers/auth_provider.dart';
 
 class ActiveSystemTrainingScreen extends StatefulWidget {
   final Map<String, dynamic> userTraining;
@@ -29,10 +32,33 @@ class _ActiveSystemTrainingScreenState
     print('🚀 userTraining данные: ${widget.userTraining}');
     print('🚀 training данные: ${widget.userTraining['training']}');
     print('🚀 training UUID: ${widget.userTraining['training']?['uuid']}');
+
+    // Проверяем подписку при открытии экрана
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkSubscription();
+    });
+
     _loadAuthToken();
     print('🚀 Вызываем _loadExerciseGroups...');
     _loadExerciseGroups();
     print('🚀 initState() завершен');
+  }
+
+  void _checkSubscription() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userProfile = authProvider.userProfile;
+
+    if (userProfile != null && userProfile.subscriptionStatus != 'active') {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => SubscriptionErrorDialog(
+          onClose: () {
+            Navigator.of(context).pop();
+          },
+        ),
+      );
+    }
   }
 
   Future<void> _loadAuthToken() async {

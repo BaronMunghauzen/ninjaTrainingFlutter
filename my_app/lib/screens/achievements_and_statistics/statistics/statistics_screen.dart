@@ -14,6 +14,7 @@ import '../../../widgets/measurement_type_modal.dart';
 import '../../../widgets/training_calendar.dart';
 import '../../../widgets/training_detail_modal.dart';
 import '../../../widgets/exercise_statistics_table.dart';
+import '../../../widgets/subscription_error_dialog.dart';
 
 class StatisticsScreen extends StatefulWidget {
   const StatisticsScreen({super.key});
@@ -207,7 +208,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         title: const Text('', style: TextStyle(color: Colors.white)),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -702,6 +703,18 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final userUuid = authProvider.userUuid;
     if (userUuid == null) return;
+
+    // Проверяем подписку перед добавлением измерения
+    final userProfile = authProvider.userProfile;
+    if (userProfile != null && userProfile.subscriptionStatus != 'active') {
+      showDialog(
+        context: context,
+        builder: (context) => SubscriptionErrorDialog(
+          message: 'Для добавления измерений необходимо продлить подписку',
+        ),
+      );
+      return;
+    }
 
     String measurementTypeUuid;
     String title;

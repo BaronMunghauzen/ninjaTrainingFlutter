@@ -8,6 +8,7 @@ import 'exercise_group_carousel_screen.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../widgets/subscription_error_dialog.dart';
 
 class ActiveTrainingScreen extends StatefulWidget {
   final Map<String, dynamic> userProgramData;
@@ -32,7 +33,28 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
   @override
   void initState() {
     super.initState();
+    // Проверяем подписку при открытии экрана
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkSubscription();
+    });
     // Не делаем ничего здесь, ждем onTrainingSelected
+  }
+
+  void _checkSubscription() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userProfile = authProvider.userProfile;
+
+    if (userProfile != null && userProfile.subscriptionStatus != 'active') {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => SubscriptionErrorDialog(
+          onClose: () {
+            Navigator.of(context).pop();
+          },
+        ),
+      );
+    }
   }
 
   @override

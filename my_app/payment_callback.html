@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Возврат в NinjaTraining</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 500px;
+            padding: 40px;
+            background: rgba(42, 42, 42, 0.8);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .logo {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 24px;
+            border-radius: 20px;
+            overflow: hidden;
+            animation: pulse 2s ease-in-out infinite;
+            box-shadow: 0 8px 32px rgba(102, 126, 234, 0.4);
+        }
+
+        .logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        h1 {
+            font-size: 28px;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        p {
+            font-size: 16px;
+            color: #b0b0b0;
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+
+        .spinner {
+            border: 4px solid rgba(102, 126, 234, 0.2);
+            border-radius: 50%;
+            border-top: 4px solid #667eea;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 24px auto;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 16px 40px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            margin-top: 24px;
+        }
+
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .button:active {
+            transform: translateY(0);
+        }
+
+        .info {
+            margin-top: 32px;
+            padding: 16px;
+            background: rgba(255, 152, 0, 0.1);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 152, 0, 0.3);
+        }
+
+        .info-text {
+            color: #ffa726;
+            font-size: 14px;
+            margin: 0;
+        }
+
+        .countdown {
+            font-size: 14px;
+            color: #888;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="logo">
+            <img src="ninja_icon.png" alt="NinjaTraining Logo">
+        </div>
+        <h1>Возврат в NinjaTraining</h1>
+        <p id="status">Открываем приложение...</p>
+        <div class="spinner" id="spinner"></div>
+
+        <button class="button" onclick="openApp()" id="openButton" style="display: none;">
+            Открыть NinjaTraining
+        </button>
+
+        <div class="info" id="infoBox" style="display: none;">
+            <p class="info-text">
+                💡 Если приложение не установлено, скачайте его из магазина приложений
+            </p>
+        </div>
+
+        <p class="countdown" id="countdown"></p>
+    </div>
+
+    <script>
+        let attempts = 0;
+        const maxAttempts = 3;
+        let countdownValue = 3;
+
+        function openApp() {
+            console.log('Attempting to open app, attempt:', attempts + 1);
+
+            // Метод 1: Custom scheme (работает всегда)
+            window.location.href = 'ninjatraining://payment/callback';
+
+            // Метод 2: Android Intent (fallback для Android)
+            setTimeout(function () {
+                window.location.href = 'intent://payment/callback#Intent;scheme=ninjatraining;package=ru.ninjatraining.app;end';
+            }, 500);
+
+            attempts++;
+
+            // Если несколько попыток не сработали, показываем кнопку
+            if (attempts >= maxAttempts) {
+                document.getElementById('spinner').style.display = 'none';
+                document.getElementById('status').textContent = 'Не удалось открыть приложение автоматически';
+                document.getElementById('openButton').style.display = 'inline-block';
+                document.getElementById('infoBox').style.display = 'block';
+                document.getElementById('countdown').style.display = 'none';
+            }
+        }
+
+        // Обратный отсчет перед попыткой
+        function startCountdown() {
+            const countdownEl = document.getElementById('countdown');
+
+            const interval = setInterval(() => {
+                if (countdownValue > 0) {
+                    countdownEl.textContent = `Попытка через ${countdownValue} сек...`;
+                    countdownValue--;
+                } else {
+                    clearInterval(interval);
+                    openApp();
+                }
+            }, 1000);
+        }
+
+        // Автоматический запуск при загрузке
+        window.onload = function () {
+            // Первая попытка сразу
+            setTimeout(openApp, 500);
+
+            // Вторая попытка через 2 секунды
+            setTimeout(openApp, 2500);
+
+            // Третья попытка через 5 секунд
+            setTimeout(function () {
+                if (attempts < maxAttempts) {
+                    openApp();
+                }
+            }, 5000);
+        };
+
+        // Обработка визибилити (если пользователь вернулся)
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden) {
+                // Пользователь переключился (возможно, в приложение) - успех!
+                console.log('User switched away - probably app opened');
+            }
+        });
+    </script>
+</body>
+
+</html>

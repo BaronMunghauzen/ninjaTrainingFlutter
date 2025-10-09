@@ -137,91 +137,121 @@ class _ContactScreenState extends State<ContactScreen> {
         centerTitle: true,
         elevation: 0,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Тип обращения
-              const Text(
-                'Тип обращения',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2A2A2A),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: DropdownButtonFormField<String>(
-                  value: _selectedType,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 16,
-                    ),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Тип обращения
+                const Text(
+                  'Тип обращения',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
                   ),
-                  dropdownColor: const Color(0xFF2A2A2A),
-                  style: const TextStyle(color: Colors.white),
-                  items: _contactTypes.map((String type) {
-                    return DropdownMenuItem<String>(
-                      value: type,
-                      child: Text(type),
-                    );
-                  }).toList(),
-                  onChanged: (String? newValue) {
-                    setState(() {
-                      _selectedType = newValue!;
-                    });
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2A2A2A),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: DropdownButtonFormField<String>(
+                    value: _selectedType,
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                    ),
+                    dropdownColor: const Color(0xFF2A2A2A),
+                    style: const TextStyle(color: Colors.white),
+                    items: _contactTypes.map((String type) {
+                      return DropdownMenuItem<String>(
+                        value: type,
+                        child: Text(type),
+                      );
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _selectedType = newValue!;
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Сообщение
+                const Text(
+                  'Сообщение',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                CustomTextField(
+                  label: '',
+                  hint: 'Опишите вашу проблему или предложение...',
+                  controller: _messageController,
+                  maxLines: 5,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Поле обязательно для заполнения';
+                    }
+                    if (value.trim().length < 10) {
+                      return 'Минимум 10 символов';
+                    }
+                    return null;
                   },
                 ),
-              ),
-              const SizedBox(height: 24),
+                const SizedBox(height: 32),
 
-              // Сообщение
-              const Text(
-                'Сообщение',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                // Кнопка отправки с увеличенной высотой
+                SizedBox(
+                  width: double.infinity,
+                  child: CustomButton(
+                    text: _isSending ? 'Отправка...' : 'Отправить',
+                    height: 64, // Увеличиваем высоту с 56 до 64
+                    onPressed: _isSending ? null : _sendMessage,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              CustomTextField(
-                label: '',
-                hint: 'Опишите вашу проблему или предложение...',
-                controller: _messageController,
-                maxLines: 5,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Поле обязательно для заполнения';
-                  }
-                  if (value.trim().length < 10) {
-                    return 'Минимум 10 символов';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 32),
 
-              // Кнопка отправки с увеличенной высотой
-              SizedBox(
-                width: double.infinity,
-                child: CustomButton(
-                  text: _isSending ? 'Отправка...' : 'Отправить',
-                  height: 64, // Увеличиваем высоту с 56 до 64
-                  onPressed: _isSending ? null : _sendMessage,
+                const SizedBox(height: 40),
+
+                // Реквизиты компании (ненавязчиво)
+                Center(
+                  child: Column(
+                    children: [
+                      Text(
+                        'ИП Маглатова Валерия Максимовна',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 11),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'ИНН 503829337132',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 11),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'ОГРНИП 325508100238252',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 11),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),

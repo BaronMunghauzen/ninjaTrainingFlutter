@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:typed_data';
 import '../../constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
@@ -312,6 +313,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 builder: (context) => const ContactScreen(),
                               ),
                             );
+                          },
+                        ),
+                        const Divider(color: Color(0xFF3A3A3A), height: 24),
+                        _buildMenuItem(
+                          'Политика конфиденциальности',
+                          Icons.privacy_tip_outlined,
+                          () async {
+                            final Uri url = Uri.parse(
+                              'https://ninjatraining.ru/privacy',
+                            );
+                            if (await canLaunchUrl(url)) {
+                              await launchUrl(
+                                url,
+                                mode: LaunchMode.externalApplication,
+                              );
+                            } else {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Не удалось открыть ссылку'),
+                                  ),
+                                );
+                              }
+                            }
                           },
                         ),
                       ],

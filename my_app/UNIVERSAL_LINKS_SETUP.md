@@ -104,7 +104,7 @@ applicationId = "ru.ninjatraining.app"
 ### Шаг 1.4: Получаем Bundle ID для iOS
 
 В том же Xcode:
-- "General" → "Bundle Identifier", например: `com.example.myApp`
+- "General" → "Bundle Identifier", например: `ru.ninjatraining.app`
 
 Или откройте `ios/Runner/Info.plist` и найдите `CFBundleIdentifier`.
 
@@ -134,9 +134,9 @@ nano ~/temp/well-known/assetlinks.json
   "relation": ["delegate_permission/common.handle_all_urls"],
   "target": {
     "namespace": "android_app",
-    "package_name": "ВАШ_PACKAGE_NAME",
+    "package_name": "ru.ninjatraining.app",
     "sha256_cert_fingerprints": [
-      "ВАШ_SHA256_БЕЗ_ДВОЕТОЧИЙ"
+      "DFB3F7BEABCD77212FAF085A748E1663E6B94E4A63281935E1FA5E4FE5EDC9E6"
     ]
   }
 }]
@@ -211,7 +211,7 @@ nano ~/temp/well-known/apple-app-site-association
     "apps": [],
     "details": [
       {
-        "appID": "ABC123XYZ.com.example.myApp",
+        "appID": "ABC123XYZ.ru.ninjatraining.app",
         "paths": ["/payment/*"]
       }
     ]
@@ -263,7 +263,7 @@ sudo nano assetlinks.json
     "namespace": "android_app",
     "package_name": "ru.ninjatraining.app",
     "sha256_cert_fingerprints": [
-      "ВАШ_SHA256_БЕЗ_ДВОЕТОЧИЙ"
+      "DFB3F7BEABCD77212FAF085A748E1663E6B94E4A63281935E1FA5E4FE5EDC9E6"
     ]
   }
 }]
