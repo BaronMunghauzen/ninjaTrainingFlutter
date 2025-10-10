@@ -20,6 +20,8 @@ class TimerOverlayProvider extends ChangeNotifier {
   bool get isBigTimerOpen => _isBigTimerOpen;
 
   void show(int seconds, {Offset? startPosition}) {
+    print('⏱️ TimerOverlayProvider: Запуск таймера на $seconds секунд');
+
     // Уничтожаем старые
     _timer?.cancel();
     _timer = null;
@@ -38,25 +40,50 @@ class TimerOverlayProvider extends ChangeNotifier {
       _position = startPosition;
     }
 
+    // Планируем уведомление сразу при запуске таймера
+    // Оно сработает даже если приложение будет закрыто
+    print('⏱️ TimerOverlayProvider: Планирование уведомления...');
+    _scheduleNotification(seconds);
+
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       final left = seconds - _controller!.value * seconds;
       updateSecondsLeft(left.ceil());
       if (left <= 0) {
+        print('⏱️ TimerOverlayProvider: Таймер завершен!');
         timer.cancel();
+        // Показываем мгновенное уведомление (ID: 998) если приложение открыто
+        // Запланированное уведомление (ID: 999) сработает автоматически
+        // Используем разные ID, поэтому они не конфликтуют!
         _showEndNotification();
-        hide(); // only call hide, do not dispose controller here
+        _hideWithoutCancellingNotification(); // Скрываем таймер БЕЗ отмены уведомления
       }
     });
     notifyListeners();
   }
 
   void hide() {
+    print('⏱️ TimerOverlayProvider: Скрытие таймера (с отменой уведомления)');
     _isVisible = false;
     _isBigTimerOpen = false;
     _timer?.cancel();
     _timer = null;
     _controller?.dispose();
     _controller = null;
+    // Отменяем запланированное уведомление, если таймер скрыли до завершения
+    print('⏱️ TimerOverlayProvider: Отмена запланированного уведомления...');
+    _cancelScheduledNotification();
+    notifyListeners();
+  }
+
+  void _hideWithoutCancellingNotification() {
+    print('⏱️ TimerOverlayProvider: Скрытие таймера (БЕЗ отмены уведомления)');
+    _isVisible = false;
+    _isBigTimerOpen = false;
+    _timer?.cancel();
+    _timer = null;
+    _controller?.dispose();
+    _controller = null;
+    // НЕ отменяем уведомление - пусть пользователь увидит его!
     notifyListeners();
   }
 
@@ -77,9 +104,33 @@ class TimerOverlayProvider extends ChangeNotifier {
 
   Future<void> _showEndNotification() async {
     try {
+      print('⏱️ TimerOverlayProvider: Вызов showTimerEndNotification()');
       await NotificationService.showTimerEndNotification();
+      print('⏱️ TimerOverlayProvider: showTimerEndNotification() завершен');
     } catch (e) {
-      // ignore errors
+      print('⏱️ TimerOverlayProvider: ОШИБКА при показе уведомления: $e');
+    }
+  }
+
+  Future<void> _scheduleNotification(int seconds) async {
+    try {
+      print(
+        '⏱️ TimerOverlayProvider: Вызов scheduleTimerEndNotification($seconds)',
+      );
+      await NotificationService.scheduleTimerEndNotification(seconds);
+      print('⏱️ TimerOverlayProvider: scheduleTimerEndNotification() завершен');
+    } catch (e) {
+      print('⏱️ TimerOverlayProvider: ОШИБКА при планировании уведомления: $e');
+    }
+  }
+
+  Future<void> _cancelScheduledNotification() async {
+    try {
+      print('⏱️ TimerOverlayProvider: Вызов cancelTimerNotification()');
+      await NotificationService.cancelTimerNotification();
+      print('⏱️ TimerOverlayProvider: cancelTimerNotification() завершен');
+    } catch (e) {
+      print('⏱️ TimerOverlayProvider: ОШИБКА при отмене уведомления: $e');
     }
   }
 }

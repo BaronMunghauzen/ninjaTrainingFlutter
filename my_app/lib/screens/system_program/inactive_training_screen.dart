@@ -143,174 +143,202 @@ class _InactiveTrainingScreenState extends State<InactiveTrainingScreen> {
                       Expanded(
                         child: Padding(
                           padding: const EdgeInsets.all(16),
-                          child: Column(
-                            children: [
-                              const Spacer(),
-                              // Информация и кнопка по центру
-                              Center(
-                                child: Container(
-                                  padding: const EdgeInsets.all(24),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.7),
-                                    borderRadius: BorderRadius.circular(20),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              return SingleChildScrollView(
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    minHeight: constraints.maxHeight,
                                   ),
                                   child: Column(
-                                    mainAxisSize: MainAxisSize.min,
+                                    mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Text(
-                                        programData!['caption'] ?? '',
-                                        style: const TextStyle(
-                                          fontSize: 28,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                          shadows: [
-                                            Shadow(
-                                              offset: Offset(0, 2),
-                                              blurRadius: 4,
-                                              color: Colors.black54,
+                                      // Информация и кнопка по центру
+                                      Center(
+                                        child: Container(
+                                          padding: const EdgeInsets.all(24),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withOpacity(
+                                              0.7,
                                             ),
-                                          ],
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                      const SizedBox(height: 16),
-                                      Text(
-                                        programData!['description'] ?? '',
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          color: Colors.white,
-                                          shadows: [
-                                            Shadow(
-                                              offset: Offset(0, 1),
-                                              blurRadius: 2,
-                                              color: Colors.black54,
-                                            ),
-                                          ],
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                      const SizedBox(height: 32),
-                                      SizedBox(
-                                        width: 220,
-                                        height: 56,
-                                        child: ElevatedButton(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: AppColors.primary,
-                                            foregroundColor: Colors.white,
-                                            elevation: 8,
-                                            shadowColor: Colors.black
-                                                .withOpacity(0.3),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
+                                            borderRadius: BorderRadius.circular(
+                                              20,
                                             ),
                                           ),
-                                          onPressed: () async {
-                                            final authProvider =
-                                                Provider.of<AuthProvider>(
-                                                  context,
-                                                  listen: false,
-                                                );
-                                            final userUuid =
-                                                authProvider.userUuid;
-                                            if (userUuid == null) {
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text(
-                                                    'Ошибка: не найден userUuid',
-                                                  ),
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                programData!['caption'] ?? '',
+                                                style: const TextStyle(
+                                                  fontSize: 28,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                  shadows: [
+                                                    Shadow(
+                                                      offset: Offset(0, 2),
+                                                      blurRadius: 4,
+                                                      color: Colors.black54,
+                                                    ),
+                                                  ],
                                                 ),
-                                              );
-                                              return;
-                                            }
-                                            setState(() {
-                                              isLoading = true;
-                                            });
-                                            try {
-                                              final userProgramUuid =
-                                                  await ProgramService.addUserProgram(
-                                                    widget.programUuid,
-                                                    userUuid,
-                                                    null, // caption будет получен автоматически из программы
-                                                  );
-
-                                              if (userProgramUuid != null) {
-                                                // После успешного добавления — проверяем активность
-                                                final queryParams = {
-                                                  'user_uuid': userUuid,
-                                                  'program_uuid':
-                                                      widget.programUuid,
-                                                  'status': 'active',
-                                                };
-                                                final checkResponse =
-                                                    await ApiService.get(
-                                                      '/user_programs/',
-                                                      queryParams: queryParams,
-                                                    );
-                                                if (checkResponse.statusCode ==
-                                                    200) {
-                                                  final data =
-                                                      ApiService.decodeJson(
-                                                        checkResponse.body,
-                                                      );
-                                                  if (data is List &&
-                                                      data.isNotEmpty) {
-                                                    Navigator.of(
-                                                      context,
-                                                    ).pushReplacement(
-                                                      MaterialPageRoute(
-                                                        builder: (context) =>
-                                                            ActiveTrainingScreen(
-                                                              userProgramData:
-                                                                  data.first,
-                                                            ),
-                                                      ),
-                                                    );
-                                                    return;
-                                                  }
-                                                }
-                                              } else {
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text(
-                                                      'Ошибка запуска программы',
+                                                textAlign: TextAlign.center,
+                                              ),
+                                              const SizedBox(height: 16),
+                                              Text(
+                                                programData!['description'] ??
+                                                    '',
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  color: Colors.white,
+                                                  shadows: [
+                                                    Shadow(
+                                                      offset: Offset(0, 1),
+                                                      blurRadius: 2,
+                                                      color: Colors.black54,
+                                                    ),
+                                                  ],
+                                                ),
+                                                textAlign: TextAlign.center,
+                                              ),
+                                              const SizedBox(height: 32),
+                                              SizedBox(
+                                                width: 220,
+                                                height: 56,
+                                                child: ElevatedButton(
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor:
+                                                        AppColors.primary,
+                                                    foregroundColor:
+                                                        Colors.white,
+                                                    elevation: 8,
+                                                    shadowColor: Colors.black
+                                                        .withOpacity(0.3),
+                                                    shape: RoundedRectangleBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            12,
+                                                          ),
                                                     ),
                                                   ),
-                                                );
-                                              }
-                                            } catch (e) {
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
-                                                SnackBar(
-                                                  content: Text('Ошибка: $e'),
+                                                  onPressed: () async {
+                                                    final authProvider =
+                                                        Provider.of<
+                                                          AuthProvider
+                                                        >(
+                                                          context,
+                                                          listen: false,
+                                                        );
+                                                    final userUuid =
+                                                        authProvider.userUuid;
+                                                    if (userUuid == null) {
+                                                      ScaffoldMessenger.of(
+                                                        context,
+                                                      ).showSnackBar(
+                                                        const SnackBar(
+                                                          content: Text(
+                                                            'Ошибка: не найден userUuid',
+                                                          ),
+                                                        ),
+                                                      );
+                                                      return;
+                                                    }
+                                                    setState(() {
+                                                      isLoading = true;
+                                                    });
+                                                    try {
+                                                      final userProgramUuid =
+                                                          await ProgramService.addUserProgram(
+                                                            widget.programUuid,
+                                                            userUuid,
+                                                            null, // caption будет получен автоматически из программы
+                                                          );
+
+                                                      if (userProgramUuid !=
+                                                          null) {
+                                                        // После успешного добавления — проверяем активность
+                                                        final queryParams = {
+                                                          'user_uuid': userUuid,
+                                                          'program_uuid': widget
+                                                              .programUuid,
+                                                          'status': 'active',
+                                                        };
+                                                        final checkResponse =
+                                                            await ApiService.get(
+                                                              '/user_programs/',
+                                                              queryParams:
+                                                                  queryParams,
+                                                            );
+                                                        if (checkResponse
+                                                                .statusCode ==
+                                                            200) {
+                                                          final data =
+                                                              ApiService.decodeJson(
+                                                                checkResponse
+                                                                    .body,
+                                                              );
+                                                          if (data is List &&
+                                                              data.isNotEmpty) {
+                                                            Navigator.of(
+                                                              context,
+                                                            ).pushReplacement(
+                                                              MaterialPageRoute(
+                                                                builder: (context) =>
+                                                                    ActiveTrainingScreen(
+                                                                      userProgramData:
+                                                                          data.first,
+                                                                    ),
+                                                              ),
+                                                            );
+                                                            return;
+                                                          }
+                                                        }
+                                                      } else {
+                                                        ScaffoldMessenger.of(
+                                                          context,
+                                                        ).showSnackBar(
+                                                          const SnackBar(
+                                                            content: Text(
+                                                              'Ошибка запуска программы',
+                                                            ),
+                                                          ),
+                                                        );
+                                                      }
+                                                    } catch (e) {
+                                                      ScaffoldMessenger.of(
+                                                        context,
+                                                      ).showSnackBar(
+                                                        SnackBar(
+                                                          content: Text(
+                                                            'Ошибка: $e',
+                                                          ),
+                                                        ),
+                                                      );
+                                                    } finally {
+                                                      setState(() {
+                                                        isLoading = false;
+                                                      });
+                                                    }
+                                                  },
+                                                  child: const Text(
+                                                    'Начать программу',
+                                                    style: TextStyle(
+                                                      fontSize: 16,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                  ),
                                                 ),
-                                              );
-                                            } finally {
-                                              setState(() {
-                                                isLoading = false;
-                                              });
-                                            }
-                                          },
-                                          child: const Text(
-                                            'Начать программу',
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                            ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                              ),
-                              const Spacer(),
-                            ],
+                              );
+                            },
                           ),
                         ),
                       ),
