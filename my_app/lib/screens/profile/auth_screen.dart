@@ -7,6 +7,7 @@ import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
 import 'forgot_password_screen.dart';
 import '../main_screen_wrapper.dart';
+import '../../services/api_service.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({Key? key}) : super(key: key);
@@ -122,6 +123,22 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
             );
           }
         });
+      }
+    } on NetworkException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.wifi_off, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(child: Text(e.message)),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
       }
     } finally {
       if (mounted) {

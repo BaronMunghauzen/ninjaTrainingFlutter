@@ -47,12 +47,14 @@ class _InactiveTrainingScreenState extends State<InactiveTrainingScreen> {
         isLoading = false;
       });
     } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Ошибка загрузки: $e')));
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Ошибка загрузки: $e')));
+      }
     }
   }
 
@@ -222,6 +224,14 @@ class _InactiveTrainingScreenState extends State<InactiveTrainingScreen> {
                                                     ),
                                                   ),
                                                   onPressed: () async {
+                                                    // Сохраняем контекст для использования после async операций
+                                                    final navigator =
+                                                        Navigator.of(context);
+                                                    final scaffoldMessenger =
+                                                        ScaffoldMessenger.of(
+                                                          context,
+                                                        );
+
                                                     final authProvider =
                                                         Provider.of<
                                                           AuthProvider
@@ -232,20 +242,26 @@ class _InactiveTrainingScreenState extends State<InactiveTrainingScreen> {
                                                     final userUuid =
                                                         authProvider.userUuid;
                                                     if (userUuid == null) {
-                                                      ScaffoldMessenger.of(
-                                                        context,
-                                                      ).showSnackBar(
-                                                        const SnackBar(
-                                                          content: Text(
-                                                            'Ошибка: не найден userUuid',
-                                                          ),
-                                                        ),
-                                                      );
+                                                      if (!mounted) return;
+                                                      scaffoldMessenger
+                                                          .showSnackBar(
+                                                            const SnackBar(
+                                                              content: Text(
+                                                                'Ошибка: не найден userUuid',
+                                                              ),
+                                                            ),
+                                                          );
                                                       return;
                                                     }
+                                                    if (!mounted) return;
                                                     setState(() {
                                                       isLoading = true;
                                                     });
+
+                                                    String? error;
+                                                    Map<String, dynamic>?
+                                                    userData;
+
                                                     try {
                                                       final userProgramUuid =
                                                           await ProgramService.addUserProgram(
@@ -279,45 +295,45 @@ class _InactiveTrainingScreenState extends State<InactiveTrainingScreen> {
                                                               );
                                                           if (data is List &&
                                                               data.isNotEmpty) {
-                                                            Navigator.of(
-                                                              context,
-                                                            ).pushReplacement(
-                                                              MaterialPageRoute(
-                                                                builder: (context) =>
-                                                                    ActiveTrainingScreen(
-                                                                      userProgramData:
-                                                                          data.first,
-                                                                    ),
-                                                              ),
-                                                            );
-                                                            return;
+                                                            userData =
+                                                                data.first;
                                                           }
                                                         }
                                                       } else {
-                                                        ScaffoldMessenger.of(
-                                                          context,
-                                                        ).showSnackBar(
-                                                          const SnackBar(
-                                                            content: Text(
-                                                              'Ошибка запуска программы',
-                                                            ),
-                                                          ),
-                                                        );
+                                                        error =
+                                                            'Ошибка запуска программы';
                                                       }
                                                     } catch (e) {
-                                                      ScaffoldMessenger.of(
-                                                        context,
-                                                      ).showSnackBar(
-                                                        SnackBar(
-                                                          content: Text(
-                                                            'Ошибка: $e',
-                                                          ),
+                                                      error = 'Ошибка: $e';
+                                                    }
+
+                                                    // Проверяем mounted перед использованием контекста
+                                                    if (!mounted) return;
+
+                                                    setState(() {
+                                                      isLoading = false;
+                                                    });
+
+                                                    if (userData != null) {
+                                                      // Навигация в самом конце
+                                                      navigator.pushReplacement(
+                                                        MaterialPageRoute(
+                                                          builder: (context) =>
+                                                              ActiveTrainingScreen(
+                                                                userProgramData:
+                                                                    userData!,
+                                                              ),
                                                         ),
                                                       );
-                                                    } finally {
-                                                      setState(() {
-                                                        isLoading = false;
-                                                      });
+                                                    } else if (error != null) {
+                                                      scaffoldMessenger
+                                                          .showSnackBar(
+                                                            SnackBar(
+                                                              content: Text(
+                                                                error,
+                                                              ),
+                                                            ),
+                                                          );
                                                     }
                                                   },
                                                   child: const Text(

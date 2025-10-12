@@ -190,8 +190,8 @@ class ExerciseReference {
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
       user: json['user'],
-      image: json['image'],
-      video: json['video'],
+      image: json['image_uuid'] ?? json['image'],
+      video: json['video_uuid'] ?? json['video'],
       gif: json['gif_uuid'],
     );
   }

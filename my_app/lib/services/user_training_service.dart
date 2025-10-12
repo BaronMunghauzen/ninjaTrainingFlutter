@@ -133,7 +133,7 @@ class UserTrainingService {
   }) async {
     try {
       final response = await ApiService.put(
-        '/exercise_reference/$exerciseUuid/',
+        '/exercise_reference/update/$exerciseUuid',
         body: {
           'exercise_type': 'user',
           'user_uuid': userUuid,

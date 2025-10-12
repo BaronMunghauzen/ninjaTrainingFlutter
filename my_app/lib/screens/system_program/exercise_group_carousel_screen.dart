@@ -164,14 +164,20 @@ class _ExerciseGroupCarouselScreenState
   List<Widget> _buildGifSection(ExerciseModel exercise) {
     final exerciseRef = exerciseReferences[exercise.uuid];
     final gifUuid = exerciseRef?['gif_uuid'];
+    final imageUuid = exerciseRef?['image_uuid'];
 
-    // Если нет gif_uuid, не показываем секцию с гифкой вообще
-    if (gifUuid == null) {
-      return [];
+    // Если есть gif_uuid, показываем гифку
+    if (gifUuid != null) {
+      return [_buildGifPlayer(exercise)];
     }
 
-    // Если есть gif_uuid, показываем только гифку без рамки
-    return [_buildGifPlayer(exercise)];
+    // Если нет гифки, но есть image_uuid, показываем картинку
+    if (imageUuid != null) {
+      return [_buildImagePlayer(exercise)];
+    }
+
+    // Если нет ни гифки, ни картинки - не показываем ничего
+    return [];
   }
 
   Widget _buildGifPlayer(ExerciseModel exercise) {
@@ -183,6 +189,39 @@ class _ExerciseGroupCarouselScreenState
       gifUuid: gifUuid,
       width: double.infinity,
       height: 250, // Увеличиваем высоту для лучшего отображения
+    );
+  }
+
+  Widget _buildImagePlayer(ExerciseModel exercise) {
+    final exerciseRef = exerciseReferences[exercise.uuid];
+    final imageUuid = exerciseRef?['image_uuid'];
+
+    // Этот метод вызывается только когда image_uuid есть
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Image.network(
+        '${ApiService.baseUrl}/files/file/$imageUuid',
+        width: double.infinity,
+        height: 250,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            height: 250,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.inputBorder),
+            ),
+            child: const Center(
+              child: Icon(
+                Icons.broken_image,
+                size: 64,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -585,7 +624,6 @@ class _ExerciseGroupCarouselScreenState
                             const SizedBox(height: 20),
                             // 4. Три серых квадрата
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 _InfoSquare(
                                   text:
@@ -874,10 +912,8 @@ class _InfoSquare extends StatelessWidget {
   const _InfoSquare({required this.text});
   @override
   Widget build(BuildContext context) {
-    return Flexible(
-      flex: 0,
+    return Expanded(
       child: Container(
-        width: 110,
         height: 60,
         margin: const EdgeInsets.symmetric(horizontal: 4),
         decoration: BoxDecoration(

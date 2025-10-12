@@ -31,6 +31,7 @@ class _UserTrainingCreateScreenState extends State<UserTrainingCreateScreen> {
   Future<void> _createTraining() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
     });
@@ -40,6 +41,7 @@ class _UserTrainingCreateScreenState extends State<UserTrainingCreateScreen> {
       final userUuid = authProvider.userUuid;
 
       if (userUuid == null) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Ошибка: не найден userUuid')),
         );
@@ -55,23 +57,28 @@ class _UserTrainingCreateScreenState extends State<UserTrainingCreateScreen> {
       );
 
       if (result != null) {
+        if (!mounted) return;
         Navigator.of(context).pop(true);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Тренировка создана')));
       } else {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Ошибка при создании тренировки')),
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -90,7 +97,7 @@ class _UserTrainingCreateScreenState extends State<UserTrainingCreateScreen> {
         elevation: 0,
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,

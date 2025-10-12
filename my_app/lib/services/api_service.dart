@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
@@ -8,6 +9,15 @@ import 'package:crypto/crypto.dart';
 import '../constants/api_constants.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:flutter/material.dart';
+
+/// Исключение для ошибок сети
+class NetworkException implements Exception {
+  final String message;
+  NetworkException(this.message);
+
+  @override
+  String toString() => message;
+}
 
 class ApiService {
   static const String _logPrefix = '🌐 API';
@@ -472,6 +482,20 @@ class ApiService {
       }
     } catch (e) {
       _logError(method: method, uri: uri, error: e.toString());
+
+      // Обработка ошибок сети
+      if (e is SocketException) {
+        throw NetworkException(
+          'Нет подключения к интернету. Проверьте сетевое соединение.',
+        );
+      } else if (e is TimeoutException) {
+        throw NetworkException(
+          'Превышено время ожидания. Проверьте подключение к интернету.',
+        );
+      } else if (e is HttpException) {
+        throw NetworkException('Ошибка HTTP соединения.');
+      }
+
       rethrow;
     }
 

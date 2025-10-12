@@ -12,7 +12,6 @@ import 'edit_profile_screen.dart';
 import 'contact_screen.dart';
 import 'auth_screen.dart';
 import '../subscription/subscription_plans_screen.dart';
-import '../subscription/payment_history_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -289,20 +288,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     child: Column(
                       children: [
-                        _buildMenuItem(
-                          'История платежей',
-                          Icons.receipt_long,
-                          () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const PaymentHistoryScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        const Divider(color: Color(0xFF3A3A3A), height: 24),
                         _buildMenuItem(
                           'Связаться с нами',
                           Icons.contact_support,

@@ -69,6 +69,9 @@ class AuthProvider extends ChangeNotifier {
       } else {
         return 'Неверные учетные данные';
       }
+    } on NetworkException {
+      // Пробрасываем ошибку сети дальше
+      rethrow;
     } catch (e) {
       return 'Ошибка входа: $e';
     }
@@ -113,6 +116,9 @@ class AuthProvider extends ChangeNotifier {
         final data = ApiService.decodeJson(response.body);
         return data['detail']?.toString() ?? 'Ошибка регистрации';
       }
+    } on NetworkException {
+      // Пробрасываем ошибку сети дальше
+      rethrow;
     } catch (e) {
       return 'Ошибка регистрации: $e';
     }
@@ -163,6 +169,10 @@ class AuthProvider extends ChangeNotifier {
         }
       }
       return false;
+    } on NetworkException catch (e) {
+      print('Network error during login: $e');
+      // Пробрасываем ошибку дальше для отображения в UI
+      rethrow;
     } catch (e) {
       print('Login error: $e');
       return false;
@@ -209,6 +219,10 @@ class AuthProvider extends ChangeNotifier {
         // Если токен недействителен, выходим из системы
         await logout();
       }
+    } on NetworkException catch (e) {
+      print('Network error fetching user profile: $e');
+      // При ошибках сети не сбрасываем состояние аутентификации
+      // Пользователь может работать с кэшированными данными
     } catch (e) {
       print('Error fetching user profile: $e');
       // При ошибках сети не сбрасываем состояние аутентификации
@@ -232,7 +246,7 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       final body = <String, dynamic>{};
-      if (username != null) body['username'] = username;
+      if (username != null) body['login'] = username;
       if (email != null) body['email'] = email;
       if (firstName != null) body['first_name'] = firstName;
       if (lastName != null) body['last_name'] = lastName;

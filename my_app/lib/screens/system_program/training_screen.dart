@@ -31,10 +31,12 @@ class _TrainingScreenState extends State<TrainingScreen> {
 
   // Состояние для поиска
   final TextEditingController _searchController = TextEditingController();
+  final GlobalKey _searchFieldKey = GlobalKey();
   Timer? _searchTimer;
   SearchResult? _searchResult;
   bool _isSearching = false;
   bool _showSearchResults = false;
+  double _searchFieldBottomPosition = 0;
 
   // Счетчик для принудительного обновления SystemTrainingListWidget
   int _systemTrainingRefreshCounter = 0;
@@ -60,6 +62,26 @@ class _TrainingScreenState extends State<TrainingScreen> {
           programs = programsList;
           isLoading = false;
         });
+      }
+    } on NetworkException catch (e) {
+      print('Network error loading programs: $e');
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.wifi_off, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(child: Text(e.message)),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
       }
     } catch (e) {
       print('Error loading programs: $e');
@@ -93,6 +115,21 @@ class _TrainingScreenState extends State<TrainingScreen> {
   String? _getImageUuid(String? imageUuid) {
     if (imageUuid == null || imageUuid.isEmpty) return null;
     return imageUuid;
+  }
+
+  void _calculateSearchFieldPosition() {
+    final RenderBox? renderBox =
+        _searchFieldKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox != null) {
+      final position = renderBox.localToGlobal(Offset.zero);
+      final size = renderBox.size;
+      print('🔍 Search field position: ${position.dy}');
+      print('🔍 Search field height: ${size.height}');
+      print('🔍 Bottom position: ${position.dy + size.height}');
+      setState(() {
+        _searchFieldBottomPosition = position.dy + size.height;
+      });
+    }
   }
 
   void _performSearch(String query) async {
@@ -130,6 +167,8 @@ class _TrainingScreenState extends State<TrainingScreen> {
       print('Search result trainings: ${result?.trainings.length}');
 
       if (mounted) {
+        // Рассчитываем позицию поисковой строки перед показом результатов
+        _calculateSearchFieldPosition();
         setState(() {
           _searchResult = result;
           _showSearchResults = true;
@@ -137,6 +176,26 @@ class _TrainingScreenState extends State<TrainingScreen> {
         });
         print(
           'State updated: _showSearchResults = $_showSearchResults, _searchResult = $_searchResult',
+        );
+      }
+    } on NetworkException catch (e) {
+      print('Network error during search: $e');
+      if (mounted) {
+        setState(() {
+          _isSearching = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.wifi_off, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(child: Text(e.message)),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
         );
       }
     } catch (e) {
@@ -308,7 +367,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
           child: Text(
             title,
             style: const TextStyle(
@@ -406,12 +465,12 @@ class _TrainingScreenState extends State<TrainingScreen> {
               ),
             ),
             child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Stack(
-                  children: [
-                    // Основной контент страницы
-                    SingleChildScrollView(
+              child: Stack(
+                children: [
+                  // Основной контент страницы
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: SingleChildScrollView(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -426,11 +485,16 @@ class _TrainingScreenState extends State<TrainingScreen> {
                           ),
                           SizedBox(height: 200),
                           // Поле поиска (без Stack)
-                          SizedBox(
+                          Container(
+                            key: _searchFieldKey,
                             width: double.infinity,
                             child: TextField(
                               controller: _searchController,
                               onChanged: _onSearchChanged,
+                              onTap: () {
+                                // Пересчитываем позицию при нажатии на поле
+                                _calculateSearchFieldPosition();
+                              },
                               decoration: InputDecoration(
                                 hintText: 'Поиск',
                                 filled: false,
@@ -758,83 +822,105 @@ class _TrainingScreenState extends State<TrainingScreen> {
                         ],
                       ),
                     ),
-                    // Overlay с результатами поиска
-                    if (_showSearchResults && _searchResult != null)
-                      Positioned(
-                        top: 350, // теперь окно сразу под строкой поиска
-                        left: 0,
-                        right: 0,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 0),
-                          child: Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 0),
-                            constraints: const BoxConstraints(maxHeight: 300),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: AppColors.inputBorder,
-                                width: 1,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
+                  ),
+                  // Overlay с результатами поиска - теперь поверх всего
+                  if (_showSearchResults && _searchResult != null) ...[
+                    // Полупрозрачный фон для закрытия по клику
+                    Positioned.fill(
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _showSearchResults = false;
+                          });
+                        },
+                        child: Container(color: Colors.black.withOpacity(0.3)),
+                      ),
+                    ),
+                    // Результаты поиска
+                    Positioned(
+                      top:
+                          _searchFieldBottomPosition -
+                          15, // Отрицательный отступ для наложения
+                      left: 24,
+                      right: 24,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
                             ),
-                            child: SingleChildScrollView(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (_searchResult!
-                                      .exerciseReferences
-                                      .isNotEmpty) ...[
-                                    _buildSearchSection(
-                                      'Упражнения',
-                                      _searchResult!.exerciseReferences,
-                                      'exercise_reference',
-                                    ),
-                                  ],
-                                  if (_searchResult!.programs.isNotEmpty) ...[
-                                    _buildSearchSection(
-                                      'Программы',
-                                      _searchResult!.programs,
-                                      'program',
-                                    ),
-                                  ],
-                                  if (_searchResult!.trainings.isNotEmpty) ...[
-                                    _buildSearchSection(
-                                      'Тренировки',
-                                      _searchResult!.trainings,
-                                      'training',
-                                    ),
-                                  ],
-                                  if (_searchResult!
-                                          .exerciseReferences
-                                          .isEmpty &&
-                                      _searchResult!.programs.isEmpty &&
-                                      _searchResult!.trainings.isEmpty) ...[
-                                    const Padding(
-                                      padding: EdgeInsets.all(16),
-                                      child: Text(
-                                        'По вашему запросу ничего не найдено',
-                                        style: TextStyle(
-                                          color: AppColors.textSecondary,
-                                          fontSize: 16,
-                                        ),
+                          ],
+                        ),
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 0),
+                          constraints: const BoxConstraints(maxHeight: 300),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppColors.inputBorder,
+                              width: 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: SingleChildScrollView(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (_searchResult!
+                                    .exerciseReferences
+                                    .isNotEmpty) ...[
+                                  _buildSearchSection(
+                                    'Упражнения',
+                                    _searchResult!.exerciseReferences,
+                                    'exercise_reference',
+                                  ),
+                                ],
+                                if (_searchResult!.programs.isNotEmpty) ...[
+                                  _buildSearchSection(
+                                    'Программы',
+                                    _searchResult!.programs,
+                                    'program',
+                                  ),
+                                ],
+                                if (_searchResult!.trainings.isNotEmpty) ...[
+                                  _buildSearchSection(
+                                    'Тренировки',
+                                    _searchResult!.trainings,
+                                    'training',
+                                  ),
+                                ],
+                                if (_searchResult!.exerciseReferences.isEmpty &&
+                                    _searchResult!.programs.isEmpty &&
+                                    _searchResult!.trainings.isEmpty) ...[
+                                  const Padding(
+                                    padding: EdgeInsets.all(8),
+                                    child: Text(
+                                      'По вашему запросу ничего не найдено',
+                                      style: TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 16,
                                       ),
                                     ),
-                                  ],
+                                  ),
                                 ],
-                              ),
+                              ],
                             ),
                           ),
                         ),
                       ),
+                    ),
                   ],
-                ),
+                ],
               ),
             ),
           ),

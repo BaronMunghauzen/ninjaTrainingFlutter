@@ -6,6 +6,7 @@ import '../../services/notification_service.dart';
 import 'system_program/training_screen.dart';
 import 'achievements_and_statistics/achievements_and_statistics_screen.dart';
 import 'profile/profile_screen.dart';
+import '../widgets/network_status_banner.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
@@ -50,29 +51,31 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: _screens[_currentIndex],
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(0, 'assets/images/training.png', ''),
-                _buildNavItem(1, 'assets/images/achivandstat.png', ''),
-                _buildNavItem(2, 'assets/images/profile.png', ''),
-              ],
+    return NetworkStatusBanner(
+      child: Scaffold(
+        body: _screens[_currentIndex],
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildNavItem(0, 'assets/images/training.png', ''),
+                  _buildNavItem(1, 'assets/images/achivandstat.png', ''),
+                  _buildNavItem(2, 'assets/images/profile.png', ''),
+                ],
+              ),
             ),
           ),
         ),

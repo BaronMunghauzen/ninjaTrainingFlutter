@@ -184,14 +184,41 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         elevation: 0,
         actions: [
           if (_hasChanges && !_isSaving)
-            TextButton(
-              onPressed: _saveProfile,
-              child: const Text(
-                'Сохранить',
-                style: TextStyle(
-                  color: const Color(0xFF1F2121),
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: ElevatedButton(
+                onPressed: _saveProfile,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  elevation: 3,
+                ),
+                child: const Text(
+                  'Сохранить',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          if (_isSaving)
+            const Padding(
+              padding: EdgeInsets.only(right: 16.0),
+              child: Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.primary,
+                    ),
+                  ),
                 ),
               ),
             ),

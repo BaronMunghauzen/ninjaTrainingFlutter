@@ -147,129 +147,131 @@ class _SystemTrainingDetailScreenState
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text(
-                      widget.training['caption'] ?? '',
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        shadows: [
-                          Shadow(
-                            offset: Offset(0, 2),
-                            blurRadius: 4,
-                            color: Colors.black54,
-                          ),
-                        ],
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    if (widget.training['description'] != null &&
-                        widget.training['description'].toString().isNotEmpty)
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
                       Text(
-                        widget.training['description'],
+                        widget.training['caption'] ?? '',
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
                           color: Colors.white,
                           shadows: [
                             Shadow(
-                              offset: Offset(0, 1),
-                              blurRadius: 2,
+                              offset: Offset(0, 2),
+                              blurRadius: 4,
                               color: Colors.black54,
                             ),
                           ],
                         ),
                         textAlign: TextAlign.center,
                       ),
-                    const SizedBox(height: 24),
-                    // Информационные блоки с фоном
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.6),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.fitness_center,
-                                size: 20,
-                                color: Colors.white,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Сложность: ${widget.training['difficulty_level'] ?? '-'}',
-                                style: const TextStyle(color: Colors.white),
+                      const SizedBox(height: 16),
+                      if (widget.training['description'] != null &&
+                          widget.training['description'].toString().isNotEmpty)
+                        Text(
+                          widget.training['description'],
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.white,
+                            shadows: [
+                              Shadow(
+                                offset: Offset(0, 1),
+                                blurRadius: 2,
+                                color: Colors.black54,
                               ),
                             ],
                           ),
-                          const SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.timer,
-                                size: 20,
-                                color: Colors.white,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Длительность: ${widget.training['duration'] ?? '-'} мин',
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.accessibility_new,
-                                size: 20,
-                                color: Colors.white,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Группа мышц: ${widget.training['muscle_group'] ?? '-'}',
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () => _startTraining(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 8,
-                          shadowColor: Colors.black.withOpacity(0.3),
+                          textAlign: TextAlign.center,
                         ),
-                        child: const Text(
-                          'Начать',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      const SizedBox(height: 24),
+                      // Информационные блоки с фоном
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.fitness_center,
+                                  size: 20,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Сложность: ${widget.training['difficulty_level'] ?? '-'}',
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.timer,
+                                  size: 20,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Длительность: ${widget.training['duration'] ?? '-'} мин',
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.accessibility_new,
+                                  size: 20,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Группа мышц: ${widget.training['muscle_group'] ?? '-'}',
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 32),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () => _startTraining(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 8,
+                            shadowColor: Colors.black.withOpacity(0.3),
+                          ),
+                          child: const Text(
+                            'Начать',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
