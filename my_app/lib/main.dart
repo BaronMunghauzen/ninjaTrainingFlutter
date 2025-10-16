@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:app_links/app_links.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'constants/app_colors.dart';
 import 'providers/auth_provider.dart';
 import 'providers/timer_overlay_provider.dart';
@@ -11,6 +13,7 @@ import 'screens/main_screen_wrapper.dart';
 import 'widgets/global_timer_overlay.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
+import 'services/fcm_service.dart';
 import 'utils/deep_link_handler.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -18,11 +21,31 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Инициализируем Firebase
+  try {
+    await Firebase.initializeApp();
+    print('✅ Firebase инициализирован');
+  } catch (e) {
+    print('❌ Ошибка инициализации Firebase: $e');
+  }
+
+  // Регистрируем обработчик фоновых FCM сообщений
+  // ВАЖНО: Должен быть зарегистрирован до runApp()
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
   // Оптимизация: инициализируем API сервис при старте
   await ApiService.initializeToken();
 
   // Инициализируем сервис уведомлений
   await NotificationService.initialize();
+
+  // Инициализируем FCM
+  try {
+    await FCMService.initialize();
+    print('✅ FCM сервис инициализирован');
+  } catch (e) {
+    print('❌ Ошибка инициализации FCM: $e');
+  }
 
   // Инициализируем обработчик Deep Links
   _initDeepLinks();

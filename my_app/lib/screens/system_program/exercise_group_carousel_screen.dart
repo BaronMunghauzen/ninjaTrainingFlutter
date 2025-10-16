@@ -884,7 +884,13 @@ class _ExerciseGroupCarouselScreenState
         context,
         listen: false,
       );
-      timerProvider.show(ex.restTime);
+      final userUuid = widget.userUuid ?? '';
+      timerProvider.show(
+        ex.restTime,
+        userUuid: userUuid.isNotEmpty ? userUuid : null,
+        exerciseUuid: ex.uuid,
+        exerciseName: ex.caption,
+      );
     }
   }
 

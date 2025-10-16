@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/fcm_service.dart';
 import '../models/user_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
@@ -214,6 +215,15 @@ class AuthProvider extends ChangeNotifier {
         // Устанавливаем флаг аутентификации при успешном получении профиля
         _isAuthenticated = true;
         print('User profile loaded successfully, user is now authenticated');
+
+        // Обновляем FCM токен после успешного входа
+        try {
+          await FCMService.getToken(); // Автоматически отправит на сервер
+          print('FCM токен обновлен при входе');
+        } catch (e) {
+          print('Ошибка обновления FCM токена: $e');
+        }
+
         notifyListeners();
       } else if (response.statusCode == 401) {
         // Если токен недействителен, выходим из системы

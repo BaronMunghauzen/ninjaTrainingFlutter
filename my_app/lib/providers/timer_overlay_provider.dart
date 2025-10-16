@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async'; // Added for Timer
 import '../utils/global_ticker_provider.dart';
 import '../services/notification_service.dart';
+import '../services/fcm_service.dart';
 
 class TimerOverlayProvider extends ChangeNotifier {
   bool _isVisible = false;
@@ -19,7 +20,13 @@ class TimerOverlayProvider extends ChangeNotifier {
   AnimationController? get controller => _controller;
   bool get isBigTimerOpen => _isBigTimerOpen;
 
-  void show(int seconds, {Offset? startPosition}) {
+  void show(
+    int seconds, {
+    Offset? startPosition,
+    String? userUuid,
+    String? exerciseUuid,
+    String? exerciseName,
+  }) {
     print('⏱️ TimerOverlayProvider: Запуск таймера на $seconds секунд');
 
     // Уничтожаем старые
@@ -45,6 +52,19 @@ class TimerOverlayProvider extends ChangeNotifier {
     print('⏱️ TimerOverlayProvider: Планирование уведомления...');
     _scheduleNotification(seconds);
 
+    // НОВОЕ: Планируем уведомление на backend через FCM (более надежно!)
+    if (userUuid != null && exerciseUuid != null && exerciseName != null) {
+      print(
+        '⏱️ TimerOverlayProvider: Планирование таймера на backend через FCM...',
+      );
+      _scheduleNotificationOnBackend(
+        userUuid: userUuid,
+        exerciseUuid: exerciseUuid,
+        exerciseName: exerciseName,
+        durationSeconds: seconds,
+      );
+    }
+
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       final left = seconds - _controller!.value * seconds;
       updateSecondsLeft(left.ceil());
@@ -61,7 +81,7 @@ class TimerOverlayProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void hide() {
+  void hide({String? userUuid}) {
     print('⏱️ TimerOverlayProvider: Скрытие таймера (с отменой уведомления)');
     _isVisible = false;
     _isBigTimerOpen = false;
@@ -72,6 +92,12 @@ class TimerOverlayProvider extends ChangeNotifier {
     // Отменяем запланированное уведомление, если таймер скрыли до завершения
     print('⏱️ TimerOverlayProvider: Отмена запланированного уведомления...');
     _cancelScheduledNotification();
+
+    // Отменяем на backend тоже
+    if (userUuid != null && userUuid.isNotEmpty) {
+      _cancelNotificationOnBackend(userUuid);
+    }
+
     notifyListeners();
   }
 
@@ -131,6 +157,41 @@ class TimerOverlayProvider extends ChangeNotifier {
       print('⏱️ TimerOverlayProvider: cancelTimerNotification() завершен');
     } catch (e) {
       print('⏱️ TimerOverlayProvider: ОШИБКА при отмене уведомления: $e');
+    }
+  }
+
+  /// Планирование уведомления на backend через FCM
+  Future<void> _scheduleNotificationOnBackend({
+    required String userUuid,
+    required String exerciseUuid,
+    required String exerciseName,
+    required int durationSeconds,
+  }) async {
+    try {
+      print('⏱️ TimerOverlayProvider: Отправка на backend...');
+      await FCMService.scheduleTimerOnBackend(
+        userUuid: userUuid,
+        exerciseUuid: exerciseUuid,
+        exerciseName: exerciseName,
+        durationSeconds: durationSeconds,
+      );
+      print('⏱️ TimerOverlayProvider: ✅ Таймер запланирован на backend');
+    } catch (e) {
+      print(
+        '⏱️ TimerOverlayProvider: ⚠️ Не удалось запланировать на backend: $e',
+      );
+      // Не критично - локальное уведомление все равно сработает
+    }
+  }
+
+  /// Отмена уведомления на backend
+  Future<void> _cancelNotificationOnBackend(String userUuid) async {
+    try {
+      print('⏱️ TimerOverlayProvider: Отмена на backend...');
+      await FCMService.cancelTimerOnBackend(userUuid: userUuid);
+      print('⏱️ TimerOverlayProvider: ✅ Таймер отменен на backend');
+    } catch (e) {
+      print('⏱️ TimerOverlayProvider: ⚠️ Не удалось отменить на backend: $e');
     }
   }
 }

@@ -372,7 +372,13 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
         context,
         listen: false,
       );
-      timerProvider.show(ex.restTime);
+      final userUuid = widget.userTraining['user']?['uuid'] ?? '';
+      timerProvider.show(
+        ex.restTime,
+        userUuid: userUuid.isNotEmpty ? userUuid : null,
+        exerciseUuid: ex.uuid,
+        exerciseName: ex.caption,
+      );
     }
   }
 
