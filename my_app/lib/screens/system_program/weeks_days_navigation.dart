@@ -38,20 +38,15 @@ class WeeksDaysNavigationState extends State<WeeksDaysNavigation> {
   int currentWeek = 0; // Для визуального отображения
   int currentDay = 0; // Для визуального отображения
   int currentDayIndex = 0; // Общий индекс дня в полотне (0-27)
-  String? _lastLoadedUserProgramUuid;
+  String? _lastLoadedUserProgramUuid; // Для предотвращения зацикливания
   final ScrollController _weekScrollController = ScrollController();
   final ScrollController _dayScrollController = ScrollController();
 
   // Оптимизация: индексация тренировок для быстрого доступа
   Map<String, Map<String, dynamic>> _trainingsIndex = {};
 
-  // Оптимизация: кэш для стилей дней текущей недели
-  Map<int, Map<String, dynamic>> _currentWeekStylesCache = {};
-  int _lastCachedWeek = -1;
-
   // Оптимизация: карта статусов для всех 28 дней
   Map<int, Map<String, dynamic>> _allDaysStatusCache = {};
-  String? _lastCachedUserProgramUuid;
 
   // Кэш стилей для всех дней (0-27)
   Map<int, Map<String, dynamic>> _allDaysStylesCache = {};
@@ -105,8 +100,6 @@ class WeeksDaysNavigationState extends State<WeeksDaysNavigation> {
         'isRestDay': training?['is_rest_day'] ?? false,
       };
     }
-
-    _lastCachedUserProgramUuid = widget.userProgramUuid;
   }
 
   // Оптимизация: получение тренировки по индексу дня O(1)
@@ -120,25 +113,6 @@ class WeeksDaysNavigationState extends State<WeeksDaysNavigation> {
   // Оптимизация: получение статуса дня из кэша
   Map<String, dynamic>? _getDayStatus(int dayIndex) {
     return _allDaysStatusCache[dayIndex];
-  }
-
-  // Оптимизация: кэширование стилей для текущей недели
-  void _updateCurrentWeekStylesCache() {
-    if (_lastCachedWeek == currentWeek) return;
-
-    _currentWeekStylesCache.clear();
-    for (int dayIndex = 0; dayIndex < widget.daysCount; dayIndex++) {
-      final globalDayIndex = currentWeek * 7 + dayIndex;
-      final dayStatus = _getDayStatus(globalDayIndex);
-      _currentWeekStylesCache[dayIndex] = {
-        'background': _calculateBackgroundColor(dayStatus),
-        'border': _calculateBorderColor(dayStatus, dayIndex),
-        'text': _calculateTextColor(dayStatus, dayIndex),
-        'borderWidth': _calculateBorderWidth(dayStatus, dayIndex),
-        'status': dayStatus?['status'],
-      };
-    }
-    _lastCachedWeek = currentWeek;
   }
 
   // Оптимизация: обновление кэша стилей для всех дней
@@ -164,13 +138,34 @@ class WeeksDaysNavigationState extends State<WeeksDaysNavigation> {
   }
 
   Color _calculateBackgroundColor(Map<String, dynamic>? dayStatus) {
-    // Всегда прозрачный фон
-    return Colors.transparent;
+    if (!widget.isActiveProgram) {
+      return Colors.transparent;
+    }
+
+    if (dayStatus == null) {
+      return Colors.transparent;
+    }
+
+    String status = dayStatus['status']?.toString().toLowerCase() ?? 'null';
+
+    switch (status) {
+      case 'passed':
+        return Colors.green.withOpacity(0.2); // Зеленый фон для завершенных
+      case 'active':
+        return Colors.blue.withOpacity(0.2); // Синий фон для активных
+      case 'skipped':
+        return Colors.red.withOpacity(0.2); // Красный фон для пропущенных
+      case 'blocked_yet':
+        return Colors.grey.withOpacity(0.1); // Серый фон для заблокированных
+      default:
+        return Colors.transparent;
+    }
   }
 
   Color _calculateBorderColor(Map<String, dynamic>? dayStatus, int dayIndex) {
-    String status = dayStatus?['status']?.toString() ?? 'null';
+    String status = dayStatus?['status']?.toString().toLowerCase() ?? 'null';
     Color result;
+
     if (!widget.isActiveProgram) {
       result = currentDay == dayIndex
           ? AppColors.buttonPrimary
@@ -185,24 +180,54 @@ class WeeksDaysNavigationState extends State<WeeksDaysNavigation> {
       return result;
     }
 
-    if (status == 'blocked_yet')
-      result = Colors.grey[600]!;
-    else if (status == 'passed')
-      result = Colors.green;
-    else if (status == 'skipped')
-      result = Colors.orange;
-    else if (status == 'active')
-      result = Colors.blueAccent;
-    else
-      result = currentDay == dayIndex ? Colors.blueAccent : Colors.grey[700]!;
+    // Цвета границ для разных статусов
+    switch (status) {
+      case 'passed':
+        result = Colors.green; // Зеленая граница для завершенных
+        break;
+      case 'active':
+        result = Colors.blue; // Синяя граница для активных
+        break;
+      case 'skipped':
+        result = Colors.red; // Красная граница для пропущенных
+        break;
+      case 'blocked_yet':
+        result = Colors.grey[600]!; // Серая граница для заблокированных
+        break;
+      default:
+        result = currentDay == dayIndex ? Colors.blueAccent : Colors.grey[700]!;
+    }
+
     return result;
   }
 
   Color _calculateTextColor(Map<String, dynamic>? dayStatus, int dayIndex) {
     int globalDayIndex = currentWeek * widget.daysCount + dayIndex;
+
+    // Если это текущий выбранный день - белый текст
     if (globalDayIndex == currentDayIndex) {
       return Colors.white;
     }
+
+    // Если это активная программа, используем цвета в зависимости от статуса
+    if (widget.isActiveProgram && dayStatus != null) {
+      String status = dayStatus['status']?.toString().toLowerCase() ?? 'null';
+
+      switch (status) {
+        case 'passed':
+          return Colors.green[800]!; // Темно-зеленый текст для завершенных
+        case 'active':
+          return Colors.blue[800]!; // Темно-синий текст для активных
+        case 'skipped':
+          return Colors.red[800]!; // Темно-красный текст для пропущенных
+        case 'blocked_yet':
+          return Colors.grey[500]!; // Серый текст для заблокированных
+        default:
+          return Colors.grey[400]!;
+      }
+    }
+
+    // По умолчанию серый текст
     return Colors.grey[400]!;
   }
 
@@ -232,8 +257,14 @@ class WeeksDaysNavigationState extends State<WeeksDaysNavigation> {
   Future<void> _loadTrainings() async {
     if (widget.userProgramUuid == null) return;
 
+    // Предотвращаем зацикливание - загружаем только если изменился userProgramUuid
     if (_lastLoadedUserProgramUuid == widget.userProgramUuid &&
         trainings.isNotEmpty) {
+      return;
+    }
+
+    // Дополнительная защита от зацикливания - не загружаем если уже загружаем
+    if (_isLoading) {
       return;
     }
 
@@ -284,6 +315,7 @@ class WeeksDaysNavigationState extends State<WeeksDaysNavigation> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _lastLoadedUserProgramUuid = widget.userProgramUuid;
         });
       }
       print('Error loading trainings: $e');
@@ -292,6 +324,9 @@ class WeeksDaysNavigationState extends State<WeeksDaysNavigation> {
 
   Future<void> refreshTrainings() async {
     if (widget.userProgramUuid == null) return;
+
+    // Очищаем кэш для принудительной перезагрузки
+    _lastLoadedUserProgramUuid = null;
 
     if (mounted) {
       setState(() {
@@ -348,6 +383,7 @@ class WeeksDaysNavigationState extends State<WeeksDaysNavigation> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _lastLoadedUserProgramUuid = widget.userProgramUuid;
         });
       }
       print('Error refreshing trainings: $e');

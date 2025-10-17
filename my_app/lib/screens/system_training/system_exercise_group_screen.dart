@@ -383,15 +383,28 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
   }
 
   Future<void> _onFinishExercise(int exIndex, ExerciseModel ex) async {
+    // Собираем все user_exercise_uuids для batch запроса
+    List<String> userExerciseUuids = [];
     for (int i = 0; i < userExerciseRows[exIndex].length; i++) {
       final row = userExerciseRows[exIndex][i];
       if (row.userExerciseUuid != null) {
-        await ApiService.patch(
-          '/user_exercises/set_passed/${row.userExerciseUuid}',
-        );
+        userExerciseUuids.add(row.userExerciseUuid!);
+      }
+    }
+
+    // Если есть упражнения для обновления, отправляем batch запрос
+    if (userExerciseUuids.isNotEmpty) {
+      await ApiService.patch(
+        '/user_exercises/batch_set_passed',
+        body: {'user_exercise_uuids': userExerciseUuids},
+      );
+
+      // Обновляем данные для каждого подхода
+      for (int i = 0; i < userExerciseRows[exIndex].length; i++) {
         await _loadUserExercise(exIndex, i, ex.uuid);
       }
     }
+
     if (mounted) {
       Navigator.of(context).pop();
     }

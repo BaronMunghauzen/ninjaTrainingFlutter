@@ -727,29 +727,51 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
             ],
           ),
         if (!isRestDay && status == 'passed')
-          const Padding(
-            padding: EdgeInsets.only(top: 16.0),
-            child: Text(
-              'Тренировка завершена',
-              style: TextStyle(
-                color: Colors.green,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(top: 16.0),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.green.withOpacity(0.3),
+                width: 1,
               ),
-              textAlign: TextAlign.center,
+            ),
+            child: const Center(
+              child: Text(
+                'Тренировка завершена',
+                style: TextStyle(
+                  color: Colors.green,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         if (!isRestDay && status == 'skipped')
-          const Padding(
-            padding: EdgeInsets.only(top: 16.0),
-            child: Text(
-              'Тренировка пропущена',
-              style: TextStyle(
-                color: Colors.orange,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(top: 16.0),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.orange.withOpacity(0.3),
+                width: 1,
               ),
-              textAlign: TextAlign.center,
+            ),
+            child: const Center(
+              child: Text(
+                'Тренировка пропущена',
+                style: TextStyle(
+                  color: Colors.orange,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         if (isRestDay) const SizedBox.shrink(),
