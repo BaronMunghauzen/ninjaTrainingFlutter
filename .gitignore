@@ -17,11 +17,13 @@ ios/Pods/
 ios/.symlinks/
 ios/Podfile.lock
 ios/Podfile.ios
+ios/Podfile
 
 # macOS
 macos/Flutter/ephemeral/
 macos/Pods/
 macos/Podfile.lock
+macos/Podfile
 
 # Android
 android/.gradle/
@@ -44,6 +46,11 @@ my_app/ios/Runner/Runner.entitlements
 my_app/macos/Flutter/GeneratedPluginRegistrant.swift
 my_app/windows/flutter/generated_plugin_registrant.cc
 my_app/windows/flutter/generated_plugins.cmake
+my_app/ios/Flutter/AppFrameworkInfo.plist
+my_app/ios/Flutter/Debug.xcconfig
+my_app/ios/Flutter/Release.xcconfig
+my_app/macos/Flutter/Flutter-Debug.xcconfig
+my_app/macos/Flutter/Flutter-Release.xcconfig
 
 # Documentation files (временные файлы документации)
 FCM_COMPLETE_GUIDE.md
