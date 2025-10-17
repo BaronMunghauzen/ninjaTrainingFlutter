@@ -43,6 +43,10 @@ void main() async {
   try {
     await FCMService.initialize();
     print('✅ FCM сервис инициализирован');
+
+    // Проверяем токен при запуске приложения
+    await FCMService.checkAndUpdateToken();
+    print('✅ FCM токен проверен');
   } catch (e) {
     print('❌ Ошибка инициализации FCM: $e');
   }

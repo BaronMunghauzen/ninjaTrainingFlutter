@@ -8,8 +8,6 @@ class NotificationService {
 
   static const int timerNotificationId =
       999; // ID для запланированного уведомления таймера
-  static const int timerInstantNotificationId =
-      998; // ID для мгновенного уведомления таймера
 
   static Future<void> initialize() async {
     print('🔔 NotificationService: Инициализация...');
@@ -198,10 +196,12 @@ class NotificationService {
     }
   }
 
-  static Future<void> showTimerEndNotification() async {
-    print(
-      '🔔 NotificationService: Показ мгновенного уведомления (ID: $timerInstantNotificationId)',
-    );
+  /// Показать FCM уведомление (для foreground)
+  static Future<void> showFCMNotification({
+    required String title,
+    required String body,
+  }) async {
+    print('🔔 NotificationService: Показ FCM уведомления (foreground)');
 
     const AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
@@ -229,19 +229,14 @@ class NotificationService {
 
     try {
       await _notificationsPlugin.show(
-        timerInstantNotificationId, // Используем другой ID!
-        'Время отдыха закончилось!',
-        'Можете приступать к следующему подходу',
+        997, // Уникальный ID для FCM уведомлений
+        title,
+        body,
         platformChannelSpecifics,
       );
-      print(
-        '🔔 NotificationService: Мгновенное уведомление показано успешно (ID: $timerInstantNotificationId)',
-      );
+      print('🔔 NotificationService: FCM уведомление показано успешно');
     } catch (e) {
-      print(
-        '🔔 NotificationService: ОШИБКА при показе мгновенного уведомления: $e',
-      );
-      rethrow;
+      print('🔔 NotificationService: ОШИБКА при показе FCM уведомления: $e');
     }
   }
 

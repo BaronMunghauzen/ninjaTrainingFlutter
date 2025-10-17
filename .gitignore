@@ -29,8 +29,27 @@ android/app/debug/
 android/app/profile/
 android/app/release/
 android/key.properties
+android/.kotlin/
 *.jks
 *.keystore
+
+# Firebase configuration files (содержат секретные ключи)
+my_app/android/app/google-services.json
+my_app/ios/Runner/GoogleService-Info.plist
+
+# iOS entitlements (содержат конфиденциальную информацию)
+my_app/ios/Runner/Runner.entitlements
+
+# Generated files (автоматически генерируемые файлы)
+my_app/macos/Flutter/GeneratedPluginRegistrant.swift
+my_app/windows/flutter/generated_plugin_registrant.cc
+my_app/windows/flutter/generated_plugins.cmake
+
+# Documentation files (временные файлы документации)
+FCM_COMPLETE_GUIDE.md
+FCM_IMPLEMENTATION_GUIDE.md
+FCM_QUICK_START.md
+FLUTTER_FCM_SETUP.md
 
 # Windows
 windows/runner/Debug/

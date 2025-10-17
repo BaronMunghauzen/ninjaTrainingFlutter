@@ -71,10 +71,7 @@ class TimerOverlayProvider extends ChangeNotifier {
       if (left <= 0) {
         print('⏱️ TimerOverlayProvider: Таймер завершен!');
         timer.cancel();
-        // Показываем мгновенное уведомление (ID: 998) если приложение открыто
-        // Запланированное уведомление (ID: 999) сработает автоматически
-        // Используем разные ID, поэтому они не конфликтуют!
-        _showEndNotification();
+        // Убираем мгновенное уведомление - теперь только FCM уведомления
         _hideWithoutCancellingNotification(); // Скрываем таймер БЕЗ отмены уведомления
       }
     });
@@ -126,16 +123,6 @@ class TimerOverlayProvider extends ChangeNotifier {
   void setBigTimerOpen(bool value) {
     _isBigTimerOpen = value;
     notifyListeners();
-  }
-
-  Future<void> _showEndNotification() async {
-    try {
-      print('⏱️ TimerOverlayProvider: Вызов showTimerEndNotification()');
-      await NotificationService.showTimerEndNotification();
-      print('⏱️ TimerOverlayProvider: showTimerEndNotification() завершен');
-    } catch (e) {
-      print('⏱️ TimerOverlayProvider: ОШИБКА при показе уведомления: $e');
-    }
   }
 
   Future<void> _scheduleNotification(int seconds) async {

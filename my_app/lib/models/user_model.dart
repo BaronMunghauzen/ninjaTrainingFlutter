@@ -18,6 +18,7 @@ class UserModel {
   final DateTime? updatedAt;
   final String? avatarUuid;
   final bool emailVerified;
+  final String? fcmToken; // Добавляем поле для FCM токена
 
   UserModel({
     required this.subscriptionStatus,
@@ -39,6 +40,7 @@ class UserModel {
     this.updatedAt,
     this.avatarUuid,
     required this.emailVerified,
+    this.fcmToken, // Добавляем в конструктор
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -68,6 +70,7 @@ class UserModel {
           : null,
       avatarUuid: json['avatar_uuid'],
       emailVerified: json['email_verified'] ?? false,
+      fcmToken: json['fcm_token'], // Парсим FCM токен
     );
   }
 
@@ -92,6 +95,7 @@ class UserModel {
       'updated_at': updatedAt?.toIso8601String(),
       'avatar_uuid': avatarUuid,
       'email_verified': emailVerified,
+      'fcm_token': fcmToken, // Добавляем в JSON
     };
   }
 
@@ -116,6 +120,7 @@ class UserModel {
     DateTime? updatedAt,
     String? avatarUuid,
     bool? emailVerified,
+    String? fcmToken, // Добавляем в copyWith
   }) {
     return UserModel(
       subscriptionStatus: subscriptionStatus ?? this.subscriptionStatus,
@@ -137,6 +142,7 @@ class UserModel {
       updatedAt: updatedAt ?? this.updatedAt,
       avatarUuid: avatarUuid ?? this.avatarUuid,
       emailVerified: emailVerified ?? this.emailVerified,
+      fcmToken: fcmToken ?? this.fcmToken, // Добавляем в copyWith
     );
   }
 }

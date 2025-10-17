@@ -12,7 +12,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   print('🔥 FCM Background: Body: ${message.notification?.body}');
 
   // Показываем локальное уведомление
-  await NotificationService.showTimerEndNotification();
+  // await NotificationService.showTimerEndNotification(); // Убираем мгновенное уведомление
 }
 
 /// Сервис для работы с Firebase Cloud Messaging
@@ -66,6 +66,34 @@ class FCMService {
       return _currentToken;
     }
 
+    return await _refreshToken();
+  }
+
+  /// Проверить и обновить токен при необходимости
+  static Future<void> checkAndUpdateToken() async {
+    print('🔥 FCM: Проверка токена...');
+
+    try {
+      final currentToken = await _messaging?.getToken();
+
+      if (currentToken != _currentToken) {
+        print('🔥 FCM: Токен изменился, обновляем...');
+        _currentToken = currentToken;
+        if (currentToken != null) {
+          await _sendTokenToServer(currentToken);
+        }
+      } else {
+        print('🔥 FCM: Токен не изменился');
+      }
+    } catch (e) {
+      print('🔥 FCM: ❌ Ошибка проверки токена: $e');
+    }
+  }
+
+  /// Принудительно обновить FCM токен (игнорирует кэш)
+  static Future<String?> forceRefreshToken() async {
+    print('🔥 FCM: Принудительное обновление токена...');
+    _currentToken = null; // Сбрасываем кэш
     return await _refreshToken();
   }
 
@@ -126,13 +154,19 @@ class FCMService {
   /// Настройка обработчиков сообщений
   static void _setupMessageHandlers() {
     // Обработчик когда приложение ОТКРЫТО (foreground)
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
       print('🔥 FCM Foreground: Получено сообщение');
       print('🔥 FCM Foreground: Title: ${message.notification?.title}');
       print('🔥 FCM Foreground: Body: ${message.notification?.body}');
 
-      // Показываем локальное уведомление
-      NotificationService.showTimerEndNotification();
+      // Показываем локальное уведомление когда приложение открыто
+      // FCM не показывает уведомления в foreground автоматически
+      await NotificationService.showFCMNotification(
+        title: message.notification?.title ?? 'Время отдыха закончилось!',
+        body:
+            message.notification?.body ??
+            'Можете приступать к следующему подходу',
+      );
     });
 
     // Обработчик когда пользователь НАЖАЛ на уведомление
