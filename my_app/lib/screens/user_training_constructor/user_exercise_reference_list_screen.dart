@@ -5,6 +5,10 @@ import '../../constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/user_training_service.dart';
 import '../../services/search_service.dart';
+import '../../services/api_service.dart';
+import '../../widgets/gif_widget.dart';
+import '../../widgets/auth_image_widget.dart';
+import '../../widgets/exercise_filter_modal.dart';
 import 'user_exercise_reference_create_screen.dart';
 import 'user_exercise_reference_detail_screen.dart';
 
@@ -25,6 +29,10 @@ class _UserExerciseReferenceListScreenState
   bool hasSearched = false;
   Timer? _searchDebounce;
   final TextEditingController _searchController = TextEditingController();
+
+  // Фильтры
+  List<String> _selectedMuscleGroups = [];
+  List<String> _selectedEquipmentNames = [];
 
   // Пагинация
   int currentPage = 1;
@@ -78,8 +86,45 @@ class _UserExerciseReferenceListScreenState
     }
   }
 
+  Future<Map<String, List<String>>> _loadFilters() async {
+    try {
+      print('DEBUG: User - Loading filters...');
+      final authProvider = context.read<AuthProvider>();
+      final userUuid = authProvider.userUuid;
+      print('DEBUG: User - User UUID: $userUuid');
+
+      if (userUuid == null) {
+        print('DEBUG: User - No user UUID, returning empty filters');
+        return {'muscle_groups': [], 'equipment_names': []};
+      }
+
+      final response = await ApiService.get(
+        '/exercise_reference/filters/$userUuid',
+      );
+      print('DEBUG: User - Filters response status: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        final data = ApiService.decodeJson(response.body);
+        print('DEBUG: User - Filters data: $data');
+        final result = {
+          'muscle_groups': List<String>.from(data['muscle_groups'] ?? []),
+          'equipment_names': List<String>.from(data['equipment_names'] ?? []),
+        };
+        print('DEBUG: User - Parsed filters: $result');
+        return result;
+      }
+      print('DEBUG: User - Filters response not 200, returning empty');
+      return {'muscle_groups': [], 'equipment_names': []};
+    } catch (e) {
+      print('Error loading filters: $e');
+      return {'muscle_groups': [], 'equipment_names': []};
+    }
+  }
+
   Future<void> _performSearch(String query) async {
-    if (query.trim().isEmpty) {
+    // Если запрос пустой И нет активных фильтров, очищаем результаты
+    if (query.trim().isEmpty &&
+        _selectedMuscleGroups.isEmpty &&
+        _selectedEquipmentNames.isEmpty) {
       setState(() {
         searchResults.clear();
         isSearching = false;
@@ -92,6 +137,10 @@ class _UserExerciseReferenceListScreenState
       isSearching = true;
       hasSearched = true;
     });
+
+    print('DEBUG: User - Performing search with query: "$query"');
+    print('DEBUG: User - Selected muscle groups: $_selectedMuscleGroups');
+    print('DEBUG: User - Selected equipment names: $_selectedEquipmentNames');
 
     try {
       final authProvider = context.read<AuthProvider>();
@@ -110,6 +159,8 @@ class _UserExerciseReferenceListScreenState
         query,
         page: currentPage,
         size: pageSize,
+        muscleGroups: _selectedMuscleGroups,
+        equipmentNames: _selectedEquipmentNames,
       );
       setState(() {
         searchResults = results.items;
@@ -221,45 +272,182 @@ class _UserExerciseReferenceListScreenState
     return result;
   }
 
+  Future<void> _openFilterModal() async {
+    print('DEBUG: User - Opening filter modal...');
+    final filters = await _loadFilters();
+    print('DEBUG: User - Filters loaded: $filters');
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => ExerciseFilterModal(
+        muscleGroups: filters['muscle_groups'] ?? [],
+        equipmentNames: filters['equipment_names'] ?? [],
+        initialSelectedMuscleGroups: _selectedMuscleGroups,
+        initialSelectedEquipmentNames: _selectedEquipmentNames,
+        onApplyFilters: (selectedMuscleGroups, selectedEquipmentNames) {
+          print('DEBUG: User - onApplyFilters called');
+          print('DEBUG: User - muscle groups: $selectedMuscleGroups');
+          print('DEBUG: User - equipment names: $selectedEquipmentNames');
+          setState(() {
+            _selectedMuscleGroups = selectedMuscleGroups;
+            _selectedEquipmentNames = selectedEquipmentNames;
+          });
+
+          // Применяем фильтры к текущему поиску
+          if (_searchController.text.isNotEmpty) {
+            print('DEBUG: User - performing search with filters');
+            _performSearch(_searchController.text);
+          } else {
+            print(
+              'DEBUG: User - performing search with empty text and filters',
+            );
+            _performSearch('');
+          }
+        },
+      ),
+    );
+  }
+
+  Widget? _buildExerciseMedia(dynamic exercise) {
+    // Приоритет: сначала гифка, потом картинка
+    String? gifUuid;
+    String? imageUuid;
+
+    // Извлекаем UUID гифки
+    final dynamic gif = exercise.gif;
+    if (gif != null) {
+      if (gif is String && gif.isNotEmpty) {
+        gifUuid = gif;
+      } else if (gif is Map<String, dynamic>) {
+        gifUuid = gif['uuid'] as String?;
+      }
+    }
+
+    // Извлекаем UUID картинки
+    final dynamic image = exercise.image;
+    if (image != null) {
+      if (image is String && image.isNotEmpty) {
+        imageUuid = image;
+      } else if (image is Map<String, dynamic>) {
+        imageUuid = image['uuid'] as String?;
+      }
+    }
+
+    // Если есть гифка, показываем её
+    if (gifUuid != null && gifUuid.isNotEmpty) {
+      return SizedBox(
+        width: 60,
+        height: 60,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: GifWidget(gifUuid: gifUuid, height: 60, width: 60),
+        ),
+      );
+    }
+
+    // Если нет гифки, но есть картинка, показываем её
+    if (imageUuid != null && imageUuid.isNotEmpty) {
+      return AuthImageWidget(
+        imageUuid: imageUuid,
+        height: 60,
+        width: 60,
+        fit: BoxFit.cover,
+      );
+    }
+
+    // Если нет ни гифки, ни картинки, показываем пустое место
+    return SizedBox(
+      width: 60,
+      height: 60,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.inputBorder.withOpacity(0.3)),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Column(
         children: [
-          // Search Bar
+          // Search Bar and Filter Button
           Padding(
             padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _searchController,
-              onChanged: _onSearchChanged,
-              decoration: InputDecoration(
-                hintText: 'Поиск упражнений...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: isSearching
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() {
-                            searchResults = [];
-                            isSearching = false;
-                            hasSearched = false;
-                          });
-                        },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: _onSearchChanged,
+                    decoration: InputDecoration(
+                      hintText: 'Поиск упражнений...',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: isSearching
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() {
+                                  searchResults = [];
+                                  isSearching = false;
+                                  hasSearched = false;
+                                  _selectedMuscleGroups.clear();
+                                  _selectedEquipmentNames.clear();
+                                });
+                              },
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                      fillColor: AppColors.inputBorder.withOpacity(0.1),
+                    ),
+                  ),
                 ),
-                filled: true,
-                fillColor: AppColors.inputBorder.withOpacity(0.1),
-              ),
+                const SizedBox(width: 12),
+                IconButton(
+                  onPressed: _openFilterModal,
+                  icon: Stack(
+                    children: [
+                      const Icon(Icons.filter_list),
+                      if (_selectedMuscleGroups.isNotEmpty ||
+                          _selectedEquipmentNames.isNotEmpty)
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  style: IconButton.styleFrom(
+                    backgroundColor:
+                        (_selectedMuscleGroups.isNotEmpty ||
+                            _selectedEquipmentNames.isNotEmpty)
+                        ? AppColors.buttonPrimary.withOpacity(0.1)
+                        : null,
+                  ),
+                ),
+              ],
             ),
           ),
           // Content
@@ -321,6 +509,7 @@ class _UserExerciseReferenceListScreenState
                         child: Stack(
                           children: [
                             ListTile(
+                              leading: _buildExerciseMedia(exercise),
                               title: Padding(
                                 padding: const EdgeInsets.only(right: 80),
                                 child: Text(

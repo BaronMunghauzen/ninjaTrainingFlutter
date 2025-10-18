@@ -16,7 +16,10 @@ class _AdminExerciseReferenceCreateScreenState
   final _descriptionController = TextEditingController();
   final _muscleGroupController = TextEditingController();
   final _techniqueDescriptionController = TextEditingController();
+  final _auxiliaryMuscleGroupsController = TextEditingController();
+  final _equipmentNameController = TextEditingController();
   bool isLoading = false;
+  bool _hasEquipment = false;
 
   @override
   void dispose() {
@@ -24,6 +27,8 @@ class _AdminExerciseReferenceCreateScreenState
     _descriptionController.dispose();
     _muscleGroupController.dispose();
     _techniqueDescriptionController.dispose();
+    _auxiliaryMuscleGroupsController.dispose();
+    _equipmentNameController.dispose();
     super.dispose();
   }
 
@@ -38,6 +43,12 @@ class _AdminExerciseReferenceCreateScreenState
       'technique_description': _techniqueDescriptionController.text.isEmpty
           ? null
           : _techniqueDescriptionController.text,
+      'auxiliary_muscle_groups': _auxiliaryMuscleGroupsController.text.isEmpty
+          ? null
+          : _auxiliaryMuscleGroupsController.text,
+      'equipment_name': _hasEquipment
+          ? _equipmentNameController.text
+          : 'Без оборудования',
     };
     final response = await ApiService.post(
       '/exercise_reference/add/',
@@ -88,6 +99,44 @@ class _AdminExerciseReferenceCreateScreenState
                 ),
                 maxLines: 3,
               ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _auxiliaryMuscleGroupsController,
+                decoration: const InputDecoration(
+                  labelText: 'Вспомогательные группы мышц (необязательно)',
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Оборудование
+              Row(
+                children: [
+                  const Text('Используется оборудование:'),
+                  const SizedBox(width: 16),
+                  Switch(
+                    value: _hasEquipment,
+                    onChanged: (value) {
+                      setState(() {
+                        _hasEquipment = value;
+                        if (!value) {
+                          _equipmentNameController.clear();
+                        }
+                      });
+                    },
+                  ),
+                ],
+              ),
+              if (_hasEquipment) ...[
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _equipmentNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Название оборудования',
+                  ),
+                  validator: (v) => _hasEquipment && (v == null || v.isEmpty)
+                      ? 'Введите название оборудования'
+                      : null,
+                ),
+              ],
               const SizedBox(height: 24),
               isLoading
                   ? const Center(child: CircularProgressIndicator())

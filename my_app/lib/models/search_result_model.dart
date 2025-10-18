@@ -141,6 +141,8 @@ class ExerciseReference {
   final String description;
   final String muscleGroup;
   final String? techniqueDescription;
+  final String? auxiliaryMuscleGroups;
+  final String? equipmentName;
   final DateTime createdAt;
   final DateTime updatedAt;
   final dynamic user;
@@ -158,6 +160,8 @@ class ExerciseReference {
     required this.description,
     required this.muscleGroup,
     this.techniqueDescription,
+    this.auxiliaryMuscleGroups,
+    this.equipmentName,
     required this.createdAt,
     required this.updatedAt,
     this.user,
@@ -187,6 +191,8 @@ class ExerciseReference {
       description: json['description'] ?? '',
       muscleGroup: json['muscle_group'] ?? '',
       techniqueDescription: json['technique_description']?.toString(),
+      auxiliaryMuscleGroups: json['auxiliary_muscle_groups']?.toString(),
+      equipmentName: json['equipment_name']?.toString(),
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
       user: json['user'],

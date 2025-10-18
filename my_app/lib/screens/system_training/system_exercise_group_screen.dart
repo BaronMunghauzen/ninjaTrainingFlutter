@@ -188,7 +188,6 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
           'set_number': setNumber + 1,
           'exercise_uuid': exerciseUuid,
           'training_date': trainingDate,
-          'training_uuid': trainingUuid,
         },
       );
       if (resp.statusCode == 200) {

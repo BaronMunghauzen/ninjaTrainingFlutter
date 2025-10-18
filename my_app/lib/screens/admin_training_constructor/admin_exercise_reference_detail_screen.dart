@@ -245,6 +245,22 @@ class _AdminExerciseReferenceDetailScreenState
                   Text('Описание: ${exercise!['description'] ?? ''}'),
                   const SizedBox(height: 8),
                   Text('Мышечная группа: ${exercise!['muscle_group'] ?? ''}'),
+                  // Вспомогательные группы мышц (только для админских упражнений)
+                  if (exercise!['auxiliary_muscle_groups'] != null &&
+                      exercise!['auxiliary_muscle_groups']
+                          .toString()
+                          .isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Вспомогательные группы мышц: ${exercise!['auxiliary_muscle_groups']}',
+                    ),
+                  ],
+                  // Оборудование
+                  if (exercise!['equipment_name'] != null &&
+                      exercise!['equipment_name'].toString().isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text('Оборудование: ${exercise!['equipment_name']}'),
+                  ],
                   if (exercise!['technique_description'] != null &&
                       exercise!['technique_description']
                           .toString()

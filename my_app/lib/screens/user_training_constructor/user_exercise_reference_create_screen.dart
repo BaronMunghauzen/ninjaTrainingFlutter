@@ -18,13 +18,16 @@ class _UserExerciseReferenceCreateScreenState
   final _captionController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _muscleGroupController = TextEditingController();
+  final _equipmentNameController = TextEditingController();
   bool _isLoading = false;
+  bool _hasEquipment = false;
 
   @override
   void dispose() {
     _captionController.dispose();
     _descriptionController.dispose();
     _muscleGroupController.dispose();
+    _equipmentNameController.dispose();
     super.dispose();
   }
 
@@ -51,6 +54,7 @@ class _UserExerciseReferenceCreateScreenState
         caption: _captionController.text,
         description: _descriptionController.text,
         muscleGroup: _muscleGroupController.text,
+        equipmentName: _hasEquipment ? _equipmentNameController.text : null,
       );
 
       if (result != null) {
@@ -138,6 +142,41 @@ class _UserExerciseReferenceCreateScreenState
                   return null;
                 },
               ),
+              const SizedBox(height: 16),
+              // Оборудование
+              Row(
+                children: [
+                  const Text('Используется оборудование:'),
+                  const SizedBox(width: 16),
+                  Switch(
+                    value: _hasEquipment,
+                    onChanged: (value) {
+                      setState(() {
+                        _hasEquipment = value;
+                        if (!value) {
+                          _equipmentNameController.clear();
+                        }
+                      });
+                    },
+                  ),
+                ],
+              ),
+              if (_hasEquipment) ...[
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _equipmentNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Название оборудования',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (_hasEquipment && (value == null || value.isEmpty)) {
+                      return 'Пожалуйста, введите название оборудования';
+                    }
+                    return null;
+                  },
+                ),
+              ],
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _isLoading ? null : _createExercise,

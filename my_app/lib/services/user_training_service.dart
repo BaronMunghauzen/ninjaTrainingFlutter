@@ -100,6 +100,7 @@ class UserTrainingService {
     required String caption,
     required String description,
     required String muscleGroup,
+    String? equipmentName,
   }) async {
     try {
       final response = await ApiService.post(
@@ -110,6 +111,7 @@ class UserTrainingService {
           'caption': caption,
           'description': description,
           'muscle_group': muscleGroup,
+          'equipment_name': equipmentName ?? 'Без оборудования',
         },
       );
 
@@ -130,6 +132,7 @@ class UserTrainingService {
     required String caption,
     required String description,
     required String muscleGroup,
+    String? equipmentName,
   }) async {
     try {
       final response = await ApiService.put(
@@ -140,6 +143,7 @@ class UserTrainingService {
           'caption': caption,
           'description': description,
           'muscle_group': muscleGroup,
+          'equipment_name': equipmentName ?? 'Без оборудования',
         },
       );
 

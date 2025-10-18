@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../constants/app_colors.dart';
 import '../../services/user_training_service.dart';
 import '../../services/api_service.dart';
+import '../../widgets/gif_widget.dart';
+import '../../widgets/auth_image_widget.dart';
 import 'user_exercise_edit_screen.dart';
 
 class UserExerciseGroupDetailScreen extends StatefulWidget {
@@ -28,6 +30,8 @@ class _UserExerciseGroupDetailScreenState
   bool? withWeight;
   bool _isLoading = true;
   String? exerciseReferenceName;
+  dynamic exerciseReferenceGif;
+  dynamic exerciseReferenceImage;
 
   @override
   void initState() {
@@ -98,12 +102,16 @@ class _UserExerciseGroupDetailScreenState
         final data = ApiService.decodeJson(response.body);
         setState(() {
           exerciseReferenceName = data['caption'] ?? 'Неизвестное упражнение';
+          exerciseReferenceGif = data['gif_uuid'] ?? data['gif'];
+          exerciseReferenceImage = data['image_uuid'] ?? data['image'];
         });
       }
     } catch (e) {
       print('Error loading exercise reference data: $e');
       setState(() {
         exerciseReferenceName = 'Ошибка загрузки';
+        exerciseReferenceGif = null;
+        exerciseReferenceImage = null;
       });
     }
   }
@@ -134,6 +142,49 @@ class _UserExerciseGroupDetailScreenState
         ],
       ),
     );
+  }
+
+  Widget? _buildMediaWidget() {
+    // Приоритет: сначала гифка, потом картинка
+    String? gifUuid;
+    String? imageUuid;
+
+    // Извлекаем UUID гифки
+    if (exerciseReferenceGif != null) {
+      if (exerciseReferenceGif is String && exerciseReferenceGif.isNotEmpty) {
+        gifUuid = exerciseReferenceGif;
+      } else if (exerciseReferenceGif is Map<String, dynamic>) {
+        gifUuid = exerciseReferenceGif['uuid'] as String?;
+      }
+    }
+
+    // Извлекаем UUID картинки
+    if (exerciseReferenceImage != null) {
+      if (exerciseReferenceImage is String &&
+          exerciseReferenceImage.isNotEmpty) {
+        imageUuid = exerciseReferenceImage;
+      } else if (exerciseReferenceImage is Map<String, dynamic>) {
+        imageUuid = exerciseReferenceImage['uuid'] as String?;
+      }
+    }
+
+    // Если есть гифка, показываем её
+    if (gifUuid != null && gifUuid.isNotEmpty) {
+      return GifWidget(gifUuid: gifUuid, height: 250, width: double.infinity);
+    }
+
+    // Если нет гифки, но есть картинка, показываем её
+    if (imageUuid != null && imageUuid.isNotEmpty) {
+      return AuthImageWidget(
+        imageUuid: imageUuid,
+        height: 250,
+        width: double.infinity,
+        fit: BoxFit.cover,
+      );
+    }
+
+    // Если нет ни гифки, ни картинки, не отображаем ничего
+    return null;
   }
 
   @override
@@ -247,6 +298,32 @@ class _UserExerciseGroupDetailScreenState
                       exerciseReferenceName!,
                     ),
                   ],
+
+                  // Медиа (гифка или картинка) из справочника
+                  Builder(
+                    builder: (context) {
+                      final mediaWidget = _buildMediaWidget();
+                      if (mediaWidget != null) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 16),
+                            Text(
+                              'Демонстрация:',
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            mediaWidget,
+                          ],
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
 
                   // Информация о тренировке
                   const SizedBox(height: 16),

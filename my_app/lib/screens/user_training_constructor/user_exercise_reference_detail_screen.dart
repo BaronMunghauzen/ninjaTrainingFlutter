@@ -594,6 +594,24 @@ class _UserExerciseReferenceDetailScreenState
                 fontSize: 16,
               ),
             ),
+            const SizedBox(height: 24),
+            // Оборудование
+            Text(
+              'Оборудование:',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              exercise.equipmentName ?? 'Без оборудования',
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 16,
+              ),
+            ),
           ],
         ),
       ),

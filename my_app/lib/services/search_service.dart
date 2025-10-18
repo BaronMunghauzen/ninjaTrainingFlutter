@@ -1,6 +1,5 @@
 import '../models/search_result_model.dart' as search_models;
 import 'api_service.dart';
-import 'user_training_service.dart';
 
 class SearchService {
   static Future<search_models.SearchResult?> search(
@@ -30,11 +29,27 @@ class SearchService {
     String caption, {
     int page = 1,
     int size = 10,
+    List<String>? muscleGroups,
+    List<String>? equipmentNames,
   }) async {
     try {
+      final queryParams = <String, dynamic>{
+        'caption': caption,
+        'page': page,
+        'size': size,
+      };
+
+      if (muscleGroups != null && muscleGroups.isNotEmpty) {
+        queryParams['muscle_groups'] = muscleGroups.join(',');
+      }
+
+      if (equipmentNames != null && equipmentNames.isNotEmpty) {
+        queryParams['equipment_names'] = equipmentNames.join(',');
+      }
+
       final response = await ApiService.get(
         '/exercise_reference/available/$userUuid/search/by-caption',
-        queryParams: {'caption': caption, 'page': page, 'size': size},
+        queryParams: queryParams,
       );
 
       if (response.statusCode == 200) {
@@ -66,16 +81,28 @@ class SearchService {
     String caption, {
     int page = 1,
     int size = 10,
+    List<String>? muscleGroups,
+    List<String>? equipmentNames,
   }) async {
     try {
+      final queryParams = <String, dynamic>{
+        'caption': caption,
+        'exercise_type': 'system',
+        'page': page,
+        'size': size,
+      };
+
+      if (muscleGroups != null && muscleGroups.isNotEmpty) {
+        queryParams['muscle_groups'] = muscleGroups.join(',');
+      }
+
+      if (equipmentNames != null && equipmentNames.isNotEmpty) {
+        queryParams['equipment_names'] = equipmentNames.join(',');
+      }
+
       final response = await ApiService.get(
         '/exercise_reference/search/by-caption',
-        queryParams: {
-          'caption': caption,
-          'exercise_type': 'system',
-          'page': page,
-          'size': size,
-        },
+        queryParams: queryParams,
       );
 
       if (response.statusCode == 200) {

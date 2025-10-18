@@ -386,7 +386,6 @@ class _ExerciseGroupCarouselScreenState
           'exercise_uuid': exerciseUuid,
           'training_date': trainingDate,
           'program_uuid': programUuid,
-          'training_uuid': trainingUuid,
         },
       );
       if (resp.statusCode == 200) {

@@ -21,7 +21,9 @@ class _UserExerciseReferenceEditScreenState
   late final TextEditingController _captionController;
   late final TextEditingController _descriptionController;
   late final TextEditingController _muscleGroupController;
+  late final TextEditingController _equipmentNameController;
   bool _isLoading = false;
+  bool _hasEquipment = false;
 
   @override
   void initState() {
@@ -34,6 +36,14 @@ class _UserExerciseReferenceEditScreenState
     _muscleGroupController = TextEditingController(
       text: widget.exercise.muscleGroup,
     );
+
+    // Инициализация оборудования
+    final equipmentName = widget.exercise.equipmentName ?? '';
+    _hasEquipment =
+        equipmentName.isNotEmpty && equipmentName != 'Без оборудования';
+    _equipmentNameController = TextEditingController(
+      text: _hasEquipment ? equipmentName : '',
+    );
   }
 
   @override
@@ -41,6 +51,7 @@ class _UserExerciseReferenceEditScreenState
     _captionController.dispose();
     _descriptionController.dispose();
     _muscleGroupController.dispose();
+    _equipmentNameController.dispose();
     super.dispose();
   }
 
@@ -72,6 +83,7 @@ class _UserExerciseReferenceEditScreenState
         caption: _captionController.text,
         description: _descriptionController.text,
         muscleGroup: _muscleGroupController.text,
+        equipmentName: _hasEquipment ? _equipmentNameController.text : null,
       );
 
       if (result != null) {
@@ -161,6 +173,42 @@ class _UserExerciseReferenceEditScreenState
                     return null;
                   },
                 ),
+                const SizedBox(height: 16),
+                // Оборудование
+                Row(
+                  children: [
+                    const Text('Используется оборудование:'),
+                    const SizedBox(width: 16),
+                    Switch(
+                      value: _hasEquipment,
+                      onChanged: (value) {
+                        setState(() {
+                          _hasEquipment = value;
+                          if (!value) {
+                            _equipmentNameController.clear();
+                          }
+                        });
+                      },
+                    ),
+                  ],
+                ),
+                if (_hasEquipment) ...[
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _equipmentNameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Название оборудования',
+                      border: OutlineInputBorder(),
+                      labelStyle: TextStyle(color: AppColors.textSecondary),
+                    ),
+                    validator: (value) {
+                      if (_hasEquipment && (value == null || value.isEmpty)) {
+                        return 'Пожалуйста, введите название оборудования';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
                 const SizedBox(height: 32),
                 ElevatedButton(
                   onPressed: _isLoading ? null : _updateExercise,
