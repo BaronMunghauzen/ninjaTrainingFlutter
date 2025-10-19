@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../constants/app_colors.dart';
-import '../../services/program_service.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
 import '../../services/api_service.dart';
-import '../admin_training_constructor/widgets.dart';
+import '../admin_training_constructor/admin_exercise_selector_screen.dart';
 
 class ExerciseCreateScreen extends StatefulWidget {
   final String exerciseGroupUuid;
@@ -39,6 +38,18 @@ class _ExerciseCreateScreenState extends State<ExerciseCreateScreen> {
         _muscleGroupController.text = ex['muscle_group'] ?? '';
       }
     });
+  }
+
+  Future<void> _selectExercise() async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const AdminExerciseSelectorScreen(),
+      ),
+    );
+
+    if (result != null) {
+      _onExerciseSelected(result);
+    }
   }
 
   Future<void> _submit() async {
@@ -128,13 +139,48 @@ class _ExerciseCreateScreenState extends State<ExerciseCreateScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              ExerciseReferenceSelector(
-                onSelected: _onExerciseSelected,
-                label: 'Выбрать упражнение из справочника',
-                buildQueryParams: (search) => {
-                  'caption': search,
-                  'exercise_type': 'system',
-                },
+              // Выбор упражнения из справочника
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2A2A2A),
+                  border: Border.all(color: Colors.grey),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: ListTile(
+                  title: Text(
+                    _selectedExerciseRef != null
+                        ? _selectedExerciseRef!['caption'] ??
+                              'Выберите упражнение'
+                        : 'Выберите упражнение',
+                    style: TextStyle(
+                      color: _selectedExerciseRef != null
+                          ? Colors.white
+                          : Colors.grey[400],
+                    ),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_selectedExerciseRef != null)
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.red),
+                          onPressed: () {
+                            setState(() {
+                              _selectedExerciseRef = null;
+                              _captionController.clear();
+                              _descriptionController.clear();
+                              _muscleGroupController.clear();
+                            });
+                          },
+                        ),
+                      IconButton(
+                        icon: const Icon(Icons.search),
+                        onPressed: _selectExercise,
+                      ),
+                    ],
+                  ),
+                  onTap: _selectExercise,
+                ),
               ),
               const SizedBox(height: 16),
               CustomTextField(

@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http_parser/http_parser.dart';
 import '../../constants/app_colors.dart';
 import '../../models/training_model.dart';
 import '../../services/user_training_service.dart';
 import '../../services/api_service.dart';
+import '../../widgets/auth_image_widget.dart';
 import 'user_exercise_group_create_screen.dart';
 import 'user_exercise_group_detail_screen.dart';
 import 'user_training_edit_screen.dart';
@@ -28,11 +34,13 @@ class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
   Map<String, Map<String, dynamic>> exerciseData =
       {}; // UUID группы -> данные упражнения
   bool isLoading = true;
+  String? _imageUuid; // UUID изображения тренировки
 
   @override
   void initState() {
     super.initState();
     _training = widget.training;
+    _imageUuid = _training.imageUuid; // Инициализируем UUID изображения
     _loadExerciseGroups();
   }
 
@@ -95,6 +103,154 @@ class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
       }
     } catch (e) {
       print('Error refreshing training data: $e');
+    }
+  }
+
+  Future<void> _uploadImage() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 80,
+        requestFullMetadata:
+            false, // Отключаем метаданные для лучшей производительности
+      );
+
+      if (image != null) {
+        print('Загружаем изображение: ${image.path}');
+        // Создаем multipart request для загрузки файла
+        final uri = Uri.parse(
+          '${ApiService.baseUrl}/trainings/${_training.uuid}/upload-image',
+        );
+        final request = http.MultipartRequest('POST', uri);
+
+        // Добавляем заголовки авторизации
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('user_token');
+        if (token != null) {
+          request.headers['Cookie'] = 'users_access_token=$token';
+        }
+
+        // Добавляем файл с правильным Content-Type
+        final fileExtension = image.path.split('.').last.toLowerCase();
+        String contentType;
+
+        switch (fileExtension) {
+          case 'jpg':
+          case 'jpeg':
+            contentType = 'image/jpeg';
+            break;
+          case 'png':
+            contentType = 'image/png';
+            break;
+          case 'webp':
+            contentType = 'image/webp';
+            break;
+          case 'gif':
+            contentType = 'image/gif';
+            break;
+          default:
+            contentType = 'image/jpeg'; // По умолчанию
+        }
+
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'file',
+            image.path,
+            contentType: MediaType.parse(contentType),
+          ),
+        );
+
+        // Отправляем запрос
+        print('Отправляем запрос на: $uri');
+        print('Заголовки: ${request.headers}');
+        print('Файлы: ${request.files.map((f) => f.field).toList()}');
+        print('Content-Type файла: $contentType');
+        final streamedResponse = await request.send();
+        final response = await http.Response.fromStream(streamedResponse);
+        print('Ответ сервера: ${response.statusCode}');
+        print('Тело ответа: ${response.body}');
+
+        if (response.statusCode == 200) {
+          final responseData = json.decode(response.body);
+          if (responseData['image_uuid'] != null) {
+            setState(() {
+              _imageUuid = responseData['image_uuid'];
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Изображение успешно загружено')),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Ошибка: не получен UUID изображения'),
+              ),
+            );
+          }
+        } else {
+          final errorBody = response.body;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Ошибка загрузки (${response.statusCode}): ${errorBody.isNotEmpty ? errorBody : 'Неизвестная ошибка'}',
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+    }
+  }
+
+  Future<void> _deleteImage() async {
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Удаление изображения'),
+          content: const Text(
+            'Вы уверены, что хотите удалить изображение тренировки?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Отмена'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Удалить'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed == true) {
+        final response = await ApiService.delete(
+          '/trainings/${_training.uuid}/delete-image',
+        );
+
+        if (response.statusCode == 200) {
+          setState(() {
+            _imageUuid = null;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Изображение успешно удалено')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Ошибка удаления: ${response.statusCode}')),
+          );
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
     }
   }
 
@@ -243,21 +399,104 @@ class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    _training.caption,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _training.description,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 16,
-                    ),
+                  // Изображение тренировки
+                  Row(
+                    children: [
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppColors.inputBorder,
+                            width: 1,
+                          ),
+                        ),
+                        child: _imageUuid != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(7),
+                                child: Builder(
+                                  builder: (context) {
+                                    try {
+                                      return AuthImageWidget(
+                                        imageUuid: _imageUuid!,
+                                        width: 80,
+                                        height: 80,
+                                      );
+                                    } catch (e) {
+                                      // Если ошибка декодирования, показываем заглушку
+                                      return Container(
+                                        width: 80,
+                                        height: 80,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.surface,
+                                          borderRadius: BorderRadius.circular(
+                                            7,
+                                          ),
+                                        ),
+                                        child: const Icon(
+                                          Icons.broken_image,
+                                          color: AppColors.textSecondary,
+                                          size: 32,
+                                        ),
+                                      );
+                                    }
+                                  },
+                                ),
+                              )
+                            : Container(
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface,
+                                  borderRadius: BorderRadius.circular(7),
+                                ),
+                                child: const Icon(
+                                  Icons.image,
+                                  color: AppColors.textSecondary,
+                                  size: 32,
+                                ),
+                              ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _training.caption,
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _training.description,
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Кнопки управления изображением
+                      Column(
+                        children: [
+                          IconButton(
+                            onPressed: _uploadImage,
+                            icon: const Icon(Icons.add_photo_alternate),
+                            tooltip: 'Загрузить изображение',
+                          ),
+                          if (_imageUuid != null)
+                            IconButton(
+                              onPressed: _deleteImage,
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              tooltip: 'Удалить изображение',
+                            ),
+                        ],
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   Text(

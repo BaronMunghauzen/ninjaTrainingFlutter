@@ -3,7 +3,8 @@ import 'package:provider/provider.dart';
 import '../../constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/user_training_service.dart';
-import '../admin_training_constructor/widgets.dart';
+import '../../models/search_result_model.dart' as search_models;
+import 'user_exercise_selector_screen.dart';
 
 class UserExerciseGroupCreateScreen extends StatefulWidget {
   final String trainingUuid;
@@ -44,6 +45,39 @@ class _UserExerciseGroupCreateScreenState
     _repsCountController.dispose();
     _restTimeController.dispose();
     super.dispose();
+  }
+
+  Future<void> _selectExercise() async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const UserExerciseSelectorScreen(),
+      ),
+    );
+
+    if (result != null) {
+      // Преобразуем ExerciseReference из search_result_model в ExerciseReference из user_training_service
+      final searchExerciseRef = result as search_models.ExerciseReference;
+      final userExerciseRef = ExerciseReference(
+        uuid: searchExerciseRef.uuid,
+        exerciseType: searchExerciseRef.exerciseType,
+        caption: searchExerciseRef.caption,
+        description: searchExerciseRef.description,
+        muscleGroup: searchExerciseRef.muscleGroup,
+        userUuid: searchExerciseRef.userId?.toString(),
+        imageUuid: searchExerciseRef.image?.toString(),
+        videoUuid: searchExerciseRef.video?.toString(),
+        createdAt: searchExerciseRef.createdAt.toIso8601String(),
+        updatedAt: searchExerciseRef.updatedAt.toIso8601String(),
+      );
+
+      setState(() {
+        selectedExercise = userExerciseRef;
+        // Заполняем поля названия, описания и группы мышц из выбранного упражнения
+        _captionController.text = searchExerciseRef.caption;
+        _descriptionController.text = searchExerciseRef.description;
+        _muscleGroupController.text = searchExerciseRef.muscleGroup;
+      });
+    }
   }
 
   Future<void> _createExerciseGroup() async {
@@ -146,34 +180,47 @@ class _UserExerciseGroupCreateScreenState
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Выбор упражнения из справочника
-                ExerciseReferenceSelector(
-                  onSelected: (exercise) {
-                    setState(() {
-                      if (exercise != null) {
-                        selectedExercise = ExerciseReference(
-                          uuid: exercise['uuid'],
-                          caption: exercise['caption'],
-                          description: exercise['description'],
-                          muscleGroup: exercise['muscle_group'] ?? '',
-                          exerciseType: exercise['exercise_type'] ?? 'user',
-                          createdAt:
-                              exercise['created_at'] ??
-                              DateTime.now().toIso8601String(),
-                          updatedAt:
-                              exercise['updated_at'] ??
-                              DateTime.now().toIso8601String(),
-                        );
-                      } else {
-                        selectedExercise = null;
-                      }
-                    });
-                  },
-                  label: 'Выберите упражнение',
-                  endpoint:
-                      '/exercise_reference/available/${context.read<AuthProvider>().userUuid}/search/by-caption',
-                  buildQueryParams: (search) {
-                    return {'caption': search};
-                  },
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2A2A2A),
+                    border: Border.all(color: AppColors.inputBorder),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: ListTile(
+                    title: Text(
+                      selectedExercise != null
+                          ? selectedExercise!.caption
+                          : 'Выберите упражнение',
+                      style: TextStyle(
+                        color: selectedExercise != null
+                            ? Colors.white
+                            : Colors.grey[400],
+                      ),
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (selectedExercise != null)
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Colors.red),
+                            onPressed: () {
+                              setState(() {
+                                selectedExercise = null;
+                                // Очищаем поля названия, описания и группы мышц при удалении упражнения
+                                _captionController.clear();
+                                _descriptionController.clear();
+                                _muscleGroupController.clear();
+                              });
+                            },
+                          ),
+                        IconButton(
+                          icon: const Icon(Icons.search),
+                          onPressed: _selectExercise,
+                        ),
+                      ],
+                    ),
+                    onTap: _selectExercise,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 TextFormField(

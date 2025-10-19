@@ -553,287 +553,336 @@ class _ExerciseGroupCarouselScreenState
           ? const Center(child: CircularProgressIndicator())
           : exercises.isEmpty
           ? const Center(child: Text('Нет упражнений'))
-          : PageView.builder(
-              itemCount: exercises.length,
-              onPageChanged: (i) {
-                if (mounted) {
-                  setState(() => currentPage = i);
-                }
-                // Очищаем кэш изображений при переключении упражнений для экономии памяти
-                if (mounted) {
-                  _clearImageCache();
-                }
-              },
-              itemBuilder: (context, index) {
-                final ex = exercises[index];
-                return Stack(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // 3. Название упражнения
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    ex.caption,
-                                    style: const TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.textPrimary,
+          : Column(
+              children: [
+                // Индикаторы упражнений (точечки) - над галереей
+                if (exercises.length > 1)
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(
+                        exercises.length,
+                        (index) => Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 6),
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: index == currentPage
+                                ? AppColors.textSecondary.withOpacity(0.3)
+                                : AppColors.buttonPrimary,
+                            border: index == currentPage
+                                ? Border.all(
+                                    color: AppColors.textSecondary.withOpacity(
+                                      0.3,
                                     ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    onTap: () => _showExerciseInfo(ex),
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.inputBorder
-                                            .withOpacity(0.3),
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(
-                                          color: AppColors.inputBorder
-                                              .withOpacity(0.5),
-                                          width: 1,
-                                        ),
-                                      ),
-                                      child: const Icon(
-                                        Icons.info_outline,
-                                        color: AppColors.textPrimary,
-                                        size: 20,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            // 2. Гифка
-                            ..._buildGifSection(ex),
-                            const SizedBox(height: 20),
-                            // 4. Три серых квадрата
-                            Row(
-                              children: [
-                                _InfoSquare(
-                                  text:
-                                      '${ex.setsCount} подход${_ending(ex.setsCount, "а", "ов", "")}',
-                                ),
-                                _InfoSquare(
-                                  text:
-                                      '${ex.repsCount} повторени${_ending(ex.repsCount, "е", "й", "я")}',
-                                ),
-                                _InfoSquare(text: '${ex.restTime} сек отдых'),
-                              ],
-                            ),
-                            const SizedBox(height: 24),
-                            // 5. Кастомная "таблица"
-                            const SizedBox(height: 24),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: Colors.transparent,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+                                    width: 2,
+                                  )
+                                : null,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                // Галерея упражнений
+                Expanded(
+                  child: PageView.builder(
+                    itemCount: exercises.length,
+                    onPageChanged: (i) {
+                      if (mounted) {
+                        setState(() => currentPage = i);
+                      }
+                      // Очищаем кэш изображений при переключении упражнений для экономии памяти
+                      if (mounted) {
+                        _clearImageCache();
+                      }
+                    },
+                    itemBuilder: (context, index) {
+                      final ex = exercises[index];
+                      return Stack(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+                            child: SingleChildScrollView(
                               child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
+                                  // 3. Название упражнения
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Expanded(
+                                      Flexible(
                                         child: Text(
-                                          'Предыдущий результат',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
+                                          ex.caption,
+                                          style: const TextStyle(
+                                            fontSize: 22,
                                             fontWeight: FontWeight.bold,
                                             color: AppColors.textPrimary,
                                           ),
+                                          textAlign: TextAlign.center,
                                         ),
                                       ),
-                                      Expanded(
-                                        child: Text(
-                                          ex.withWeight
-                                              ? 'Повторения и вес'
-                                              : 'Повторения',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: AppColors.textPrimary,
+                                      const SizedBox(width: 6),
+                                      Material(
+                                        color: Colors.transparent,
+                                        child: InkWell(
+                                          onTap: () => _showExerciseInfo(ex),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
                                           ),
-                                        ),
-                                      ),
-                                      Expanded(
-                                        child: Text(
-                                          'Выполнено',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: AppColors.textPrimary,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.inputBorder
+                                                  .withOpacity(0.3),
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              border: Border.all(
+                                                color: AppColors.inputBorder
+                                                    .withOpacity(0.5),
+                                                width: 1,
+                                              ),
+                                            ),
+                                            child: const Icon(
+                                              Icons.info_outline,
+                                              color: AppColors.textPrimary,
+                                              size: 20,
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ],
                                   ),
-                                  ...List.generate(
-                                    ex.setsCount,
-                                    (setIdx) => Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 10,
+                                  const SizedBox(height: 12),
+                                  // 2. Гифка
+                                  ..._buildGifSection(ex),
+                                  const SizedBox(height: 20),
+                                  // 4. Три серых квадрата
+                                  Row(
+                                    children: [
+                                      _InfoSquare(
+                                        text:
+                                            '${ex.setsCount} подход${_ending(ex.setsCount, "а", "ов", "")}',
                                       ),
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          color: AppColors.inputBorder
-                                              .withOpacity(0.13),
-                                          borderRadius: BorderRadius.circular(
-                                            32,
-                                          ),
-                                        ),
-                                        child: Row(
+                                      _InfoSquare(
+                                        text:
+                                            '${ex.repsCount} повторени${_ending(ex.repsCount, "е", "й", "я")}',
+                                      ),
+                                      _InfoSquare(
+                                        text: '${ex.restTime} сек отдых',
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 24),
+                                  // 5. Кастомная "таблица"
+                                  const SizedBox(height: 24),
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.transparent,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        Row(
                                           mainAxisAlignment:
                                               MainAxisAlignment.center,
                                           children: [
                                             Expanded(
-                                              child: Center(
-                                                child: Text(
-                                                  userExerciseRows[index][setIdx]
-                                                      .lastResult,
-                                                  textAlign: TextAlign.center,
-                                                  style: TextStyle(
-                                                    color:
-                                                        AppColors.textPrimary,
-                                                    fontSize: 20,
-                                                  ),
+                                              child: Text(
+                                                'Предыдущий результат',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: AppColors.textPrimary,
                                                 ),
                                               ),
                                             ),
                                             Expanded(
-                                              child: GestureDetector(
-                                                onTap:
-                                                    userExerciseRows[index][setIdx]
-                                                            .status ==
-                                                        'passed'
-                                                    ? null
-                                                    : () => _showRepsWeightPicker(
-                                                        index,
-                                                        setIdx,
-                                                        100, // Фиксированное максимальное количество повторений
-                                                        ex.withWeight,
-                                                      ),
-                                                child: Center(
-                                                  child: ex.withWeight
-                                                      ? Row(
-                                                          mainAxisAlignment:
-                                                              MainAxisAlignment
-                                                                  .center,
-                                                          mainAxisSize:
-                                                              MainAxisSize.min,
-                                                          children: [
-                                                            Text(
-                                                              '${userExerciseRows[index][setIdx].reps}',
-                                                              style: TextStyle(
-                                                                color: AppColors
-                                                                    .textPrimary,
-                                                                fontSize: 20,
-                                                              ),
-                                                            ),
-                                                            const SizedBox(
-                                                              width: 10,
-                                                            ),
-                                                            Text(
-                                                              '${userExerciseRows[index][setIdx].weight.toStringAsFixed(2)} кг',
-                                                              style: TextStyle(
-                                                                color: AppColors
-                                                                    .textPrimary,
-                                                                fontSize: 20,
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        )
-                                                      : Text(
-                                                          '${userExerciseRows[index][setIdx].reps}',
-                                                          style: TextStyle(
-                                                            color: AppColors
-                                                                .textPrimary,
-                                                            fontSize: 20,
-                                                          ),
-                                                        ),
+                                              child: Text(
+                                                ex.withWeight
+                                                    ? 'Повторения и вес'
+                                                    : 'Повторения',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: AppColors.textPrimary,
                                                 ),
                                               ),
                                             ),
                                             Expanded(
-                                              child: Center(
-                                                child: (() {
-                                                  final row =
-                                                      userExerciseRows[index][setIdx];
-                                                  if (row.status == 'passed') {
-                                                    return IgnorePointer(
-                                                      ignoring: true,
-                                                      child: const Icon(
-                                                        Icons.check_circle,
-                                                        color: Colors.green,
-                                                        size: 34,
-                                                      ),
-                                                    );
-                                                  } else {
-                                                    return _RoundCheckbox(
-                                                      value:
-                                                          row.userExerciseUuid !=
-                                                          null,
-                                                      onChanged: (val) {
-                                                        _onSetCompleted(
-                                                          index,
-                                                          setIdx,
-                                                          ex,
-                                                          value: val,
-                                                        );
-                                                      },
-                                                    );
-                                                  }
-                                                })(),
+                                              child: Text(
+                                                'Выполнено',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: AppColors.textPrimary,
+                                                ),
                                               ),
                                             ),
                                           ],
                                         ),
-                                      ),
+                                        ...List.generate(
+                                          ex.setsCount,
+                                          (setIdx) => Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 10,
+                                            ),
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                color: AppColors.inputBorder
+                                                    .withOpacity(0.13),
+                                                borderRadius:
+                                                    BorderRadius.circular(32),
+                                              ),
+                                              child: Row(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  Expanded(
+                                                    child: Center(
+                                                      child: Text(
+                                                        userExerciseRows[index][setIdx]
+                                                            .lastResult,
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                        style: TextStyle(
+                                                          color: AppColors
+                                                              .textPrimary,
+                                                          fontSize: 20,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  Expanded(
+                                                    child: GestureDetector(
+                                                      onTap:
+                                                          userExerciseRows[index][setIdx]
+                                                                  .status ==
+                                                              'passed'
+                                                          ? null
+                                                          : () => _showRepsWeightPicker(
+                                                              index,
+                                                              setIdx,
+                                                              100, // Фиксированное максимальное количество повторений
+                                                              ex.withWeight,
+                                                            ),
+                                                      child: Center(
+                                                        child: ex.withWeight
+                                                            ? Row(
+                                                                mainAxisAlignment:
+                                                                    MainAxisAlignment
+                                                                        .center,
+                                                                mainAxisSize:
+                                                                    MainAxisSize
+                                                                        .min,
+                                                                children: [
+                                                                  Text(
+                                                                    '${userExerciseRows[index][setIdx].reps}',
+                                                                    style: TextStyle(
+                                                                      color: AppColors
+                                                                          .textPrimary,
+                                                                      fontSize:
+                                                                          20,
+                                                                    ),
+                                                                  ),
+                                                                  const SizedBox(
+                                                                    width: 10,
+                                                                  ),
+                                                                  Text(
+                                                                    '${userExerciseRows[index][setIdx].weight.toStringAsFixed(2)} кг',
+                                                                    style: TextStyle(
+                                                                      color: AppColors
+                                                                          .textPrimary,
+                                                                      fontSize:
+                                                                          20,
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              )
+                                                            : Text(
+                                                                '${userExerciseRows[index][setIdx].reps}',
+                                                                style: TextStyle(
+                                                                  color: AppColors
+                                                                      .textPrimary,
+                                                                  fontSize: 20,
+                                                                ),
+                                                              ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  Expanded(
+                                                    child: Center(
+                                                      child: (() {
+                                                        final row =
+                                                            userExerciseRows[index][setIdx];
+                                                        if (row.status ==
+                                                            'passed') {
+                                                          return IgnorePointer(
+                                                            ignoring: true,
+                                                            child: const Icon(
+                                                              Icons
+                                                                  .check_circle,
+                                                              color:
+                                                                  Colors.green,
+                                                              size: 34,
+                                                            ),
+                                                          );
+                                                        } else {
+                                                          return _RoundCheckbox(
+                                                            value:
+                                                                row.userExerciseUuid !=
+                                                                null,
+                                                            onChanged: (val) {
+                                                              _onSetCompleted(
+                                                                index,
+                                                                setIdx,
+                                                                ex,
+                                                                value: val,
+                                                              );
+                                                            },
+                                                          );
+                                                        }
+                                                      })(),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    // 6. Кнопка закреплена внизу
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: CustomButton(
-                          text: 'Завершить упражнение',
-                          onPressed:
-                              userExerciseRows[index].every(
-                                (row) => row.status == 'passed',
-                              )
-                              ? null
-                              : () => _onFinishExercise(index, ex),
-                          height: 64,
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
+                          ),
+                          // 6. Кнопка закреплена внизу
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: CustomButton(
+                                text: 'Завершить упражнение',
+                                onPressed:
+                                    userExerciseRows[index].every(
+                                      (row) => row.status == 'passed',
+                                    )
+                                    ? null
+                                    : () => _onFinishExercise(index, ex),
+                                height: 64,
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
     );
   }
