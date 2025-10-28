@@ -6,11 +6,13 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'constants/app_colors.dart';
 import 'providers/auth_provider.dart';
 import 'providers/timer_overlay_provider.dart';
+import 'providers/stopwatch_overlay_provider.dart';
 import 'providers/achievement_provider.dart';
 
 import 'screens/profile/auth_screen.dart';
 import 'screens/main_screen_wrapper.dart';
 import 'widgets/global_timer_overlay.dart';
+import 'widgets/global_stopwatch_overlay.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
 import 'services/fcm_service.dart';
@@ -83,6 +85,7 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => TimerOverlayProvider()),
+        ChangeNotifierProvider(create: (_) => StopwatchOverlayProvider()),
         ChangeNotifierProvider(create: (_) => AchievementProvider()),
       ],
       child: MaterialApp(
@@ -90,7 +93,13 @@ class MyApp extends StatelessWidget {
         title: 'Fitness App',
         debugShowCheckedModeBanner: false,
         builder: (context, child) {
-          return Stack(children: [child!, const GlobalTimerOverlay()]);
+          return Stack(
+            children: [
+              child!,
+              const GlobalTimerOverlay(),
+              const GlobalStopwatchOverlay(),
+            ],
+          );
         },
         theme: ThemeData(
           useMaterial3: true,

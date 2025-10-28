@@ -71,6 +71,10 @@ class _AdminExerciseEditScreenState extends State<AdminExerciseEditScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => isSaving = true);
+
+    // Нормализуем вес: заменяем запятую на точку для корректного парсинга
+    final weightText = _weightController.text.replaceAll(',', '.');
+
     final body = {
       'caption': _captionController.text,
       'description': _descriptionController.text,
@@ -81,7 +85,7 @@ class _AdminExerciseEditScreenState extends State<AdminExerciseEditScreen> {
       'reps_count': int.tryParse(_repsController.text) ?? 0,
       'rest_time': int.tryParse(_restTimeController.text) ?? 0,
       'with_weight': _withWeight,
-      'weight': double.tryParse(_weightController.text) ?? 0.0,
+      'weight': double.tryParse(weightText) ?? 0.0,
     };
     final resp = await ApiService.put(
       '/exercises/update/${widget.exerciseUuid}',

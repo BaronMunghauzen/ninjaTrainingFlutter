@@ -70,7 +70,9 @@ class _MeasurementModalState extends State<MeasurementModal> {
       return;
     }
 
-    final value = double.tryParse(valueText);
+    // Заменяем запятую на точку для корректного парсинга десятичных чисел
+    final normalizedValueText = valueText.replaceAll(',', '.');
+    final value = double.tryParse(normalizedValueText);
     if (value == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Введите корректное значение')),

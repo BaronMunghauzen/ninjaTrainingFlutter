@@ -1,8 +1,8 @@
 class ApiConstants {
-  static const String baseUrl =
-      'http://10.0.2.2:8000'; //Локальный IP на эмуляторе
   // static const String baseUrl =
-  //     'https://ninjatraining.ru'; //IP сервера продакшена
+  //     'http://10.0.2.2:8000'; //Локальный IP на эмуляторе
+  static const String baseUrl =
+      'https://ninjatraining.ru'; //IP сервера продакшена
 
   // Auth endpoints
   static const String loginUrl = '$baseUrl/auth/login';
