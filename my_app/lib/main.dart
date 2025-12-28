@@ -56,6 +56,9 @@ void main() async {
   // Инициализируем обработчик Deep Links
   _initDeepLinks();
 
+  // Регистрируем обработчик 403 ответов
+  _registerApiForbiddenHandler();
+
   runApp(const MyApp());
 }
 
@@ -73,6 +76,28 @@ void _initDeepLinks() {
   // Обработка deep links когда приложение открыто
   appLinks.uriLinkStream.listen((uri) {
     DeepLinkHandler.handleDeepLink(uri.toString());
+  });
+}
+
+void _registerApiForbiddenHandler() {
+  ApiService.registerForbiddenHandler(() async {
+    final context = navigatorKey.currentState?.context;
+    if (context == null) return;
+
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await authProvider.logout();
+    } catch (e) {
+      print('❌ Ошибка автоматического выхода при 403: $e');
+    }
+
+    final navigator = navigatorKey.currentState;
+    if (navigator != null) {
+      navigator.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AuthScreen()),
+        (route) => false,
+      );
+    }
   });
 }
 

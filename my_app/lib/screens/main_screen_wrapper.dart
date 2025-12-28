@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/notification_service.dart';
 import 'main_screen.dart';
 import 'profile/email_verification_screen.dart';
 import 'profile/auth_screen.dart';
@@ -16,6 +17,9 @@ class _MainScreenWrapperState extends State<MainScreenWrapper> {
   @override
   void initState() {
     super.initState();
+    // Очищаем все уведомления при входе в приложение
+    NotificationService.clearAllNotifications();
+    
     // Даем время AuthProvider инициализироваться
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authProvider = context.read<AuthProvider>();

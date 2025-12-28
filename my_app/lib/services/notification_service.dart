@@ -1,6 +1,8 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/services.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'fcm_service.dart';
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
@@ -107,7 +109,10 @@ class NotificationService {
         );
 
     try {
-      await _notificationsPlugin.initialize(initializationSettings);
+      await _notificationsPlugin.initialize(
+        initializationSettings,
+        onDidReceiveNotificationResponse: _onNotificationTapped,
+      );
       print('🔔 NotificationService: Инициализация плагина завершена');
 
       // Создаём notification channel для Android 8.0+ (API 26+)
@@ -196,14 +201,46 @@ class NotificationService {
     }
   }
 
+  /// Обработчик нажатия на уведомление
+  static void _onNotificationTapped(NotificationResponse response) {
+    print('🔔 NotificationService: Нажатие на уведомление (ID: ${response.id}, payload: ${response.payload})');
+    
+    if (response.payload != null && response.payload!.isNotEmpty) {
+      // Парсим payload (ожидаем формат: "achievement_uuid:UUID")
+      final parts = response.payload!.split(':');
+      if (parts.length == 2 && parts[0] == 'achievement_uuid') {
+        final achievementUuid = parts[1];
+        print('🔔 NotificationService: Открытие достижения: $achievementUuid');
+        
+        // Импортируем FCMService для открытия модального окна
+        _handleAchievementNotificationTap(achievementUuid);
+      }
+    }
+  }
+
+  /// Обработка нажатия на уведомление о достижении
+  static Future<void> _handleAchievementNotificationTap(String achievementUuid) async {
+    try {
+      // Вызываем публичный метод FCMService
+      await FCMService.handleAchievementTap(achievementUuid);
+    } catch (e) {
+      print('🔔 NotificationService: Ошибка вызова FCMService: $e');
+    }
+  }
+
   /// Показать FCM уведомление (для foreground)
   static Future<void> showFCMNotification({
     required String title,
     required String body,
+    int? notificationId,
+    String? achievementUuid, // Добавляем параметр для achievement_uuid
   }) async {
     print('🔔 NotificationService: Показ FCM уведомления (foreground)');
 
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+    // Формируем payload если есть achievement_uuid
+    final payload = achievementUuid != null ? 'achievement_uuid:$achievementUuid' : null;
+
+    final AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
           'timer_channel',
           'Timer Notifications',
@@ -215,26 +252,32 @@ class NotificationService {
           enableVibration: true,
         );
 
-    const DarwinNotificationDetails iOSPlatformChannelSpecifics =
+    final DarwinNotificationDetails iOSPlatformChannelSpecifics =
         DarwinNotificationDetails(
           presentAlert: true,
           presentBadge: true,
           presentSound: true,
         );
 
-    const NotificationDetails platformChannelSpecifics = NotificationDetails(
+    final NotificationDetails platformChannelSpecifics = NotificationDetails(
       android: androidPlatformChannelSpecifics,
       iOS: iOSPlatformChannelSpecifics,
     );
 
+    // Генерируем уникальный ID если не передан
+    // Используем хэш от title + body + timestamp для уникальности
+    final id = notificationId ?? 
+               (title.hashCode + body.hashCode + DateTime.now().millisecondsSinceEpoch).abs() % 2147483647;
+
     try {
       await _notificationsPlugin.show(
-        997, // Уникальный ID для FCM уведомлений
+        id,
         title,
         body,
         platformChannelSpecifics,
+        payload: payload,
       );
-      print('🔔 NotificationService: FCM уведомление показано успешно');
+      print('🔔 NotificationService: FCM уведомление показано успешно (ID: $id)');
     } catch (e) {
       print('🔔 NotificationService: ОШИБКА при показе FCM уведомления: $e');
     }
@@ -313,7 +356,7 @@ class NotificationService {
 
       await _notificationsPlugin.zonedSchedule(
         timerNotificationId,
-        'Время отдыха закончилось!',
+        'Время отдыха закончилось',
         'Можете приступать к следующему подходу',
         scheduledTime,
         platformChannelSpecifics,
@@ -380,6 +423,57 @@ class NotificationService {
     } catch (e) {
       print('🔔 NotificationService: ОШИБКА при отмене уведомления: $e');
       rethrow;
+    }
+  }
+
+  /// Очистить все уведомления и badge (включая FCM уведомления)
+  static Future<void> clearAllNotifications() async {
+    print('🔔 NotificationService: Очистка всех уведомлений...');
+    try {
+      // Отменяем все локальные уведомления (включая запланированные)
+      await _notificationsPlugin.cancelAll();
+      print('🔔 NotificationService: Все локальные уведомления отменены');
+
+      // Очищаем все уведомления приложения на Android (включая FCM) через platform channel
+      try {
+        const platform = MethodChannel('ru.ninjatraining.app/notifications');
+        await platform.invokeMethod('cancelAllNotifications');
+        print('🔔 NotificationService: Все уведомления приложения очищены на Android (включая FCM)');
+      } catch (e) {
+        // Если platform channel не настроен, это не критично
+        print('🔔 NotificationService: Platform channel для очистки уведомлений не доступен: $e');
+        print('🔔 NotificationService: Используется только cancelAll() из flutter_local_notifications');
+      }
+
+      // Очищаем badge на iOS (показываем уведомление с badgeNumber: 0, затем сразу отменяем)
+      final iosPlugin = _notificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin>();
+      if (iosPlugin != null) {
+        try {
+          // Показываем временное уведомление с badgeNumber: 0 для очистки badge
+          await _notificationsPlugin.show(
+            0,
+            '',
+            '',
+            const NotificationDetails(
+              iOS: DarwinNotificationDetails(
+                presentAlert: false,
+                presentBadge: true,
+                badgeNumber: 0,
+                presentSound: false,
+              ),
+            ),
+          );
+          // Сразу отменяем его
+          await _notificationsPlugin.cancel(0);
+          print('🔔 NotificationService: Badge очищен на iOS');
+        } catch (e) {
+          print('🔔 NotificationService: Ошибка очистки badge на iOS: $e');
+        }
+      }
+    } catch (e) {
+      print('🔔 NotificationService: ОШИБКА при очистке уведомлений: $e');
     }
   }
 }

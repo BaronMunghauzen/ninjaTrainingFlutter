@@ -24,7 +24,6 @@ class _AdminExerciseEditScreenState extends State<AdminExerciseEditScreen> {
   final _setsController = TextEditingController();
   final _repsController = TextEditingController();
   final _restTimeController = TextEditingController();
-  final _weightController = TextEditingController();
   bool _withWeight = false;
   bool isLoading = true;
   bool isSaving = false;
@@ -51,7 +50,6 @@ class _AdminExerciseEditScreenState extends State<AdminExerciseEditScreen> {
         _repsController.text = ex['reps_count']?.toString() ?? '';
         _restTimeController.text = ex['rest_time']?.toString() ?? '';
         _withWeight = ex['with_weight'] ?? false;
-        _weightController.text = ex['weight']?.toString() ?? '';
       });
       // Загрузить справочник упражнения
       if (ex['exercise_reference_uuid'] != null) {
@@ -72,9 +70,6 @@ class _AdminExerciseEditScreenState extends State<AdminExerciseEditScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => isSaving = true);
 
-    // Нормализуем вес: заменяем запятую на точку для корректного парсинга
-    final weightText = _weightController.text.replaceAll(',', '.');
-
     final body = {
       'caption': _captionController.text,
       'description': _descriptionController.text,
@@ -85,7 +80,6 @@ class _AdminExerciseEditScreenState extends State<AdminExerciseEditScreen> {
       'reps_count': int.tryParse(_repsController.text) ?? 0,
       'rest_time': int.tryParse(_restTimeController.text) ?? 0,
       'with_weight': _withWeight,
-      'weight': double.tryParse(weightText) ?? 0.0,
     };
     final resp = await ApiService.put(
       '/exercises/update/${widget.exerciseUuid}',
@@ -192,14 +186,6 @@ class _AdminExerciseEditScreenState extends State<AdminExerciseEditScreen> {
                       onChanged: (v) => setState(() => _withWeight = v),
                       title: const Text('С отягощением'),
                     ),
-                    if (_withWeight)
-                      TextFormField(
-                        controller: _weightController,
-                        decoration: const InputDecoration(labelText: 'Вес'),
-                        keyboardType: TextInputType.number,
-                        validator: (v) =>
-                            v == null || v.isEmpty ? 'Введите вес' : null,
-                      ),
                     const SizedBox(height: 24),
                     isSaving
                         ? const Center(child: CircularProgressIndicator())

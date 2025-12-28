@@ -76,10 +76,6 @@ class _TrainingDetailModalState extends State<TrainingDetailModal> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Длительность: ${training.training.duration} мин',
-                        style: TextStyle(color: AppColors.textSecondary),
-                      ),
-                      Text(
                         'Группа мышц: ${training.training.muscleGroup}',
                         style: TextStyle(color: AppColors.textSecondary),
                       ),

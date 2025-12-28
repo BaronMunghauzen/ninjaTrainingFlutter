@@ -417,6 +417,32 @@ class UserTrainingService {
       return null;
     }
   }
+
+  /// Добавить упражнение в избранное
+  static Future<bool> addToFavorites(String exerciseUuid) async {
+    try {
+      final response = await ApiService.post(
+        '/exercise_reference/$exerciseUuid/favorite',
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error adding exercise to favorites: $e');
+      return false;
+    }
+  }
+
+  /// Удалить упражнение из избранного
+  static Future<bool> removeFromFavorites(String exerciseUuid) async {
+    try {
+      final response = await ApiService.delete(
+        '/exercise_reference/$exerciseUuid/favorite',
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error removing exercise from favorites: $e');
+      return false;
+    }
+  }
 }
 
 // Модели для упражнений и групп упражнений

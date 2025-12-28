@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_service.dart';
 import '../../constants/app_colors.dart';
 import 'package:provider/provider.dart';
@@ -18,18 +17,22 @@ class SystemTrainingListWidget extends StatefulWidget {
 class _SystemTrainingListWidgetState extends State<SystemTrainingListWidget> {
   List<Map<String, dynamic>> trainings = [];
   bool isLoading = true;
-  String? _authToken;
 
   @override
   void initState() {
     super.initState();
-    _loadAuthToken();
     _loadTrainings();
   }
 
-  Future<void> _loadAuthToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    _authToken = prefs.getString('user_token');
+  Future<ImageProvider?> _loadTrainingImage(String? imageUuid) async {
+    if (imageUuid == null || imageUuid.isEmpty) return null;
+    try {
+      // Используем метод кэширования ApiService
+      return await ApiService.getImageProvider(imageUuid);
+    } catch (e) {
+      print('[SystemTrainingListWidget] Ошибка загрузки изображения: $e');
+      return null;
+    }
   }
 
   Future<void> _loadTrainings() async {
@@ -111,8 +114,13 @@ class _SystemTrainingListWidgetState extends State<SystemTrainingListWidget> {
             }
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (context) =>
-                    SystemTrainingDetailScreen(training: training),
+                builder: (context) => SystemTrainingDetailScreen(
+                  training: {
+                    ...training,
+                    'training_type':
+                        'system_training', // Явно указываем тип тренировки
+                  },
+                ),
               ),
             );
           },
@@ -124,77 +132,88 @@ class _SystemTrainingListWidgetState extends State<SystemTrainingListWidget> {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppColors.inputBorder),
             ),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // Картинка тренировки
-                if (training['image_uuid'] != null)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      '${ApiService.baseUrl}/files/file/${training['image_uuid']}',
-                      width: 140,
-                      height: 140,
-                      fit: BoxFit.cover,
-                      headers: _authToken != null
-                          ? {'Cookie': 'users_access_token=$_authToken'}
-                          : {},
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: AppColors.surface,
-                          child: const Icon(
-                            Icons.fitness_center,
-                            size: 60,
+            child: FutureBuilder<ImageProvider?>(
+              future: _loadTrainingImage(training['image_uuid']),
+              builder: (context, snapshot) {
+                final image = snapshot.data;
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Картинка тренировки
+                    if (image != null)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image(
+                          image: image,
+                          width: 140,
+                          height: 140,
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    else if (snapshot.connectionState ==
+                        ConnectionState.waiting)
+                      Container(
+                        color: AppColors.surface,
+                        child: const Center(
+                          child: CircularProgressIndicator(
                             color: AppColors.textSecondary,
                           ),
-                        );
-                      },
-                      key: ValueKey(training['image_uuid']),
-                    ),
-                  ),
-                // Полупрозрачный оверлей для лучшей читаемости текста
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withOpacity(0.7),
-                      ],
-                      stops: const [0.4, 1.0],
-                    ),
-                  ),
-                ),
-                // Текст поверх картинки
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Text(
-                      training['caption'] ?? '',
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        shadows: [
-                          Shadow(
-                            offset: Offset(0, 1),
-                            blurRadius: 2,
-                            color: Colors.black54,
-                          ),
-                        ],
+                        ),
+                      )
+                    else
+                      Container(
+                        color: AppColors.surface,
+                        child: const Icon(
+                          Icons.fitness_center,
+                          size: 60,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                    // Полупрозрачный оверлей для лучшей читаемости текста
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.7),
+                          ],
+                          stops: const [0.4, 1.0],
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ],
+                    // Текст поверх картинки
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Text(
+                          training['caption'] ?? '',
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            shadows: [
+                              Shadow(
+                                offset: Offset(0, 1),
+                                blurRadius: 2,
+                                color: Colors.black54,
+                              ),
+                            ],
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         );

@@ -187,37 +187,37 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Заголовок категории с количеством достижений
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16, top: 8),
-              child: Row(
-                children: [
-                  Text(
-                    category,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${categoryAchievements.length}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            // Padding(
+            //   padding: const EdgeInsets.only(bottom: 16, top: 8),
+            //   child: Row(
+            //     children: [
+            //       Text(
+            //         category,
+            //         style: const TextStyle(
+            //           fontSize: 20,
+            //           fontWeight: FontWeight.bold,
+            //           color: Colors.black87,
+            //         ),
+            //       ),
+            //       const SizedBox(width: 12),
+            //       Container(
+            //         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            //         decoration: BoxDecoration(
+            //           color: Colors.grey[200],
+            //           borderRadius: BorderRadius.circular(12),
+            //         ),
+            //         child: Text(
+            //           '${categoryAchievements.length}',
+            //           style: TextStyle(
+            //             fontSize: 14,
+            //             fontWeight: FontWeight.w600,
+            //             color: Colors.grey[700],
+            //           ),
+            //         ),
+            //       ),
+            //     ],
+            //   ),
+            // ),
             // Сетка достижений для этой категории
             GridView.builder(
               shrinkWrap: true,

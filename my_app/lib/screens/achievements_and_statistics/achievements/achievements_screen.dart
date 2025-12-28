@@ -1,9 +1,11 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../providers/achievement_provider.dart';
-import '../../../models/achievement_model.dart';
 import '../../../constants/app_colors.dart';
-import 'achievement_detail_screen.dart';
+import '../../../models/user_achievement_type_model.dart';
+import '../../../providers/auth_provider.dart';
+import '../../../services/user_achievement_service.dart';
+import '../../../services/api_service.dart';
 
 class AchievementsScreen extends StatefulWidget {
   const AchievementsScreen({super.key});
@@ -13,445 +15,433 @@ class AchievementsScreen extends StatefulWidget {
 }
 
 class _AchievementsScreenState extends State<AchievementsScreen> {
-  String? _selectedCategory;
+  List<UserAchievementType> _achievements = [];
+  bool _isLoading = true;
+  String? _error;
+  int? _userScore;
+  final Map<String, ImageProvider?> _imageCache = {};
 
   @override
   void initState() {
     super.initState();
-    // Загружаем достижения при инициализации экрана
+    // Откладываем загрузку данных до завершения фазы сборки
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadAchievements();
+      _loadData();
     });
   }
 
-  Future<void> _loadAchievements() async {
-    final provider = context.read<AchievementProvider>();
+  Future<void> _loadData() async {
+    if (!mounted) return;
+    
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
-    // Пытаемся загрузить из API, если не получится - используем mock
-    await provider.loadAchievementsFromTypesTable();
+    try {
+      // Получаем score из профиля пользователя (используем уже загруженный профиль)
+      final authProvider = context.read<AuthProvider>();
+      
+      // Используем уже загруженный профиль, не вызываем fetchUserProfile() чтобы избежать перестройки
+      _userScore = authProvider.userProfile?.score;
 
-    // Проверяем, что у нас есть достижения
-    if (provider.achievements.isEmpty) {
-      await provider.loadMockAchievements();
+      // Загружаем достижения
+      final userUuid = authProvider.userUuid ?? authProvider.userProfile?.uuid;
+      if (userUuid == null) {
+        if (!mounted) return;
+        setState(() {
+          _error = 'Пользователь не найден';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final achievements = await UserAchievementService.getUserAchievements(userUuid);
+      
+      if (!mounted) return;
+      
+      // Фильтруем только активные достижения
+      final activeAchievements = achievements.where((a) => a.isActive).toList();
+      
+      // Предзагружаем картинки для полученных достижений
+      for (final achievement in activeAchievements) {
+        if (achievement.isEarned && 
+            achievement.imageUuid != null && 
+            achievement.imageUuid!.isNotEmpty) {
+          _loadImage(achievement.imageUuid!);
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _achievements = activeAchievements;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Ошибка загрузки достижений: $e');
+      if (!mounted) return;
+      setState(() {
+        _error = 'Ошибка загрузки данных: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadImage(String imageUuid) async {
+    if (_imageCache.containsKey(imageUuid)) {
+      return; // Уже загружено
     }
 
-    // Загружаем достижения пользователя (используем временный UUID для демонстрации)
-    // В реальном приложении здесь должен быть UUID текущего пользователя
-    const String demoUserUuid = 'demo-user-123';
-    await provider.loadUserAchievementsByUuid(demoUserUuid);
+    try {
+      final imageProvider = await ApiService.getImageProvider(imageUuid);
+      if (mounted && imageProvider != null) {
+        setState(() {
+          _imageCache[imageUuid] = imageProvider;
+        });
+      }
+    } catch (e) {
+      print('Ошибка загрузки картинки $imageUuid: $e');
+    }
+  }
+
+  Map<String, List<UserAchievementType>> _groupByCategory(List<UserAchievementType> achievements) {
+    final Map<String, List<UserAchievementType>> grouped = {};
+    for (final achievement in achievements) {
+      final category = achievement.category;
+      if (!grouped.containsKey(category)) {
+        grouped[category] = [];
+      }
+      grouped[category]!.add(achievement);
+    }
+    return grouped;
+  }
+
+  String _getCategoryDisplayName(String category) {
+    // Преобразуем технические названия категорий в читаемые
+    final categoryNames = {
+      'training_count': 'Количество тренировок',
+      'training_count_in_week': 'Тренировки за неделю',
+      'special_day': 'Особые дни',
+      'time_less_than': 'Ранние тренировки',
+      'time_more_than': 'Поздние тренировки',
+    };
+    return categoryNames[category] ?? category;
+  }
+
+  void _showAchievementDetail(UserAchievementType achievement) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _buildAchievementDetailModal(achievement),
+    );
+  }
+
+  Widget _buildAchievementDetailModal(UserAchievementType achievement) {
+    final isEarned = achievement.isEarned;
+    final imageUuid = achievement.imageUuid;
+    final hasImage = isEarned && 
+                     imageUuid != null && 
+                     imageUuid.isNotEmpty &&
+                     _imageCache.containsKey(imageUuid) &&
+                     _imageCache[imageUuid] != null;
+
+    // Загружаем картинку если еще не загружена
+    if (isEarned && imageUuid != null && imageUuid.isNotEmpty && !_imageCache.containsKey(imageUuid)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadImage(imageUuid);
+      });
+    }
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Картинка или знак вопроса
+          if (hasImage)
+            Container(
+              width: 150,
+              height: 150,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image(
+                  image: _imageCache[imageUuid]!,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return _buildQuestionMark(size: 100);
+                  },
+                ),
+              ),
+            )
+          else
+            _buildQuestionMark(size: 100),
+          const SizedBox(height: 24),
+          // Название
+          Text(
+            achievement.name,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          // Описание
+          Text(
+            achievement.description,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 16,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          // Очки
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.buttonPrimary.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.stars,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '+ ${achievement.points}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuestionMark({double size = 80}) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: Colors.grey.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(size / 2),
+      ),
+      child: Icon(
+        Icons.help_outline,
+        size: size * 0.6,
+        color: Colors.grey,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF1A1A1A),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1A1A1A),
-        iconTheme: const IconThemeData(color: Colors.white),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: () => _loadAchievements(),
-            tooltip: 'Обновить',
-          ),
-          IconButton(
-            icon: const Icon(Icons.person, color: Colors.white),
-            onPressed: () {
-              const String demoUserUuid = 'demo-user-123';
-              context.read<AchievementProvider>().loadUserAchievementsByUuid(
-                demoUserUuid,
-              );
-            },
-            tooltip: 'Загрузить достижения пользователя',
-          ),
-          IconButton(
-            icon: const Icon(Icons.smart_toy, color: Colors.white),
-            onPressed: () =>
-                context.read<AchievementProvider>().loadMockAchievements(),
-            tooltip: 'Mock данные',
-          ),
-        ],
-      ),
-      body: Consumer<AchievementProvider>(
-        builder: (context, provider, child) {
-          if (provider.isLoading) {
-            return const Center(
+      body: _isLoading
+          ? const Center(
               child: CircularProgressIndicator(color: Color(0xFF1F2121)),
-            );
-          }
-
-          if (provider.error != null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Ошибка загрузки: ${provider.error}',
-                    style: const TextStyle(color: Colors.red),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => provider.refreshAchievements(),
-                    child: const Text('Повторить'),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          if (provider.achievements.isEmpty) {
-            return const Center(
-              child: Text(
-                'Достижения не найдены',
-                style: TextStyle(fontSize: 18, color: Colors.white),
-              ),
-            );
-          }
-
-          return Column(
-            children: [
-              // Вкладки для фильтрации по категориям
-              _buildCategoryTabs(provider.achievements),
-              // Список достижений
-              Expanded(
-                child: _buildAchievementsGrid(
-                  _selectedCategory != null
-                      ? provider.achievements
-                            .where((a) => a.category == _selectedCategory)
-                            .toList()
-                      : provider.achievements,
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildAchievementsGrid(List<AchievementModel> achievements) {
-    // Группируем достижения по категориям
-    final Map<String, List<AchievementModel>> groupedAchievements = {};
-
-    for (final achievement in achievements) {
-      final category = achievement.category;
-      if (!groupedAchievements.containsKey(category)) {
-        groupedAchievements[category] = [];
-      }
-      groupedAchievements[category]!.add(achievement);
-    }
-
-    // Сортируем категории в логичном порядке
-    final List<String> sortedCategories = groupedAchievements.keys.toList()
-      ..sort((a, b) {
-        // Приоритетные категории идут первыми
-        final priorityOrder = {
-          'Общие': 1,
-          'Тренировки': 2,
-          'Упражнения': 3,
-          'Стреж': 4,
-          'Время': 5,
-          'Социальные': 6,
-          'Вес': 7,
-          'Дистанция': 8,
-          'Калории': 9,
-        };
-
-        final aPriority = priorityOrder[a] ?? 999;
-        final bPriority = priorityOrder[b] ?? 999;
-
-        if (aPriority != bPriority) {
-          return aPriority.compareTo(bPriority);
-        }
-
-        // Если приоритет одинаковый, сортируем по алфавиту
-        return a.compareTo(b);
-      });
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: sortedCategories.length,
-      itemBuilder: (context, index) {
-        final category = sortedCategories[index];
-        final categoryAchievements = groupedAchievements[category]!;
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Заголовок категории с количеством достижений
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16, top: 8),
-              child: Row(
-                children: [
-                  Text(
-                    category,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2A2A2A),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${categoryAchievements.length}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+            )
+          : _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _error!,
+                        style: const TextStyle(color: Colors.red, fontSize: 16),
+                        textAlign: TextAlign.center,
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Сетка достижений для этой категории
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: 0.8,
-              ),
-              itemCount: categoryAchievements.length,
-              itemBuilder: (context, index) {
-                final achievement = categoryAchievements[index];
-                return _buildAchievementItem(achievement);
-              },
-            ),
-            const SizedBox(height: 24),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildAchievementItem(AchievementModel achievement) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) =>
-                AchievementDetailScreen(achievement: achievement),
-          ),
-        );
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: achievement.isUnlocked ? AppColors.primary : Colors.grey[300],
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: achievement.isUnlocked
-                ? AppColors.primary
-                : Colors.grey[400]!,
-            width: 2,
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Иконка достижения
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(30),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Text(
-                  achievement.icon,
-                  style: const TextStyle(fontSize: 32),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            // Название достижения
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text(
-                achievement.title,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: achievement.isUnlocked
-                      ? Colors.white
-                      : Colors.grey[700],
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(height: 8),
-            // Статус разблокировки
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: achievement.isUnlocked ? Colors.green : Colors.orange,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                achievement.isUnlocked ? 'Разблокировано' : 'Заблокировано',
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCategoryTabs(List<AchievementModel> achievements) {
-    // Получаем уникальные категории
-    final categories = achievements.map((a) => a.category).toSet().toList()
-      ..sort((a, b) {
-        final priorityOrder = {
-          'Общие': 1,
-          'Тренировки': 2,
-          'Упражнения': 3,
-          'Стреж': 4,
-          'Время': 5,
-          'Социальные': 6,
-          'Вес': 7,
-          'Дистанция': 8,
-          'Калории': 9,
-        };
-
-        final aPriority = priorityOrder[a] ?? 999;
-        final bPriority = priorityOrder[b] ?? 999;
-
-        if (aPriority != bPriority) {
-          return aPriority.compareTo(bPriority);
-        }
-        return a.compareTo(b);
-      });
-
-    return Container(
-      height: 50,
-      margin: const EdgeInsets.only(bottom: 16),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: categories.length + 1, // +1 для кнопки "Все"
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            // Кнопка "Все"
-            return Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _selectedCategory = null;
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _selectedCategory == null
-                        ? AppColors.primary
-                        : Colors.grey[300],
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    'Все',
-                    style: TextStyle(
-                      color: _selectedCategory == null
-                          ? Colors.white
-                          : Colors.grey[700],
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }
-
-          final category = categories[index - 1];
-          final isSelected = _selectedCategory == category;
-          final count = achievements
-              .where((a) => a.category == category)
-              .length;
-
-          return Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectedCategory = isSelected ? null : category;
-                });
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primary : Colors.grey[300],
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      category,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.grey[700],
-                        fontWeight: FontWeight.w600,
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadData,
+                        child: const Text('Повторить'),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? Colors.white.withOpacity(0.3)
-                            : Colors.grey[400],
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '$count',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isSelected ? Colors.white : Colors.grey[700],
-                          fontWeight: FontWeight.w600,
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadData,
+                  color: AppColors.buttonPrimary,
+                  child: CustomScrollView(
+                    slivers: [
+                      // Заголовок с очками
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.start,
+                              children: [
+                                const Icon(
+                                  Icons.stars,
+                                  color: AppColors.buttonPrimary,
+                                  size: 24,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Заработано очков: ${_userScore ?? 0}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                      // Список достижений по категориям
+                      ..._buildAchievementGroups(),
+                    ],
+                  ),
+                ),
+    );
+  }
+
+  List<Widget> _buildAchievementGroups() {
+    final grouped = _groupByCategory(_achievements);
+    final categories = grouped.keys.toList()..sort();
+
+    return categories.map((category) {
+      final achievements = grouped[category]!;
+      return SliverPadding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        sliver: SliverToBoxAdapter(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Заголовок категории
+              // Padding(
+              //   padding: const EdgeInsets.only(bottom: 12),
+              //   child: Text(
+              //     _getCategoryDisplayName(category),
+              //     style: const TextStyle(
+              //       color: Colors.white,
+              //       fontSize: 20,
+              //       fontWeight: FontWeight.bold,
+              //     ),
+              //   ),
+              // ),
+              // Сетка достижений (2 в строке)
+              _buildAchievementsGrid(achievements),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      );
+    }).toList();
+  }
+
+  Widget _buildAchievementsGrid(List<UserAchievementType> achievements) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.9,
+      ),
+      itemCount: achievements.length,
+      itemBuilder: (context, index) {
+        return _buildAchievementItem(achievements[index]);
+      },
+    );
+  }
+
+  Widget _buildAchievementItem(UserAchievementType achievement) {
+    final isEarned = achievement.isEarned;
+    final imageUuid = achievement.imageUuid;
+    final hasImage = isEarned && 
+                     imageUuid != null && 
+                     imageUuid.isNotEmpty &&
+                     _imageCache.containsKey(imageUuid) &&
+                     _imageCache[imageUuid] != null;
+
+    // Загружаем картинку если еще не загружена
+    if (isEarned && imageUuid != null && imageUuid.isNotEmpty && !_imageCache.containsKey(imageUuid)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadImage(imageUuid);
+      });
+    }
+
+    return GestureDetector(
+      onTap: () => _showAchievementDetail(achievement),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Картинка или знак вопроса
+          if (hasImage)
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image(
+                    image: _imageCache[imageUuid]!,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return _buildQuestionMark();
+                    },
+                  ),
                 ),
               ),
+            )
+          else
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: _buildQuestionMark(),
+              ),
             ),
-          );
-        },
+          const SizedBox(height: 8),
+          // Название достижения
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: Text(
+              achievement.name,
+              style: TextStyle(
+                color: isEarned ? Colors.white : Colors.white70,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -7,8 +7,9 @@ import '../../services/search_service.dart';
 import '../../services/api_service.dart';
 import '../../widgets/gif_widget.dart';
 import '../../widgets/auth_image_widget.dart';
-import '../../widgets/exercise_filter_modal.dart';
+import '../../widgets/video_player_widget.dart';
 import '../../models/search_result_model.dart' as search_models;
+import '../../services/user_training_service.dart';
 
 class UserExerciseSelectorScreen extends StatefulWidget {
   const UserExerciseSelectorScreen({Key? key}) : super(key: key);
@@ -20,6 +21,7 @@ class UserExerciseSelectorScreen extends StatefulWidget {
 
 class _UserExerciseSelectorScreenState
     extends State<UserExerciseSelectorScreen> {
+  String? _activeVideoUuid;
   List<dynamic> userExercises = [];
   List<dynamic> searchResults = [];
   bool isLoading = true;
@@ -31,6 +33,8 @@ class _UserExerciseSelectorScreenState
   // Фильтры
   List<String> _selectedMuscleGroups = [];
   List<String> _selectedEquipmentNames = [];
+  List<String> _availableMuscleGroups = [];
+  List<String> _availableEquipmentNames = [];
 
   // Пагинация
   int currentPage = 1;
@@ -45,6 +49,7 @@ class _UserExerciseSelectorScreenState
   @override
   void initState() {
     super.initState();
+    _loadFilters();
     _loadUserExercises();
   }
 
@@ -66,28 +71,25 @@ class _UserExerciseSelectorScreenState
         return;
       }
 
-      final response = await ApiService.get(
-        '/exercise_reference/available/$userUuid?page=$currentPage&size=$pageSize',
+      final exercises = await UserTrainingService.getUserExerciseReferences(
+        userUuid,
+        page: currentPage,
+        size: pageSize,
       );
-
-      if (response.statusCode == 200) {
-        final data = ApiService.decodeJson(response.body);
-        setState(() {
-          userExercises = data['items'] ?? [];
-          totalItems = data['total'] ?? 0;
-          totalPages = data['pages'] ?? 0;
-          isLoading = false;
-        });
-      } else {
-        setState(() => isLoading = false);
-      }
+      setState(() {
+        userExercises = exercises.items;
+        totalItems = exercises.total;
+        totalPages = exercises.pages;
+        currentPage = exercises.page;
+        isLoading = false;
+      });
     } catch (e) {
       print('Error loading user exercises: $e');
       setState(() => isLoading = false);
     }
   }
 
-  Future<Map<String, List<String>>> _loadFilters() async {
+  Future<void> _loadFilters() async {
     try {
       print('DEBUG: User - Loading filters...');
       final authProvider = context.read<AuthProvider>();
@@ -96,7 +98,11 @@ class _UserExerciseSelectorScreenState
 
       if (userUuid == null) {
         print('DEBUG: User - No user UUID, returning empty filters');
-        return {'muscle_groups': [], 'equipment_names': []};
+        setState(() {
+          _availableMuscleGroups = [];
+          _availableEquipmentNames = [];
+        });
+        return;
       }
 
       final response = await ApiService.get(
@@ -106,18 +112,30 @@ class _UserExerciseSelectorScreenState
       if (response.statusCode == 200) {
         final data = ApiService.decodeJson(response.body);
         print('DEBUG: User - Filters data: $data');
-        final result = {
-          'muscle_groups': List<String>.from(data['muscle_groups'] ?? []),
-          'equipment_names': List<String>.from(data['equipment_names'] ?? []),
-        };
-        print('DEBUG: User - Parsed filters: $result');
-        return result;
+        setState(() {
+          _availableMuscleGroups = List<String>.from(
+            data['muscle_groups'] ?? [],
+          );
+          _availableEquipmentNames = List<String>.from(
+            data['equipment_names'] ?? [],
+          );
+        });
+        print(
+          'DEBUG: User - Loaded filters: muscle_groups=${_availableMuscleGroups.length}, equipment_names=${_availableEquipmentNames.length}',
+        );
+      } else {
+        print('DEBUG: User - Filters response not 200, returning empty');
+        setState(() {
+          _availableMuscleGroups = [];
+          _availableEquipmentNames = [];
+        });
       }
-      print('DEBUG: User - Filters response not 200, returning empty');
-      return {'muscle_groups': [], 'equipment_names': []};
     } catch (e) {
       print('Error loading filters: $e');
-      return {'muscle_groups': [], 'equipment_names': []};
+      setState(() {
+        _availableMuscleGroups = [];
+        _availableEquipmentNames = [];
+      });
     }
   }
 
@@ -186,42 +204,60 @@ class _UserExerciseSelectorScreenState
     });
   }
 
-  Future<void> _openFilterModal() async {
-    print('DEBUG: User - Opening filter modal...');
-    final filters = await _loadFilters();
-    print('DEBUG: User - Filters loaded: $filters');
+  void _toggleMuscleGroupFilter(String muscleGroup) {
+    setState(() {
+      if (_selectedMuscleGroups.contains(muscleGroup)) {
+        _selectedMuscleGroups.remove(muscleGroup);
+      } else {
+        _selectedMuscleGroups.add(muscleGroup);
+      }
+    });
 
-    if (!mounted) return;
+    // Немедленно обновляем список
+    setState(() {
+      currentPage = 1; // Сброс на первую страницу
+    });
 
-    showDialog(
-      context: context,
-      builder: (context) => ExerciseFilterModal(
-        muscleGroups: filters['muscle_groups'] ?? [],
-        equipmentNames: filters['equipment_names'] ?? [],
-        initialSelectedMuscleGroups: _selectedMuscleGroups,
-        initialSelectedEquipmentNames: _selectedEquipmentNames,
-        onApplyFilters: (selectedMuscleGroups, selectedEquipmentNames) {
-          print('DEBUG: User - onApplyFilters called');
-          print('DEBUG: User - muscle groups: $selectedMuscleGroups');
-          print('DEBUG: User - equipment names: $selectedEquipmentNames');
-          setState(() {
-            _selectedMuscleGroups = selectedMuscleGroups;
-            _selectedEquipmentNames = selectedEquipmentNames;
-          });
+    if (_searchController.text.isNotEmpty ||
+        _selectedMuscleGroups.isNotEmpty ||
+        _selectedEquipmentNames.isNotEmpty) {
+      _performSearch(_searchController.text);
+    } else {
+      // Сбрасываем флаг поиска и загружаем обычный список
+      setState(() {
+        hasSearched = false;
+        searchResults.clear();
+      });
+      _loadUserExercises();
+    }
+  }
 
-          // Применяем фильтры к текущему поиску
-          if (_searchController.text.isNotEmpty) {
-            print('DEBUG: User - performing search with filters');
-            _performSearch(_searchController.text);
-          } else {
-            print(
-              'DEBUG: User - performing search with empty text and filters',
-            );
-            _performSearch('');
-          }
-        },
-      ),
-    );
+  void _toggleEquipmentFilter(String equipmentName) {
+    setState(() {
+      if (_selectedEquipmentNames.contains(equipmentName)) {
+        _selectedEquipmentNames.remove(equipmentName);
+      } else {
+        _selectedEquipmentNames.add(equipmentName);
+      }
+    });
+
+    // Немедленно обновляем список
+    setState(() {
+      currentPage = 1; // Сброс на первую страницу
+    });
+
+    if (_searchController.text.isNotEmpty ||
+        _selectedMuscleGroups.isNotEmpty ||
+        _selectedEquipmentNames.isNotEmpty) {
+      _performSearch(_searchController.text);
+    } else {
+      // Сбрасываем флаг поиска и загружаем обычный список
+      setState(() {
+        hasSearched = false;
+        searchResults.clear();
+      });
+      _loadUserExercises();
+    }
   }
 
   void _selectExercise(dynamic exercise) {
@@ -238,6 +274,7 @@ class _UserExerciseSelectorScreenState
 
     setState(() {
       _selectedExercise = exerciseRef;
+      _activeVideoUuid = exerciseRef.video;
     });
   }
 
@@ -271,6 +308,48 @@ class _UserExerciseSelectorScreenState
       _performSearch(_searchController.text);
     } else {
       _loadUserExercises();
+    }
+  }
+
+  Future<void> _toggleFavorite(dynamic exercise) async {
+    try {
+      final exerciseUuid = _getExerciseUuid(exercise);
+      if (exerciseUuid.isEmpty) return;
+
+      final isFavorite = _getExerciseIsFavorite(exercise);
+      bool success = false;
+
+      if (isFavorite) {
+        success = await UserTrainingService.removeFromFavorites(exerciseUuid);
+      } else {
+        success = await UserTrainingService.addToFavorites(exerciseUuid);
+      }
+
+      if (success) {
+        // Перезагружаем список
+        if (hasSearched) {
+          await _performSearch(_searchController.text);
+        } else {
+          await _loadUserExercises();
+        }
+      } else {
+        // Показываем сообщение об ошибке
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Ошибка при изменении статуса избранного'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error toggling favorite: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -360,11 +439,6 @@ class _UserExerciseSelectorScreenState
                         Text(exerciseRef.techniqueDescription!),
                       ],
                       const SizedBox(height: 24),
-                      // Гифка (отображаем только если есть gif_uuid)
-                      if (exerciseRef.gif != null) ...[
-                        GifWidget(gifUuid: exerciseRef.gif, height: 250),
-                        const SizedBox(height: 24),
-                      ],
                     ],
                   ),
                 ),
@@ -377,14 +451,17 @@ class _UserExerciseSelectorScreenState
   }
 
   Widget? _buildExerciseMedia(dynamic exercise) {
-    // Приоритет: сначала гифка, потом картинка
+    // Приоритет: видео -> гиф -> картинка
+    String? videoUuid;
     String? gifUuid;
     String? imageUuid;
 
     if (exercise is search_models.ExerciseReference) {
+      videoUuid = exercise.video;
       gifUuid = exercise.gif;
       imageUuid = exercise.image;
     } else if (exercise is Map<String, dynamic>) {
+      videoUuid = exercise['video_uuid'];
       gifUuid = exercise['gif_uuid'];
       imageUuid = exercise['image_uuid'];
     }
@@ -409,11 +486,21 @@ class _UserExerciseSelectorScreenState
   Widget? _buildExerciseMediaForModal(
     search_models.ExerciseReference exercise,
   ) {
-    // Приоритет: сначала гифка, потом картинка
-    String? gifUuid = exercise.gif;
-    String? imageUuid = exercise.image;
+    // Приоритет: видео -> гиф -> картинка
+    final String? videoUuid = exercise.video;
+    final String? gifUuid = exercise.gif;
+    final String? imageUuid = exercise.image;
 
-    if (gifUuid != null) {
+    if (videoUuid != null) {
+      return VideoPlayerWidget(
+        videoUuid: videoUuid,
+        imageUuid: imageUuid,
+        height: 200,
+        width: double.infinity,
+        showControls: true,
+        autoInitialize: true,
+      );
+    } else if (gifUuid != null) {
       return GifWidget(gifUuid: gifUuid, height: 200, width: 200);
     } else if (imageUuid != null) {
       return AuthImageWidget(imageUuid: imageUuid, height: 200, width: 200);
@@ -467,6 +554,15 @@ class _UserExerciseSelectorScreenState
     return '';
   }
 
+  bool _getExerciseIsFavorite(dynamic exercise) {
+    if (exercise is search_models.ExerciseReference) {
+      return exercise.isFavorite;
+    } else if (exercise is Map<String, dynamic>) {
+      return exercise['is_favorite'] ?? false;
+    }
+    return false;
+  }
+
   List<dynamic> get _displayedExercises {
     final result = hasSearched ? searchResults : userExercises;
     return result;
@@ -493,80 +589,112 @@ class _UserExerciseSelectorScreenState
       ),
       body: Column(
         children: [
-          // Search Bar and Filter Button
+          // Search Bar
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: _onSearchChanged,
-                    decoration: InputDecoration(
-                      hintText: 'Поиск упражнений...',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: isSearching
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : _searchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() {
-                                  searchResults = [];
-                                  isSearching = false;
-                                  hasSearched = false;
-                                  _selectedMuscleGroups.clear();
-                                  _selectedEquipmentNames.clear();
-                                });
-                              },
-                            )
-                          : null,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: AppColors.inputBorder.withOpacity(0.1),
-                    ),
-                  ),
+            child: TextField(
+              controller: _searchController,
+              onChanged: _onSearchChanged,
+              decoration: InputDecoration(
+                hintText: 'Поиск упражнений...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: isSearching
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {
+                            searchResults = [];
+                            isSearching = false;
+                            hasSearched = false;
+                            _selectedMuscleGroups.clear();
+                            _selectedEquipmentNames.clear();
+                          });
+                          currentPage = 1;
+                          _loadUserExercises();
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(width: 12),
-                IconButton(
-                  onPressed: _openFilterModal,
-                  icon: Stack(
-                    children: [
-                      const Icon(Icons.filter_list),
-                      if (_selectedMuscleGroups.isNotEmpty ||
-                          _selectedEquipmentNames.isNotEmpty)
-                        Positioned(
-                          right: 0,
-                          top: 0,
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  style: IconButton.styleFrom(
-                    backgroundColor:
-                        (_selectedMuscleGroups.isNotEmpty ||
-                            _selectedEquipmentNames.isNotEmpty)
-                        ? AppColors.buttonPrimary.withOpacity(0.1)
-                        : null,
-                  ),
-                ),
-              ],
+                filled: true,
+                fillColor: AppColors.inputBorder.withOpacity(0.1),
+              ),
             ),
           ),
+          // Фильтры - Группы мышц
+          if (_availableMuscleGroups.isNotEmpty)
+            Container(
+              height: 50,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: _availableMuscleGroups.map((muscleGroup) {
+                  final isSelected = _selectedMuscleGroups.contains(
+                    muscleGroup,
+                  );
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      label: Text(muscleGroup),
+                      selected: isSelected,
+                      onSelected: (selected) {
+                        _toggleMuscleGroupFilter(muscleGroup);
+                      },
+                      selectedColor: AppColors.buttonPrimary.withOpacity(0.3),
+                      checkmarkColor: AppColors.buttonPrimary,
+                      backgroundColor: AppColors.surface,
+                      side: BorderSide(
+                        color: isSelected
+                            ? const Color.fromARGB(255, 155, 155, 155)
+                            : AppColors.inputBorder,
+                        width: isSelected ? 2.0 : 1.0,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          // Фильтры - Оборудование
+          if (_availableEquipmentNames.isNotEmpty)
+            Container(
+              height: 50,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: _availableEquipmentNames.map((equipmentName) {
+                  final isSelected = _selectedEquipmentNames.contains(
+                    equipmentName,
+                  );
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      label: Text(equipmentName),
+                      selected: isSelected,
+                      onSelected: (selected) {
+                        _toggleEquipmentFilter(equipmentName);
+                      },
+                      selectedColor: AppColors.buttonPrimary.withOpacity(0.3),
+                      checkmarkColor: AppColors.buttonPrimary,
+                      backgroundColor: AppColors.surface,
+                      side: BorderSide(
+                        color: isSelected
+                            ? const Color.fromARGB(255, 155, 155, 155)
+                            : AppColors.inputBorder,
+                        width: isSelected ? 2.0 : 1.0,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
           // Content
           Expanded(
             child: isLoading
@@ -646,12 +774,23 @@ class _UserExerciseSelectorScreenState
                             ),
                             // Кнопка информации
                             Positioned(
-                              right: 8,
+                              right: 40,
                               top: 8,
                               child: IconButton(
                                 icon: const Icon(Icons.info_outline),
                                 onPressed: () => _showExerciseDetail(exercise),
                                 tooltip: 'Детали упражнения',
+                              ),
+                            ),
+                            // Кнопка избранного (сердечко)
+                            Positioned(
+                              right: 8,
+                              top: 8,
+                              child: _FavoriteButton(
+                                isFavorite: _getExerciseIsFavorite(exercise),
+                                onPressed: () async {
+                                  await _toggleFavorite(exercise);
+                                },
                               ),
                             ),
                             // Индикатор выбора
@@ -819,6 +958,70 @@ class _UserExerciseSelectorScreenState
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _FavoriteButton extends StatefulWidget {
+  final bool isFavorite;
+  final VoidCallback onPressed;
+
+  const _FavoriteButton({required this.isFavorite, required this.onPressed});
+
+  @override
+  State<_FavoriteButton> createState() => _FavoriteButtonState();
+}
+
+class _FavoriteButtonState extends State<_FavoriteButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.8,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleTap() {
+    _controller.forward().then((_) {
+      _controller.reverse();
+    });
+    widget.onPressed();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: _scaleAnimation,
+      child: IconButton(
+        icon: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: Icon(
+            widget.isFavorite ? Icons.favorite : Icons.favorite_border,
+            key: ValueKey<bool>(widget.isFavorite),
+            color: widget.isFavorite ? Colors.red : AppColors.textSecondary,
+            size: 24,
+          ),
+        ),
+        iconSize: 24,
+        onPressed: _handleTap,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
       ),
     );
   }

@@ -12,6 +12,7 @@ class TimerOverlayProvider extends ChangeNotifier {
   AnimationController? _controller;
   Timer? _timer; // Added for Timer
   bool _isBigTimerOpen = false;
+  String? _currentUserUuid; // Для отмены таймера на backend
 
   bool get isVisible => _isVisible;
   Offset get position => _position;
@@ -47,13 +48,12 @@ class TimerOverlayProvider extends ChangeNotifier {
       _position = startPosition;
     }
 
-    // Планируем уведомление сразу при запуске таймера
-    // Оно сработает даже если приложение будет закрыто
-    print('⏱️ TimerOverlayProvider: Планирование уведомления...');
-    _scheduleNotification(seconds);
-
-    // НОВОЕ: Планируем уведомление на backend через FCM (более надежно!)
-    if (userUuid != null && exerciseUuid != null && exerciseName != null) {
+    // Если есть данные пользователя и упражнения — используем backend (FCM)
+    // и не планируем локальное уведомление, чтобы не было дублирования
+    if (userUuid != null && userUuid.isNotEmpty &&
+        exerciseUuid != null && exerciseUuid.isNotEmpty &&
+        exerciseName != null && exerciseName.isNotEmpty) {
+      _currentUserUuid = userUuid;
       print(
         '⏱️ TimerOverlayProvider: Планирование таймера на backend через FCM...',
       );
@@ -63,6 +63,10 @@ class TimerOverlayProvider extends ChangeNotifier {
         exerciseName: exerciseName,
         durationSeconds: seconds,
       );
+    } else {
+      // Иначе используем только локальное уведомление
+      print('⏱️ TimerOverlayProvider: Планирование ЛОКАЛЬНОГО уведомления...');
+      _scheduleNotification(seconds);
     }
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -86,14 +90,18 @@ class TimerOverlayProvider extends ChangeNotifier {
     _timer = null;
     _controller?.dispose();
     _controller = null;
-    // Отменяем запланированное уведомление, если таймер скрыли до завершения
-    print('⏱️ TimerOverlayProvider: Отмена запланированного уведомления...');
+    // Отменяем запланированное локальное уведомление, если таймер скрыли до завершения
+    print('⏱️ TimerOverlayProvider: Отмена ЗАПЛАНИРОВАННОГО локального уведомления...');
     _cancelScheduledNotification();
 
-    // Отменяем на backend тоже
-    if (userUuid != null && userUuid.isNotEmpty) {
-      _cancelNotificationOnBackend(userUuid);
+    // Отменяем на backend тоже (используем переданный userUuid или последний сохранённый)
+    final cancelUuid = (userUuid != null && userUuid.isNotEmpty)
+        ? userUuid
+        : _currentUserUuid;
+    if (cancelUuid != null && cancelUuid.isNotEmpty) {
+      _cancelNotificationOnBackend(cancelUuid);
     }
+    _currentUserUuid = null;
 
     notifyListeners();
   }
@@ -167,7 +175,18 @@ class TimerOverlayProvider extends ChangeNotifier {
       print(
         '⏱️ TimerOverlayProvider: ⚠️ Не удалось запланировать на backend: $e',
       );
-      // Не критично - локальное уведомление все равно сработает
+      // Фолбэк: если backend не смог запланировать, ставим локальное уведомление,
+      // чтобы пользователь всё равно получил одно оповещение
+      try {
+        print(
+          '⏱️ TimerOverlayProvider: Планирование ЛОКАЛЬНОГО уведомления как фолбэк...',
+        );
+        await _scheduleNotification(durationSeconds);
+      } catch (e2) {
+        print(
+          '⏱️ TimerOverlayProvider: ❌ Ошибка при фолбэке локального уведомления: $e2',
+        );
+      }
     }
   }
 

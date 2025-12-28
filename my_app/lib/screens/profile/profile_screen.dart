@@ -14,7 +14,9 @@ import 'auth_screen.dart';
 import '../subscription/subscription_plans_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final bool isPaymentVisible;
+
+  const ProfileScreen({super.key, this.isPaymentVisible = true});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -22,6 +24,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _isRefreshing = false;
+  bool _isDeletingProfile = false;
 
   @override
   void initState() {
@@ -51,6 +54,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         centerTitle: true,
         elevation: 0,
+        actions: [
+          PopupMenuButton<_ProfileMenuAction>(
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            color: const Color(0xFF2A2A2A),
+            onSelected: (action) {
+              switch (action) {
+                case _ProfileMenuAction.deleteProfile:
+                  _confirmDeleteProfile();
+                  break;
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: _ProfileMenuAction.deleteProfile,
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_forever, color: Colors.red),
+                    SizedBox(width: 12),
+                    Text(
+                      'Удалить профиль',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: Consumer<AuthProvider>(
         builder: (context, authProvider, child) {
@@ -219,49 +250,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 32),
 
-                  // Подписка
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2A2A2A),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Подписка',
+                  // Подписка (показываем весь блок в зависимости от isPaymentVisible)
+                  if (widget.isPaymentVisible)
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2A2A2A),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Подписка',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              _buildSubscriptionStatus(
+                                userProfile.subscriptionStatus,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (userProfile.subscriptionUntil != null) ...[
+                            Text(
+                              'Истекает: ${_formatDate(userProfile.subscriptionUntil!)}',
                               style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                                color: Colors.grey[400],
+                                fontSize: 14,
                               ),
                             ),
-                            _buildSubscriptionStatus(
-                              userProfile.subscriptionStatus,
-                            ),
+                            const SizedBox(height: 12),
                           ],
-                        ),
-                        const SizedBox(height: 8),
-                        if (userProfile.subscriptionUntil != null) ...[
-                          Text(
-                            'Истекает: ${_formatDate(userProfile.subscriptionUntil!)}',
-                            style: TextStyle(
-                              color: Colors.grey[400],
-                              fontSize: 14,
-                            ),
+                          _buildSubscriptionButton(
+                            userProfile.subscriptionStatus,
                           ),
-                          const SizedBox(height: 12),
                         ],
-                        _buildSubscriptionButton(
-                          userProfile.subscriptionStatus,
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
                   const SizedBox(height: 20),
 
                   // Кнопка "Мой профиль" с увеличенной высотой
@@ -613,4 +645,97 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+
+  Future<void> _confirmDeleteProfile() async {
+    if (_isDeletingProfile) return;
+
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF2A2A2A),
+        title: const Text(
+          'Удалить профиль?',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'Это действие нельзя отменить. Все данные будут удалены без возможности восстановления.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete == true) {
+      await _deleteProfile();
+    }
+  }
+
+  Future<void> _deleteProfile() async {
+    if (_isDeletingProfile) return;
+
+    setState(() {
+      _isDeletingProfile = true;
+    });
+
+    try {
+      final response = await ApiService.delete('/auth/me/');
+      if (!mounted) return;
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        await authProvider.logout();
+
+        if (!mounted) return;
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AuthScreen()),
+          (route) => false,
+        );
+      } else {
+        final message =
+            _extractErrorMessage(response.body) ??
+            'Не удалось удалить профиль. Попробуйте позже.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ошибка удаления профиля: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDeletingProfile = false;
+        });
+      }
+    }
+  }
+
+  String? _extractErrorMessage(String body) {
+    try {
+      final data = ApiService.decodeJson(body);
+      if (data is Map && data['detail'] != null) {
+        return data['detail'].toString();
+      }
+    } catch (_) {
+      // Игнорируем ошибки парсинга
+    }
+    return null;
+  }
 }
+
+enum _ProfileMenuAction { deleteProfile }

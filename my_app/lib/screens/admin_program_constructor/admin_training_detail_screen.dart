@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
 import '../../constants/app_colors.dart';
-import '../../services/program_service.dart';
 import '../../widgets/custom_button.dart';
 import 'admin_training_edit_screen.dart';
 import '../../services/api_service.dart';
@@ -43,6 +42,7 @@ class _AdminTrainingDetailScreenState extends State<AdminTrainingDetailScreen> {
   }
 
   Future<void> _loadTrainingData() async {
+    if (!mounted) return;
     setState(() {
       isLoading = true;
     });
@@ -52,33 +52,42 @@ class _AdminTrainingDetailScreenState extends State<AdminTrainingDetailScreen> {
         '/trainings/${widget.trainingUuid}',
       );
 
+      if (!mounted) return;
       if (response.statusCode == 200) {
         final data = ApiService.decodeJson(response.body);
+        if (!mounted) return;
         setState(() {
           trainingData = data;
           isLoading = false;
         });
         _loadExerciseGroups();
       } else {
+        if (!mounted) return;
         setState(() {
           isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка загрузки:  {response.statusCode}')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Ошибка загрузки:  {response.statusCode}')),
+          );
+        }
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         isLoading = false;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      }
     }
   }
 
   Future<void> _loadExerciseGroups() async {
     if (trainingData == null) return;
+    if (!mounted) return;
     setState(() {
       isLoadingGroups = true;
     });
@@ -87,20 +96,24 @@ class _AdminTrainingDetailScreenState extends State<AdminTrainingDetailScreen> {
         '/exercise-groups/',
         queryParams: {'training_uuid': trainingData!['uuid']},
       );
+      if (!mounted) return;
       if (resp.statusCode == 200) {
         final data = ApiService.decodeJson(resp.body);
         if (data is List) {
+          if (!mounted) return;
           setState(() {
             exerciseGroups = List<Map<String, dynamic>>.from(data);
             isLoadingGroups = false;
           });
         }
       } else {
+        if (!mounted) return;
         setState(() {
           isLoadingGroups = false;
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         isLoadingGroups = false;
       });
@@ -145,6 +158,7 @@ class _AdminTrainingDetailScreenState extends State<AdminTrainingDetailScreen> {
 
     if (confirm != true) return;
 
+    if (!mounted) return;
     setState(() {
       isDeleting = true;
     });
@@ -154,23 +168,30 @@ class _AdminTrainingDetailScreenState extends State<AdminTrainingDetailScreen> {
         '/trainings/delete/${widget.trainingUuid}',
       );
 
+      if (!mounted) return;
       if (response.statusCode >= 200 && response.statusCode < 300) {
         if (mounted) {
           Navigator.of(context).pop(true);
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка удаления: ${response.statusCode}')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Ошибка удаления: ${response.statusCode}')),
+          );
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      }
     } finally {
-      setState(() {
-        isDeleting = false;
-      });
+      if (mounted) {
+        setState(() {
+          isDeleting = false;
+        });
+      }
     }
   }
 
@@ -281,78 +302,77 @@ class _AdminTrainingDetailScreenState extends State<AdminTrainingDetailScreen> {
                 ),
               ],
             ),
-            isLoadingGroups
-                ? const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                : exerciseGroups.isEmpty
-                ? const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text('Нет групп упражнений'),
-                  )
-                : ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: exerciseGroups.length,
-                    separatorBuilder: (_, __) => const Divider(),
-                    itemBuilder: (context, idx) {
-                      final group = exerciseGroups[idx];
-                      return ListTile(
-                        leading: FutureBuilder<ImageProvider?>(
-                          future: _loadExerciseGroupImage(_getImageUuid(group)),
-                          builder: (context, snapshot) {
-                            final image = snapshot.data;
-                            return Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[800],
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: Colors.grey[700]!,
-                                  width: 1,
-                                ),
-                                image: image != null
-                                    ? DecorationImage(
-                                        image: image,
-                                        fit: BoxFit.cover,
-                                        colorFilter: ColorFilter.mode(
-                                          Colors.black.withOpacity(0.5),
-                                          BlendMode.darken,
-                                        ),
-                                      )
-                                    : null,
+            const SizedBox(height: 8),
+            Expanded(
+              child: isLoadingGroups
+                  ? const Center(
+                      child: CircularProgressIndicator(),
+                    )
+                  : exerciseGroups.isEmpty
+                      ? const Center(
+                          child: Text('Нет групп упражнений'),
+                        )
+                      : ListView.separated(
+                          itemCount: exerciseGroups.length,
+                          separatorBuilder: (_, __) => const Divider(),
+                          itemBuilder: (context, idx) {
+                            final group = exerciseGroups[idx];
+                            return ListTile(
+                              leading: FutureBuilder<ImageProvider?>(
+                                future:
+                                    _loadExerciseGroupImage(_getImageUuid(group)),
+                                builder: (context, snapshot) {
+                                  final image = snapshot.data;
+                                  return Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[800],
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: Colors.grey[700]!,
+                                        width: 1,
+                                      ),
+                                      image: image != null
+                                          ? DecorationImage(
+                                              image: image,
+                                              fit: BoxFit.cover,
+                                              colorFilter: ColorFilter.mode(
+                                                Colors.black.withOpacity(0.5),
+                                                BlendMode.darken,
+                                              ),
+                                            )
+                                          : null,
+                                    ),
+                                    child: image == null
+                                        ? const Icon(
+                                            Icons.image,
+                                            color: Colors.grey,
+                                            size: 24,
+                                          )
+                                        : null,
+                                  );
+                                },
                               ),
-                              child: image == null
-                                  ? const Icon(
-                                      Icons.image,
-                                      color: Colors.grey,
-                                      size: 24,
-                                    )
-                                  : null,
+                              title: Text(group['caption'] ?? ''),
+                              subtitle: Text(
+                                'Порядок: ${group['order'] ?? '-'}, Мышцы: ${group['muscle_group'] ?? '-'}',
+                              ),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        AdminExerciseGroupDetailScreen(
+                                      exerciseGroupUuid: group['uuid'],
+                                    ),
+                                  ),
+                                );
+                              },
                             );
                           },
                         ),
-                        title: Text(group['caption'] ?? ''),
-                        subtitle: Text(
-                          'Порядок: ${group['order'] ?? '-'}, Мышцы: ${group['muscle_group'] ?? '-'}',
-                        ),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  AdminExerciseGroupDetailScreen(
-                                    exerciseGroupUuid: group['uuid'],
-                                  ),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-            const Spacer(),
+            ),
             CustomButton(text: 'Редактировать', onPressed: _editTraining),
             const SizedBox(height: 8),
             CustomButton(

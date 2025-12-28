@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../services/api_service.dart';
 import '../../widgets/gif_widget.dart';
+import '../../widgets/video_player_widget.dart';
 import 'admin_exercise_reference_edit_screen.dart';
 
 class AdminExerciseReferenceDetailScreen extends StatefulWidget {
@@ -277,8 +278,18 @@ class _AdminExerciseReferenceDetailScreenState
                     Text(exercise!['technique_description']),
                   ],
                   const SizedBox(height: 24),
-                  // Гифка (отображаем только если есть gif_uuid)
-                  if (exercise!['gif_uuid'] != null) ...[
+                  // Медиа: приоритет видео, затем гифка
+                  if (exercise!['video_uuid'] != null) ...[
+                    VideoPlayerWidget(
+                      videoUuid: exercise!['video_uuid'],
+                      imageUuid: exercise!['image_uuid'],
+                      height: 250,
+                      width: double.infinity,
+                      showControls: true,
+                      autoInitialize: true,
+                    ),
+                    const SizedBox(height: 24),
+                  ] else if (exercise!['gif_uuid'] != null) ...[
                     GifWidget(gifUuid: exercise!['gif_uuid'], height: 250),
                     const SizedBox(height: 24),
                   ],

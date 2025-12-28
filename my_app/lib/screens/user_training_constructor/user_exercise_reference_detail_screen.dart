@@ -3,6 +3,7 @@ import '../../constants/app_colors.dart';
 import '../../services/api_service.dart';
 import '../../models/search_result_model.dart' as search_models;
 import '../../widgets/gif_widget.dart';
+import '../../widgets/video_player_widget.dart';
 import 'user_exercise_reference_edit_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -529,29 +530,57 @@ class _UserExerciseReferenceDetailScreenState
               const SizedBox(height: 24),
             ],
 
-            // Гифка (только для системных упражнений)
+            // Медиа (с приоритетом видео) только для системных упражнений
             if (exercise.exerciseType == 'system')
               Builder(
                 builder: (context) {
+                  String? videoUuid;
                   String? gifUuid;
-                  final dynamic gif = exercise.gif;
+                  String? imageUuid;
 
-                  // API может возвращать gif_uuid как строку или как объект
+                  final dynamic video = exercise.video;
+                  final dynamic gif = exercise.gif;
+                  final dynamic image = exercise.image;
+
+                  // Извлекаем UUID видео/гиф/изображения (API может возвращать строку или объект)
+                  if (video is String && video.isNotEmpty) {
+                    videoUuid = video;
+                  } else if (video is Map<String, dynamic>) {
+                    videoUuid = video['uuid'] as String?;
+                  }
+
                   if (gif is String && gif.isNotEmpty) {
                     gifUuid = gif;
                   } else if (gif is Map<String, dynamic>) {
                     gifUuid = gif['uuid'] as String?;
                   }
 
-                  if (gifUuid == null || gifUuid.isEmpty) {
-                    return const SizedBox.shrink();
+                  if (image is String && image.isNotEmpty) {
+                    imageUuid = image;
+                  } else if (image is Map<String, dynamic>) {
+                    imageUuid = image['uuid'] as String?;
                   }
 
-                  return GifWidget(
-                    gifUuid: gifUuid,
-                    height: 250,
-                    width: double.infinity,
-                  );
+                  if (videoUuid != null && videoUuid.isNotEmpty) {
+                    return VideoPlayerWidget(
+                      videoUuid: videoUuid,
+                      imageUuid: imageUuid,
+                      height: 250,
+                      width: double.infinity,
+                      showControls: true,
+                      autoInitialize: true,
+                    );
+                  }
+
+                  if (gifUuid != null && gifUuid.isNotEmpty) {
+                    return GifWidget(
+                      gifUuid: gifUuid,
+                      height: 250,
+                      width: double.infinity,
+                    );
+                  }
+
+                  return const SizedBox.shrink();
                 },
               ),
             const SizedBox(height: 24),

@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../user_training_constructor/user_exercise_selector_screen.dart';
 import 'free_workout_exercise_group_screen.dart';
 import '../../widgets/gif_widget.dart';
+// import '../../widgets/video_player_widget.dart';
 
 class FreeWorkoutScreen extends StatefulWidget {
   final String userTrainingUuid;
@@ -150,7 +151,7 @@ class _FreeWorkoutScreenState extends State<FreeWorkoutScreen> {
       return const SizedBox(width: 60, height: 60);
     }
 
-    // Проверяем сначала gif_uuid
+    // Приоритет: гиф -> изображение (видео не показываем на списке)
     final gifUuid = ref['gif_uuid'];
     if (gifUuid != null) {
       return ClipRRect(

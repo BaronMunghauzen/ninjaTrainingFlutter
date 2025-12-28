@@ -43,163 +43,43 @@ class _TrainingScreenState extends State<TrainingScreen> {
   // Счетчик для принудительного обновления SystemTrainingListWidget
   int _systemTrainingRefreshCounter = 0;
 
-  // Состояние для свободной тренировки
-  bool _isCheckingFreeTraining = true;
-  Map<String, dynamic>? _activeFreeTraining;
+  // Свободная тренировка: активная
+  Map<String, dynamic>?
+  _activeFreeUserTraining; // { user_training_uuid, training_uuid }
+
+  Future<void> _loadActiveFreeTraining() async {
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final userUuid = authProvider.userUuid;
+      if (userUuid == null) return;
+      final resp = await ApiService.get(
+        '/user_trainings/active/userFree/$userUuid',
+      );
+      if (resp.statusCode == 200) {
+        final data = ApiService.decodeJson(resp.body);
+        if (data is List && data.isNotEmpty) {
+          final first = data[0];
+          final training = first['training'] as Map<String, dynamic>?;
+          setState(() {
+            _activeFreeUserTraining = {
+              'user_training_uuid': first['uuid'],
+              'training_uuid': training != null ? training['uuid'] : null,
+            };
+          });
+        } else {
+          setState(() {
+            _activeFreeUserTraining = null;
+          });
+        }
+      }
+    } catch (_) {}
+  }
 
   @override
   void initState() {
     super.initState();
     _loadPrograms();
-    _checkActiveFreeTraining();
-  }
-
-  Future<void> _checkActiveFreeTraining() async {
-    try {
-      final authProvider = context.read<AuthProvider>();
-      final userUuid = authProvider.userUuid;
-
-      if (userUuid == null) {
-        setState(() => _isCheckingFreeTraining = false);
-        return;
-      }
-
-      final response = await ApiService.get(
-        '/user_trainings/active/userFree/$userUuid',
-      );
-
-      if (response.statusCode == 200) {
-        final data = ApiService.decodeJson(response.body);
-        final List trainings = data ?? [];
-
-        setState(() {
-          _activeFreeTraining = trainings.isNotEmpty ? trainings[0] : null;
-          _isCheckingFreeTraining = false;
-        });
-      } else {
-        setState(() => _isCheckingFreeTraining = false);
-      }
-    } catch (e) {
-      print('Error checking active free training: $e');
-      setState(() => _isCheckingFreeTraining = false);
-    }
-  }
-
-  Future<void> _startNewFreeTraining() async {
-    // Показываем модалку для ввода названия
-    final name = await showDialog<String>(
-      context: context,
-      builder: (context) => const FreeTrainingNameModal(),
-    );
-
-    if (name == null || name.isEmpty) return;
-
-    try {
-      final authProvider = context.read<AuthProvider>();
-      final userUuid = authProvider.userUuid;
-
-      if (userUuid == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ошибка: не найден userUuid')),
-        );
-        return;
-      }
-
-      // Запрос 1: POST /trainings/add/
-      final trainingResponse = await ApiService.post(
-        '/trainings/add/',
-        body: {
-          'training_type': 'userFree',
-          'user_uuid': userUuid,
-          'caption': name,
-          'description': 'Свободная тренировка',
-          'difficulty_level': 1,
-          'duration': 1,
-          'order': 0,
-          'muscle_group': 'Свободная тренировка',
-          'stage': 0,
-          'actual': true,
-        },
-      );
-
-      if (trainingResponse.statusCode != 200) {
-        throw Exception('Failed to create training');
-      }
-
-      final trainingData = ApiService.decodeJson(trainingResponse.body);
-      final trainingUuid = trainingData['uuid'];
-
-      // Запрос 2: POST /user_trainings/add/
-      final userTrainingResponse = await ApiService.post(
-        '/user_trainings/add/',
-        body: {
-          'training_uuid': trainingUuid,
-          'user_uuid': userUuid,
-          'training_date': DateTime.now().toIso8601String().split('T')[0],
-          'status': 'ACTIVE',
-          'is_rest_day': false,
-        },
-      );
-
-      if (userTrainingResponse.statusCode != 200) {
-        throw Exception('Failed to create user training');
-      }
-
-      final userTrainingData = ApiService.decodeJson(userTrainingResponse.body);
-      final userTrainingUuid = userTrainingData['uuid'];
-
-      // Переходим на экран свободной тренировки
-      if (mounted) {
-        final result = await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => FreeWorkoutScreen(
-              userTrainingUuid: userTrainingUuid,
-              trainingUuid: trainingUuid,
-            ),
-          ),
-        );
-
-        if (result == true) {
-          // Обновляем после завершения тренировки
-          _checkActiveFreeTraining();
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка создания тренировки: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _continueFreeTraining() async {
-    if (_activeFreeTraining == null) return;
-
-    final userTrainingUuid = _activeFreeTraining!['uuid'];
-    final trainingUuid = _activeFreeTraining!['training']?['uuid'];
-
-    if (userTrainingUuid == null || trainingUuid == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ошибка: не найдены данные тренировки')),
-      );
-      return;
-    }
-
-    // Переходим на экран свободной тренировки
-    final result = await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => FreeWorkoutScreen(
-          userTrainingUuid: userTrainingUuid,
-          trainingUuid: trainingUuid,
-        ),
-      ),
-    );
-
-    if (result == true) {
-      // Обновляем после завершения тренировки
-      _checkActiveFreeTraining();
-    }
+    _loadActiveFreeTraining();
   }
 
   Future<void> _loadPrograms() async {
@@ -500,10 +380,14 @@ class _TrainingScreenState extends State<TrainingScreen> {
       'uuid': training.uuid,
       'caption': training.caption,
       'description': training.description,
-      'difficulty_level': null, // Добавьте если есть в Training
-      'duration': null, // Добавьте если есть в Training
-      'muscle_group': null, // Добавьте если есть в Training
-      // Добавьте другие нужные поля из Training
+      'training_type': training.trainingType,
+      'difficulty_level':
+          null, // Поля могут отсутствовать в модели Training из search_result_model
+      'duration': null,
+      'muscle_group': null,
+      'image_uuid': training.image is Map
+          ? training.image['uuid']
+          : (training.image is String ? training.image : null),
     };
   }
 
@@ -515,6 +399,95 @@ class _TrainingScreenState extends State<TrainingScreen> {
         backgroundColor: Color(0xFF1F2121),
       ),
     );
+  }
+
+  Future<void> _startNewFreeTrainingFlow() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userUuid = authProvider.userUuid;
+    if (userUuid == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ошибка: не найден userUuid')),
+      );
+      return;
+    }
+    // Запрашиваем название
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => const FreeTrainingNameModal(),
+    );
+    if (name == null || name.trim().isEmpty) return;
+
+    try {
+      // Запрос 1: создать training
+      final body1 = {
+        'training_type': 'userFree',
+        'user_uuid': userUuid,
+        'caption': name.trim(),
+        'description': 'Свободная тренировка',
+        'difficulty_level': 1,
+        'duration': 1,
+        'order': 0,
+        'muscle_group': 'Свободная тренировка',
+        'stage': 0,
+        'actual': true,
+      };
+      final resp1 = await ApiService.post('/trainings/add/', body: body1);
+      if (resp1.statusCode != 200)
+        throw Exception('Не удалось создать тренировку');
+      final tr = ApiService.decodeJson(resp1.body);
+      final trainingUuid = tr['uuid'];
+
+      // Запрос 2: создать user_training
+      final today = DateTime.now().toIso8601String().split('T')[0];
+      final body2 = {
+        'training_uuid': trainingUuid,
+        'user_uuid': userUuid,
+        'training_date': today,
+        'status': 'ACTIVE',
+        'is_rest_day': false,
+      };
+      final resp2 = await ApiService.post('/user_trainings/add/', body: body2);
+      if (resp2.statusCode != 200)
+        throw Exception('Не удалось создать user_training');
+      final ut = ApiService.decodeJson(resp2.body);
+      final userTrainingUuid = ut['uuid'];
+
+      // Открываем экран свободной тренировки
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => FreeWorkoutScreen(
+            userTrainingUuid: userTrainingUuid,
+            trainingUuid: trainingUuid,
+          ),
+        ),
+      );
+
+      // Обновляем состояние кнопки
+      _loadActiveFreeTraining();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Ошибка создания тренировки: $e')));
+    }
+  }
+
+  Future<void> _continueFreeTrainingFlow() async {
+    final data = _activeFreeUserTraining;
+    if (data == null) return;
+    final userTrainingUuid = data['user_training_uuid'];
+    final trainingUuid = data['training_uuid'];
+    if (userTrainingUuid == null || trainingUuid == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => FreeWorkoutScreen(
+          userTrainingUuid: userTrainingUuid,
+          trainingUuid: trainingUuid,
+        ),
+      ),
+    );
+    _loadActiveFreeTraining();
   }
 
   Widget _buildSearchSection(String title, List<dynamic> items, String type) {
@@ -974,9 +947,48 @@ class _TrainingScreenState extends State<TrainingScreen> {
                               });
                             },
                           ),
-                          // Добавляем отступ снизу для кнопок свободной тренировки
-                          const SizedBox(height: 80),
                         ],
+                      ),
+                    ),
+                  ),
+                  // Плавающая кнопка свободной тренировки над контентом
+                  Positioned(
+                    left: 24,
+                    right: 24,
+                    bottom: 24,
+                    child: SafeArea(
+                      top: false,
+                      child: Builder(
+                        builder: (context) {
+                          final hasActive = _activeFreeUserTraining != null;
+                          return ElevatedButton(
+                            onPressed: () async {
+                              if (hasActive) {
+                                await _continueFreeTrainingFlow();
+                              } else {
+                                await _startNewFreeTrainingFlow();
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.buttonPrimary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 6,
+                            ),
+                            child: Text(
+                              hasActive
+                                  ? 'Продолжить свободную тренировку'
+                                  : 'Начать свободную тренировку',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -1077,53 +1089,6 @@ class _TrainingScreenState extends State<TrainingScreen> {
                       ),
                     ),
                   ],
-                  // Кнопки свободной тренировки - всегда внизу экрана
-                  if (!_isCheckingFreeTraining)
-                    Positioned(
-                      left: 24,
-                      right: 24,
-                      bottom:
-                          10, // Близко к нижнему краю (безопасно - SafeArea активен)
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 10,
-                              offset: const Offset(0, -2),
-                            ),
-                          ],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: ElevatedButton(
-                          onPressed: _activeFreeTraining == null
-                              ? _startNewFreeTraining
-                              : _continueFreeTraining,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.buttonPrimary,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 16,
-                              horizontal: 24,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: Text(
-                            _activeFreeTraining == null
-                                ? 'Начать новую тренировку'
-                                : 'Продолжить свободную тренировку',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
                 ],
               ),
             ),

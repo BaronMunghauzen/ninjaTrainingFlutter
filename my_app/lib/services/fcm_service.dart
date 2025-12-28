@@ -1,7 +1,12 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'notification_service.dart';
+import '../models/user_achievement_type_model.dart';
+import '../services/user_achievement_service.dart';
+import '../constants/app_colors.dart';
+import '../main.dart';
 
 /// Обработчик фоновых сообщений FCM
 /// Должен быть функцией верхнего уровня (не в классе!)
@@ -158,14 +163,35 @@ class FCMService {
       print('🔥 FCM Foreground: Получено сообщение');
       print('🔥 FCM Foreground: Title: ${message.notification?.title}');
       print('🔥 FCM Foreground: Body: ${message.notification?.body}');
+      print('🔥 FCM Foreground: Data: ${message.data}');
 
-      // Показываем локальное уведомление когда приложение открыто
+      // Получаем title и body из сообщения
+      final title = message.notification?.title ?? '';
+      final body = message.notification?.body ?? '';
+
+      // Генерируем уникальный ID для уведомления
+      // Для достижений используем achievement_uuid, для других - timestamp
+      int? notificationId;
+      if (message.data.containsKey('achievement_uuid')) {
+        // Используем хэш от UUID достижения для уникального ID
+        notificationId = message.data['achievement_uuid'].toString().hashCode.abs() % 2147483647;
+      } else {
+        // Для других уведомлений используем timestamp
+        notificationId = DateTime.now().millisecondsSinceEpoch % 2147483647;
+      }
+
+      // Извлекаем achievement_uuid если есть
+      final achievementUuid = message.data.containsKey('achievement_uuid')
+          ? message.data['achievement_uuid'] as String?
+          : null;
+
+      // Для всех уведомлений показываем локальное уведомление с правильным текстом из FCM
       // FCM не показывает уведомления в foreground автоматически
       await NotificationService.showFCMNotification(
-        title: message.notification?.title ?? 'Время отдыха закончилось!',
-        body:
-            message.notification?.body ??
-            'Можете приступать к следующему подходу',
+        title: title.isNotEmpty ? title : 'Время отдыха закончилось',
+        body: body.isNotEmpty ? body : 'Можете приступать к следующему подходу',
+        notificationId: notificationId,
+        achievementUuid: achievementUuid,
       );
     });
 
@@ -174,8 +200,7 @@ class FCMService {
       print('🔥 FCM: Пользователь открыл приложение через уведомление');
       print('🔥 FCM: Data: ${message.data}');
 
-      // Здесь можно добавить навигацию к нужному экрану
-      // Например, если в data есть exercise_uuid - открыть это упражнение
+      _handleNotificationTap(message);
     });
 
     // Проверяем, было ли приложение открыто через уведомление
@@ -183,6 +208,7 @@ class FCMService {
       if (message != null) {
         print('🔥 FCM: Приложение запущено через уведомление');
         print('🔥 FCM: Data: ${message.data}');
+        _handleNotificationTap(message);
       }
     });
   }
@@ -257,5 +283,176 @@ class FCMService {
     } catch (e) {
       print('🔥 FCM: ❌ Ошибка отправки тестового уведомления: $e');
     }
+  }
+
+  /// Обработка нажатия на уведомление о достижении (публичный метод для NotificationService)
+  static Future<void> handleAchievementTap(String achievementUuid) async {
+    print('🔥 FCM: Открытие достижения: $achievementUuid');
+    
+    // Получаем user_uuid из SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    final userUuid = prefs.getString('user_uuid');
+    
+    if (userUuid == null || userUuid.isEmpty) {
+      print('🔥 FCM: ⚠️ User UUID не найден');
+      return;
+    }
+    
+    // Загружаем информацию о достижении
+    try {
+      final achievements = await UserAchievementService.getUserAchievements(userUuid);
+      final achievement = achievements.firstWhere(
+        (a) => a.uuid == achievementUuid,
+        orElse: () => throw Exception('Achievement not found'),
+      );
+      
+      // Открываем модальное окно с достижением
+      final context = navigatorKey.currentContext;
+      if (context != null && context.mounted) {
+        _showAchievementModal(context, achievement);
+      }
+    } catch (e) {
+      print('🔥 FCM: ❌ Ошибка загрузки достижения: $e');
+    }
+  }
+
+  /// Обработка нажатия на уведомление
+  static Future<void> _handleNotificationTap(RemoteMessage message) async {
+    final data = message.data;
+    
+    // Проверяем, есть ли achievement_uuid в данных
+    if (data.containsKey('achievement_uuid')) {
+      final achievementUuid = data['achievement_uuid'] as String;
+      await handleAchievementTap(achievementUuid);
+    }
+  }
+
+  /// Показать модальное окно с достижением
+  static void _showAchievementModal(
+    BuildContext context,
+    UserAchievementType achievement,
+  ) {
+    // Находим экран достижений или открываем его
+    // Сначала пытаемся открыть модальное окно на текущем экране
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _buildAchievementDetailModal(context, achievement),
+    );
+  }
+
+  /// Построить модальное окно с деталями достижения
+  static Widget _buildAchievementDetailModal(
+    BuildContext context,
+    UserAchievementType achievement,
+  ) {
+    final isEarned = achievement.isEarned;
+    
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Картинка или знак вопроса
+          if (isEarned && achievement.imageUuid != null && achievement.imageUuid!.isNotEmpty)
+            FutureBuilder<ImageProvider?>(
+              future: ApiService.getImageProvider(achievement.imageUuid!),
+              builder: (context, snapshot) {
+                if (snapshot.hasData && snapshot.data != null) {
+                  return Container(
+                    width: 150,
+                    height: 150,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image(
+                        image: snapshot.data!,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  );
+                }
+                return _buildQuestionMark(size: 100);
+              },
+            )
+          else
+            _buildQuestionMark(size: 100),
+          const SizedBox(height: 24),
+          // Название
+          Text(
+            achievement.name,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          // Описание
+          Text(
+            achievement.description,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 16,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          // Очки
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.buttonPrimary.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.stars,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '+ ${achievement.points}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  static Widget _buildQuestionMark({double size = 80}) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: Colors.grey.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(size / 2),
+      ),
+      child: Icon(
+        Icons.help_outline,
+        size: size * 0.6,
+        color: Colors.grey,
+      ),
+    );
   }
 }

@@ -196,37 +196,26 @@ class _SystemTrainingDetailScreenState
                         ),
                         child: Column(
                           children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.fitness_center,
-                                  size: 20,
-                                  color: Colors.white,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Сложность: ${widget.training['difficulty_level'] ?? '-'}',
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.timer,
-                                  size: 20,
-                                  color: Colors.white,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Длительность: ${widget.training['duration'] ?? '-'} мин',
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                              ],
-                            ),
+                            // Показываем длительность только для system_training
+                            if (widget.training['training_type'] ==
+                                'system_training') ...[
+                              const SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.timer,
+                                    size: 20,
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Длительность: ${widget.training['duration'] ?? '-'} мин',
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                ],
+                              ),
+                            ],
                             const SizedBox(height: 12),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,

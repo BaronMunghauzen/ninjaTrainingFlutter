@@ -149,6 +149,7 @@ class ExerciseReference {
   final dynamic image; // Может быть строкой, Map или null
   final dynamic video; // Может быть строкой, Map или null
   final dynamic gif; // Может быть строкой, Map или null
+  final bool isFavorite; // Флаг избранного
 
   ExerciseReference({
     required this.exerciseType,
@@ -168,6 +169,7 @@ class ExerciseReference {
     this.image,
     this.video,
     this.gif,
+    this.isFavorite = false,
   });
 
   static int? _parseImageId(dynamic value) {
@@ -199,6 +201,7 @@ class ExerciseReference {
       image: json['image_uuid'] ?? json['image'],
       video: json['video_uuid'] ?? json['video'],
       gif: json['gif_uuid'],
+      isFavorite: json['is_favorite'] ?? false,
     );
   }
 }

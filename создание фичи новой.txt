@@ -1,0 +1,304 @@
+Да, первое что хочу сказать, это то что нельзя портить уже существующий функционал и как то его исправлять. Далее реализация:
+	1) Создай новую папку для этого. Все новые экраны будут реализовываться там
+	2) На главной странице (тренировки), надо добавить доп вызов бекенда - GET /user_trainings/active/userFree/{user_uuid},
+		Если в ответе пустой список, то внизу добавить кнопку в калссическом стиле приложения "Начать новую тренировку"
+		Если в ответе НЕ пустой список, то отображать кнопку "Продолжить свободную тренировку", по нажатию на которую переходить сразу к пункту 5, запросу №3 (training_uuid = значению [0].training.uuid из ответа на предыдущий запрос. Для получения user_training_id взять значение [0].uuid
+	3) По нажатии на кнопку "Начать новую тренировку" должна открываться модалка, с предложением ввести название тренировки, кнопками "отмена" и "Создать"
+	4) По кнопка отмена, модалка должна закрываться
+	5) По кнопке Создать на модалке, должны:
+		a) Отправляться запросы:
+			- (запрос 1) POST /trainings/add/ с body:
+				{
+				  "training_type": "userFree", - константа
+				  "user_uuid": "string", - ююид пользователя
+				  "caption": "string", - название тренировки из модалки на предыдущем шаге
+				  "description": "Свободная тренировка",  - константа
+				  "difficulty_level": 1, - константа
+				  "duration": 1, - константа
+				  "order": 0, - константа
+				  "muscle_group": "Свободная тренировка",  - константа
+				  "stage": 0, - константа
+				  "actual": true
+				}
+				В ответ будет получен uuid, его необходимо сохранить как training_uuid
+
+			- (запрос 2) POST /user_trainings/add/ с body:
+				{
+				  "training_uuid": "string", - training_uuid из ответа на предыдущий запрос
+				  "user_uuid": "string", - ююид пользователя
+				  "training_date": "2025-10-26", - текущая дата
+				  "status": "ACTIVE", - константа
+				  "is_rest_day": false - константа
+				}
+				В ответ будет получен uuid, его необходимо сохранить как user_training_uuid
+				
+			- (запрос 3) GET /exercise-groups/ с параметрами:
+				training_uuid 
+				Вот пример ответа, который может прийти:
+					[
+					  {
+						"uuid": "d89f7257-0577-4f78-922a-1e8764710a14",
+						"caption": "Отжимания",
+						"description": "Универсально развивают грудные, передние дельты и трицепсы, улучшают стабильность корпуса и базовую выносливость.",
+						"exercises": [
+						  "5a585aae-810f-4a7d-b0e2-916b55393767"
+						],
+						"difficulty_level": 1,
+						"order": 0,
+						"muscle_group": "Грудь",
+						"stage": 1,
+						"image_uuid": null,
+						"training": {
+						  "uuid": "203710c1-a2ef-476a-b799-c9d607349118",
+						  "training_type": "userFree",
+						  "caption": "Треня ног",
+						  "description": "Свободная тренировка",
+						  "difficulty_level": 1,
+						  "duration": 1,
+						  "order": 0,
+						  "muscle_group": "Свободная тренировка",
+						  "stage": 0,
+						  "image_uuid": null,
+						  "actual": true
+						}
+					  }
+					]
+					- (запрос 4) Как видно, в ответе, есть список exercises, в этом месте, всегда придет только один элемент в списке, поэтому надо по нему вызвать метод GET /exercises/{exercise_uuid}, и вот пример ответа на этот запрос:
+						{
+						  "uuid": "5a585aae-810f-4a7d-b0e2-916b55393767",
+						  "exercise_type": "userFree",
+						  "caption": "Отжимания",
+						  "description": null,
+						  "difficulty_level": 1,
+						  "order": 0,
+						  "muscle_group": "Грудь",
+						  "sets_count": null,
+						  "reps_count": null,
+						  "rest_time": null,
+						  "with_weight": null,
+						  "weight": null,
+						  "image_uuid": null,
+						  "video_uuid": null,
+						  "video_preview_uuid": null,
+						  "exercise_reference_uuid": "7090af6c-9d12-4b64-bd0a-a8af3e24c728",
+						  "user": {
+							"uuid": "01f2ca69-19ff-47b7-8641-f7096a69d883",
+							"login": "abram1",
+							"phone_number": null,
+							"first_name": "Михаил",
+							"middle_name": null,
+							"last_name": "Маглатов",
+							"gender": null,
+							"description": null,
+							"email": "maglatow@yandex.ru",
+							"password": "$2b$12$eJ7uBwHgK5HTw.hngT97x.b56JbkxyjYoE.C2ooD1N55OQthr4xMm",
+							"is_user": true,
+							"is_admin": true,
+							"subscription_status": "active",
+							"subscription_until": "2025-11-16",
+							"theme": "dark",
+							"avatar_uuid": "81ffd1dc-2ed6-42b0-a973-07b531d658e8",
+							"email_verified": true,
+							"email_verification_sent_at": "2025-10-13T18:56:58.195391",
+							"trial_used": true,
+							"trial_started_at": "2025-10-07T17:11:28.736316",
+							"fcm_token": "f4oaKaOtT6qWNzq8-RgrAq:APA91bFk5GcrQpIby5W570Xx0C4muoyM0WTA2xhRNyJwGPYchgWL_kdnVZRpF70HF1bvZv9cxuZ4Pe4ZJVtsDlYYO3lDJnwBtz6QeEYJ0Bj6khjxTqeXKxs"
+						  }
+						}
+						- (запрос 5) Из ответа надо вызвать GET /exercise_reference/{exercise_reference_uuid} передав exercise_reference_uuid из ответа на запрос. Вот пример ответа:
+							{
+							  "uuid": "7090af6c-9d12-4b64-bd0a-a8af3e24c728",
+							  "exercise_type": "system",
+							  "user_uuid": null,
+							  "caption": "Отжимания",
+							  "description": "Универсально развивают грудные, передние дельты и трицепсы, улучшают стабильность корпуса и базовую выносливость.",
+							  "technique_description": null,
+							  "muscle_group": "Грудь",
+							  "equipment_name": "Без оборудования",
+							  "auxiliary_muscle_groups": null,
+							  "image_uuid": null,
+							  "video_uuid": null,
+							  "gif_uuid": null,
+							  "created_at": "2025-08-16T19:17:44.218286",
+							  "updated_at": "2025-08-17T10:42:47.267554"
+							}
+							И сохранить, если есть image_uuid и gif_uuid, если есть
+						- (запрос 6) GET /user_exercises/ с передачей параметра exercise_uuid = uuid из ответа на запрос 4. Пример ответа:
+							[
+							  {
+								"uuid": "a1ff7fcc-dcc4-472d-b224-a2c038ab0514",
+								"training_date": "2025-10-27",
+								"status": "active",
+								"set_number": 1,
+								"weight": 0,
+								"reps": 0,
+								"program": null,
+								"training": {
+								  "uuid": "203710c1-a2ef-476a-b799-c9d607349118",
+								  "training_type": "userFree",
+								  "caption": "Треня ног",
+								  "description": "Свободная тренировка",
+								  "difficulty_level": 1,
+								  "duration": 1,
+								  "order": 0,
+								  "muscle_group": "Свободная тренировка",
+								  "stage": 0,
+								  "image_uuid": null,
+								  "actual": true
+								},
+								"user": {
+								  "uuid": "01f2ca69-19ff-47b7-8641-f7096a69d883",
+								  "login": "abram1",
+								  "phone_number": null,
+								  "first_name": "Михаил",
+								  "middle_name": null,
+								  "last_name": "Маглатов",
+								  "gender": null,
+								  "description": null,
+								  "email": "maglatow@yandex.ru",
+								  "password": "$2b$12$eJ7uBwHgK5HTw.hngT97x.b56JbkxyjYoE.C2ooD1N55OQthr4xMm",
+								  "is_user": true,
+								  "is_admin": true,
+								  "subscription_status": "active",
+								  "subscription_until": "2025-11-16",
+								  "theme": "dark",
+								  "avatar_uuid": "81ffd1dc-2ed6-42b0-a973-07b531d658e8",
+								  "email_verified": true,
+								  "email_verification_sent_at": "2025-10-13T18:56:58.195391",
+								  "trial_used": true,
+								  "trial_started_at": "2025-10-07T17:11:28.736316",
+								  "fcm_token": "f4oaKaOtT6qWNzq8-RgrAq:APA91bFk5GcrQpIby5W570Xx0C4muoyM0WTA2xhRNyJwGPYchgWL_kdnVZRpF70HF1bvZv9cxuZ4Pe4ZJVtsDlYYO3lDJnwBtz6QeEYJ0Bj6khjxTqeXKxs"
+								},
+								"exercise": {
+								  "uuid": "5a585aae-810f-4a7d-b0e2-916b55393767",
+								  "exercise_type": "userFree",
+								  "user_id": 25,
+								  "caption": "Отжимания",
+								  "description": null,
+								  "difficulty_level": 1,
+								  "order": 0,
+								  "muscle_group": "Грудь",
+								  "sets_count": null,
+								  "reps_count": null,
+								  "rest_time": null,
+								  "with_weight": null,
+								  "weight": null,
+								  "image_uuid": null,
+								  "video_uuid": null,
+								  "video_preview_uuid": null,
+								  "exercise_reference_uuid": "7090af6c-9d12-4b64-bd0a-a8af3e24c728"
+								}
+							  },
+							  {
+								"uuid": "3f3a461b-d9ec-42c6-8bc5-2bbd7dcfc66f",
+								"training_date": "2025-10-27",
+								"status": "active",
+								"set_number": 2,
+								"weight": null,
+								"reps": 3,
+								"program": null,
+								"training": {
+								  "uuid": "203710c1-a2ef-476a-b799-c9d607349118",
+								  "training_type": "userFree",
+								  "caption": "Треня ног",
+								  "description": "Свободная тренировка",
+								  "difficulty_level": 1,
+								  "duration": 1,
+								  "order": 0,
+								  "muscle_group": "Свободная тренировка",
+								  "stage": 0,
+								  "image_uuid": null,
+								  "actual": true
+								},
+								"user": {
+								  "uuid": "01f2ca69-19ff-47b7-8641-f7096a69d883",
+								  "login": "abram1",
+								  "phone_number": null,
+								  "first_name": "Михаил",
+								  "middle_name": null,
+								  "last_name": "Маглатов",
+								  "gender": null,
+								  "description": null,
+								  "email": "maglatow@yandex.ru",
+								  "password": "$2b$12$eJ7uBwHgK5HTw.hngT97x.b56JbkxyjYoE.C2ooD1N55OQthr4xMm",
+								  "is_user": true,
+								  "is_admin": true,
+								  "subscription_status": "active",
+								  "subscription_until": "2025-11-16",
+								  "theme": "dark",
+								  "avatar_uuid": "81ffd1dc-2ed6-42b0-a973-07b531d658e8",
+								  "email_verified": true,
+								  "email_verification_sent_at": "2025-10-13T18:56:58.195391",
+								  "trial_used": true,
+								  "trial_started_at": "2025-10-07T17:11:28.736316",
+								  "fcm_token": "f4oaKaOtT6qWNzq8-RgrAq:APA91bFk5GcrQpIby5W570Xx0C4muoyM0WTA2xhRNyJwGPYchgWL_kdnVZRpF70HF1bvZv9cxuZ4Pe4ZJVtsDlYYO3lDJnwBtz6QeEYJ0Bj6khjxTqeXKxs"
+								},
+								"exercise": {
+								  "uuid": "5a585aae-810f-4a7d-b0e2-916b55393767",
+								  "exercise_type": "userFree",
+								  "user_id": 25,
+								  "caption": "Отжимания",
+								  "description": null,
+								  "difficulty_level": 1,
+								  "order": 0,
+								  "muscle_group": "Грудь",
+								  "sets_count": null,
+								  "reps_count": null,
+								  "rest_time": null,
+								  "with_weight": null,
+								  "weight": null,
+								  "image_uuid": null,
+								  "video_uuid": null,
+								  "video_preview_uuid": null,
+								  "exercise_reference_uuid": "7090af6c-9d12-4b64-bd0a-a8af3e24c728"
+								}
+							  }
+							]
+							
+
+				
+
+		б) Открываться новая страница:
+			- есть кнопка "Назад" (возвращает назад на главный экран)
+			- внизу кнопка "Завершить" (по нажатии после вопроса подтверждения - вызывается POST /user_trainings/{user_training_uuid}/pass)
+			- Существующие упражнения если они есть - отображать из запросов №3, 4 и 5:
+				Отображать список групп упражнений:
+					Слева на каждом элементе отображать или гифку (gif_uuid) если есть, или картинку (image_uuid) если она есть, или ничего не отображать. Картинки надо загрузить и сохранить в кэщ в ключом uuid и в след разы не скачивать сразу, а брать из кэша.
+					Далее Название = caption из ответа на запрос 3
+					Под названием более темным шрифтом отображать информацию из запроса №6:
+						По каждой записи в списке (по каждому set_number) через запятую:
+							Если в ответе weight != null - отображать инфо как {weight}X{reps}, иначе - {reps}. 
+				Список упражнений кликабельный:
+					По нажатию на элемент открывается страница - копия страницы system_exercise_group_screen.dart в папке system_training, за исключением того, что нет 3 квадратиков с информацией о подходах, повторениях и секундах отдыха. Также в отличие от этой форма в нашей может быть пустая таблица user_exercise и тогда нужно под названиями столбцов отображать кнопку "добавить подход" (а сама кнопка должна отображаться всегда, даже если уже есть user_exercise). При нажатии на эту кнопку должна появляться строчка с подходом, в том числе заполняться ячейка "Предыдущий результат", повторения = 0 (но с возможностью ввести там значение - функционал аналогичный копии близнеца), а также кнопка для отметки о выполнении (методы апи все длжны вызываться аналогичные, но не должен появляться таймер. Вместо таймера надо отображать секундомер, который выглядит и работает точно также как таймер. Я имею ввиду, он точно также должен быть поверх всех окон, его можно двигать, его можно открыть чтоб открылась модалка, но различие в том что это именно секундомер,а не таймер (соответственно оповещения тоже не будет)
+			- Кнопка "Добавить упражнение":
+				по нажатии - переход на страницу user_exercise_selector_screen, и при выборе упражнения на этой странице (только старую логику не ломай, она должна работать так же как и работала - просто добавь новую логику-обработку события), должна сохраняться информация об exercise_reference, и должен происходить переход обратно и после этого вызываться запросы:
+					- POST /exercises/add/ с body:
+						{
+						  "exercise_type": "userFree", - константа
+						  "user_uuid": "string", - ююид пользователя
+						  "caption": "string", - caption из выбранного exercise_reference
+						  "difficulty_level": 1, - константа
+						  "order": 0, - константа
+						  "muscle_group": "string", - muscle_group из выбранного exercise_reference
+						  "exercise_reference_uuid": "string" - uuid из выбранного exercise_reference
+						}
+					Сохранить uuid из ответа на запрос 
+					
+					- POST /exercise-groups/add/ с body:
+						{
+						  "training_uuid": "string",  - training_uuid из ответа на запрос 1
+						  "caption": "string", - caption из выбранного exercise_reference
+						  "description": "string", - description из выбранного exercise_reference
+						  "exercises": [
+							"string" - uuid из предыдущего запроса 
+						  ],
+						  "difficulty_level": 1, - константа
+						  "order": 0, - константа
+						  "muscle_group": "string", - muscle_group из выбранного exercise_reference
+						  "stage": 1, - константа
+						}
+					Сохранить uuid из ответа на запрос 
+					
+				После вызова запросов, необходимо обновить список групп упражнений (запрос 3 - запрос 6)
+					
+					

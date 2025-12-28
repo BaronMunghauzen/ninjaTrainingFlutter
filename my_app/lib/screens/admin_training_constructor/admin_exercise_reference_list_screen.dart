@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../constants/app_colors.dart';
 import '../../services/api_service.dart';
 import '../../services/search_service.dart';
 import '../../widgets/gif_widget.dart';
 import '../../widgets/auth_image_widget.dart';
-import '../../widgets/exercise_filter_modal.dart';
 import 'admin_exercise_reference_create_screen.dart';
 import 'admin_exercise_reference_detail_screen.dart';
 
@@ -18,6 +18,7 @@ class AdminExerciseReferenceListScreen extends StatefulWidget {
 
 class _AdminExerciseReferenceListScreenState
     extends State<AdminExerciseReferenceListScreen> {
+  String? _activeVideoUuid;
   List<Map<String, dynamic>> exercises = [];
   List<dynamic> searchResults = [];
   bool isLoading = true;
@@ -29,6 +30,8 @@ class _AdminExerciseReferenceListScreenState
   // Фильтры
   List<String> _selectedMuscleGroups = [];
   List<String> _selectedEquipmentNames = [];
+  List<String> _availableMuscleGroups = [];
+  List<String> _availableEquipmentNames = [];
 
   // Пагинация
   int currentPage = 1;
@@ -40,6 +43,7 @@ class _AdminExerciseReferenceListScreenState
   @override
   void initState() {
     super.initState();
+    _loadFilters();
     _fetchExercises();
   }
 
@@ -74,7 +78,7 @@ class _AdminExerciseReferenceListScreenState
     }
   }
 
-  Future<Map<String, List<String>>> _loadFilters() async {
+  Future<void> _loadFilters() async {
     try {
       print('DEBUG: Admin - Loading filters...');
       final response = await ApiService.get(
@@ -84,18 +88,30 @@ class _AdminExerciseReferenceListScreenState
       if (response.statusCode == 200) {
         final data = ApiService.decodeJson(response.body);
         print('DEBUG: Admin - Filters data: $data');
-        final result = {
-          'muscle_groups': List<String>.from(data['muscle_groups'] ?? []),
-          'equipment_names': List<String>.from(data['equipment_names'] ?? []),
-        };
-        print('DEBUG: Admin - Parsed filters: $result');
-        return result;
+        setState(() {
+          _availableMuscleGroups = List<String>.from(
+            data['muscle_groups'] ?? [],
+          );
+          _availableEquipmentNames = List<String>.from(
+            data['equipment_names'] ?? [],
+          );
+        });
+        print(
+          'DEBUG: Admin - Loaded filters: muscle_groups=${_availableMuscleGroups.length}, equipment_names=${_availableEquipmentNames.length}',
+        );
+      } else {
+        print('DEBUG: Admin - Filters response not 200, returning empty');
+        setState(() {
+          _availableMuscleGroups = [];
+          _availableEquipmentNames = [];
+        });
       }
-      print('DEBUG: Admin - Filters response not 200, returning empty');
-      return {'muscle_groups': [], 'equipment_names': []};
     } catch (e) {
       print('Error loading filters: $e');
-      return {'muscle_groups': [], 'equipment_names': []};
+      setState(() {
+        _availableMuscleGroups = [];
+        _availableEquipmentNames = [];
+      });
     }
   }
 
@@ -182,9 +198,20 @@ class _AdminExerciseReferenceListScreenState
   }
 
   Widget _buildExerciseMedia(dynamic exercise) {
-    // Приоритет: сначала гифка, потом картинка
+    // Приоритет: видео -> гиф -> картинка
+    String? videoUuid;
     String? gifUuid;
     String? imageUuid;
+
+    // Извлекаем UUID видео
+    final dynamic video = hasSearched ? exercise.video : exercise['video_uuid'];
+    if (video != null) {
+      if (video is String && video.isNotEmpty) {
+        videoUuid = video;
+      } else if (video is Map<String, dynamic>) {
+        videoUuid = video['uuid'] as String?;
+      }
+    }
 
     // Извлекаем UUID гифки
     final dynamic gif = hasSearched ? exercise.gif : exercise['gif_uuid'];
@@ -206,7 +233,7 @@ class _AdminExerciseReferenceListScreenState
       }
     }
 
-    // Если есть гифка, показываем её
+    // На списке видео не показываем — используем гифку, затем картинку
     if (gifUuid != null && gifUuid.isNotEmpty) {
       return SizedBox(
         width: 60,
@@ -218,7 +245,6 @@ class _AdminExerciseReferenceListScreenState
       );
     }
 
-    // Если нет гифки, но есть картинка, показываем её
     if (imageUuid != null && imageUuid.isNotEmpty) {
       return AuthImageWidget(
         imageUuid: imageUuid,
@@ -228,7 +254,6 @@ class _AdminExerciseReferenceListScreenState
       );
     }
 
-    // Если нет ни гифки, ни картинки, показываем пустое место
     return SizedBox(
       width: 60,
       height: 60,
@@ -243,42 +268,60 @@ class _AdminExerciseReferenceListScreenState
     );
   }
 
-  Future<void> _openFilterModal() async {
-    print('DEBUG: Admin - Opening filter modal...');
-    final filters = await _loadFilters();
-    print('DEBUG: Admin - Filters loaded: $filters');
+  void _toggleMuscleGroupFilter(String muscleGroup) {
+    setState(() {
+      if (_selectedMuscleGroups.contains(muscleGroup)) {
+        _selectedMuscleGroups.remove(muscleGroup);
+      } else {
+        _selectedMuscleGroups.add(muscleGroup);
+      }
+    });
 
-    if (!mounted) return;
+    // Немедленно обновляем список
+    setState(() {
+      currentPage = 1; // Сброс на первую страницу
+    });
 
-    showDialog(
-      context: context,
-      builder: (context) => ExerciseFilterModal(
-        muscleGroups: filters['muscle_groups'] ?? [],
-        equipmentNames: filters['equipment_names'] ?? [],
-        initialSelectedMuscleGroups: _selectedMuscleGroups,
-        initialSelectedEquipmentNames: _selectedEquipmentNames,
-        onApplyFilters: (selectedMuscleGroups, selectedEquipmentNames) {
-          print('DEBUG: Admin - onApplyFilters called');
-          print('DEBUG: Admin - muscle groups: $selectedMuscleGroups');
-          print('DEBUG: Admin - equipment names: $selectedEquipmentNames');
-          setState(() {
-            _selectedMuscleGroups = selectedMuscleGroups;
-            _selectedEquipmentNames = selectedEquipmentNames;
-          });
+    if (_searchController.text.isNotEmpty ||
+        _selectedMuscleGroups.isNotEmpty ||
+        _selectedEquipmentNames.isNotEmpty) {
+      _performSearch(_searchController.text);
+    } else {
+      // Сбрасываем флаг поиска и загружаем обычный список
+      setState(() {
+        hasSearched = false;
+        searchResults.clear();
+      });
+      _fetchExercises();
+    }
+  }
 
-          // Применяем фильтры к текущему поиску
-          if (_searchController.text.isNotEmpty) {
-            print('DEBUG: Admin - performing search with filters');
-            _performSearch(_searchController.text);
-          } else {
-            print(
-              'DEBUG: Admin - performing search with empty text and filters',
-            );
-            _performSearch('');
-          }
-        },
-      ),
-    );
+  void _toggleEquipmentFilter(String equipmentName) {
+    setState(() {
+      if (_selectedEquipmentNames.contains(equipmentName)) {
+        _selectedEquipmentNames.remove(equipmentName);
+      } else {
+        _selectedEquipmentNames.add(equipmentName);
+      }
+    });
+
+    // Немедленно обновляем список
+    setState(() {
+      currentPage = 1; // Сброс на первую страницу
+    });
+
+    if (_searchController.text.isNotEmpty ||
+        _selectedMuscleGroups.isNotEmpty ||
+        _selectedEquipmentNames.isNotEmpty) {
+      _performSearch(_searchController.text);
+    } else {
+      // Сбрасываем флаг поиска и загружаем обычный список
+      setState(() {
+        hasSearched = false;
+        searchResults.clear();
+      });
+      _fetchExercises();
+    }
   }
 
   Future<void> _deleteExercise(String uuid) async {
@@ -363,80 +406,112 @@ class _AdminExerciseReferenceListScreenState
     return Scaffold(
       body: Column(
         children: [
-          // Search Bar and Filter Button
+          // Search Bar
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: _onSearchChanged,
-                    decoration: InputDecoration(
-                      hintText: 'Поиск упражнений...',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: isSearching
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : _searchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() {
-                                  searchResults.clear();
-                                  isSearching = false;
-                                  hasSearched = false;
-                                  _selectedMuscleGroups.clear();
-                                  _selectedEquipmentNames.clear();
-                                });
-                              },
-                            )
-                          : null,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey.withOpacity(0.1),
-                    ),
-                  ),
+            child: TextField(
+              controller: _searchController,
+              onChanged: _onSearchChanged,
+              decoration: InputDecoration(
+                hintText: 'Поиск упражнений...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: isSearching
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {
+                            searchResults.clear();
+                            isSearching = false;
+                            hasSearched = false;
+                            _selectedMuscleGroups.clear();
+                            _selectedEquipmentNames.clear();
+                          });
+                          currentPage = 1;
+                          _fetchExercises();
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(width: 12),
-                IconButton(
-                  onPressed: _openFilterModal,
-                  icon: Stack(
-                    children: [
-                      const Icon(Icons.filter_list),
-                      if (_selectedMuscleGroups.isNotEmpty ||
-                          _selectedEquipmentNames.isNotEmpty)
-                        Positioned(
-                          right: 0,
-                          top: 0,
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  style: IconButton.styleFrom(
-                    backgroundColor:
-                        (_selectedMuscleGroups.isNotEmpty ||
-                            _selectedEquipmentNames.isNotEmpty)
-                        ? Colors.blue.withOpacity(0.1)
-                        : null,
-                  ),
-                ),
-              ],
+                filled: true,
+                fillColor: Colors.grey.withOpacity(0.1),
+              ),
             ),
           ),
+          // Фильтры - Группы мышц
+          if (_availableMuscleGroups.isNotEmpty)
+            Container(
+              height: 50,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: _availableMuscleGroups.map((muscleGroup) {
+                  final isSelected = _selectedMuscleGroups.contains(
+                    muscleGroup,
+                  );
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      label: Text(muscleGroup),
+                      selected: isSelected,
+                      onSelected: (selected) {
+                        _toggleMuscleGroupFilter(muscleGroup);
+                      },
+                      selectedColor: AppColors.buttonPrimary.withOpacity(0.3),
+                      checkmarkColor: AppColors.buttonPrimary,
+                      backgroundColor: AppColors.surface,
+                      side: BorderSide(
+                        color: isSelected
+                            ? const Color.fromARGB(255, 155, 155, 155)
+                            : AppColors.inputBorder,
+                        width: isSelected ? 2.0 : 1.0,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          // Фильтры - Оборудование
+          if (_availableEquipmentNames.isNotEmpty)
+            Container(
+              height: 50,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: _availableEquipmentNames.map((equipmentName) {
+                  final isSelected = _selectedEquipmentNames.contains(
+                    equipmentName,
+                  );
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      label: Text(equipmentName),
+                      selected: isSelected,
+                      onSelected: (selected) {
+                        _toggleEquipmentFilter(equipmentName);
+                      },
+                      selectedColor: AppColors.buttonPrimary.withOpacity(0.3),
+                      checkmarkColor: AppColors.buttonPrimary,
+                      backgroundColor: AppColors.surface,
+                      side: BorderSide(
+                        color: isSelected
+                            ? const Color.fromARGB(255, 155, 155, 155)
+                            : AppColors.inputBorder,
+                        width: isSelected ? 2.0 : 1.0,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
           // Content
           Expanded(
             child: isLoading
@@ -495,14 +570,23 @@ class _AdminExerciseReferenceListScreenState
                       return ListTile(
                         leading: _buildExerciseMedia(exercise),
                         title: Text(caption),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => AdminExerciseReferenceDetailScreen(
-                              exerciseReferenceUuid: uuid,
+                        onTap: () {
+                          final video = hasSearched
+                              ? exercise.video
+                              : exercise['video_uuid'];
+                          setState(() {
+                            _activeVideoUuid = video;
+                          });
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  AdminExerciseReferenceDetailScreen(
+                                    exerciseReferenceUuid: uuid,
+                                  ),
                             ),
-                          ),
-                        ),
+                          );
+                        },
                         trailing: IconButton(
                           icon: const Icon(Icons.close, color: Colors.red),
                           onPressed: () => _deleteExercise(uuid),

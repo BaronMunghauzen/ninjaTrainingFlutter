@@ -25,6 +25,8 @@ class ApiService {
   // Кэш токена для избежания повторных обращений к SharedPreferences
   static String? _cachedToken;
   static bool _tokenInitialized = false;
+  static Future<void> Function()? _forbiddenHandler;
+  static bool _isHandlingForbidden = false;
 
   // Кэш файлов в памяти для быстрого доступа
   static final Map<String, Uint8List> _fileCache = {};
@@ -55,6 +57,7 @@ class ApiService {
   }
 
   /// Проверить, есть ли файл в кэше
+  // ignore: unused_element
   static Future<bool> _isFileCached(String uuid) async {
     // Сначала проверяем память
     if (_fileCache.containsKey(uuid)) {
@@ -508,6 +511,10 @@ class ApiService {
       body: response.body,
     );
 
+    if (response.statusCode == 403 && (_cachedToken?.isNotEmpty ?? false)) {
+      unawaited(_handleForbidden());
+    }
+
     return response;
   }
 
@@ -740,4 +747,23 @@ class ApiService {
 
   /// Вспомогательный метод для получения базового URL
   static String get baseUrl => ApiConstants.baseUrl;
+
+  /// Регистрация обработчика 403 статусов для автоматического выхода
+  static void registerForbiddenHandler(Future<void> Function()? handler) {
+    _forbiddenHandler = handler;
+  }
+
+  static Future<void> _handleForbidden() async {
+    if (_isHandlingForbidden) return;
+    if (_forbiddenHandler == null) return;
+
+    _isHandlingForbidden = true;
+    try {
+      await _forbiddenHandler!.call();
+    } catch (e) {
+      print('$_logPrefix ❌ Ошибка обработчика 403: $e');
+    } finally {
+      _isHandlingForbidden = false;
+    }
+  }
 }

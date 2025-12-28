@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:ui' as ui;
 import '../../constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/notification_service.dart';
+import '../../services/api_service.dart';
 import 'system_program/training_screen.dart';
 import 'achievements_and_statistics/achievements_and_statistics_screen.dart';
 import 'profile/profile_screen.dart';
@@ -17,12 +19,8 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
-
-  final List<Widget> _screens = [
-    const TrainingScreen(),
-    const AchievementsAndStatisticsScreen(),
-    const ProfileScreen(),
-  ];
+  bool _isPaymentVisible = true;
+  bool _isFetchingSettings = false;
 
   @override
   void initState() {
@@ -53,7 +51,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return NetworkStatusBanner(
       child: Scaffold(
-        body: _screens[_currentIndex],
+        body: _buildCurrentScreen(),
         bottomNavigationBar: Container(
           decoration: BoxDecoration(
             color: AppColors.surface,
@@ -87,11 +85,7 @@ class _MainScreenState extends State<MainScreen> {
     final isSelected = _currentIndex == index;
 
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          _currentIndex = index;
-        });
-      },
+      onTap: () => _onTabSelected(index),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
@@ -128,5 +122,125 @@ class _MainScreenState extends State<MainScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildCurrentScreen() {
+    switch (_currentIndex) {
+      case 0:
+        return const TrainingScreen();
+      case 1:
+        return const AchievementsAndStatisticsScreen();
+      case 2:
+        return ProfileScreen(isPaymentVisible: _isPaymentVisible);
+      default:
+        return const TrainingScreen();
+    }
+  }
+
+  Future<void> _onTabSelected(int index) async {
+    if (_currentIndex != index) {
+      setState(() {
+        _currentIndex = index;
+      });
+    }
+
+    if (index == 2) {
+      await _loadAppSettings();
+    }
+  }
+
+  /// Проверяет, является ли пользователь из России по locale устройства
+  bool _isUserFromRussia() {
+    final locale = ui.PlatformDispatcher.instance.locale;
+    // Проверяем код страны или языка
+    return locale.countryCode == 'RU' || 
+           locale.languageCode == 'ru' ||
+           locale.toString().toLowerCase().contains('ru');
+  }
+
+  /// Вычисляет, нужно ли показывать блок оплаты на основе настроек и страны пользователя
+  bool _calculatePaymentVisibility({
+    required bool isPaymentVisible,
+    required bool isPaymentVisibleWorldwide,
+  }) {
+    // Если isPaymentVisible = false, не показывать
+    if (!isPaymentVisible) {
+      return false;
+    }
+
+    // Если isPaymentVisible = true и isPaymentVisibleWorldwide = true, показывать всем
+    if (isPaymentVisible && isPaymentVisibleWorldwide) {
+      return true;
+    }
+
+    // Если isPaymentVisible = true и isPaymentVisibleWorldwide = false,
+    // показывать только для пользователей из России
+    if (isPaymentVisible && !isPaymentVisibleWorldwide) {
+      return _isUserFromRussia();
+    }
+
+    // По умолчанию не показывать
+    return false;
+  }
+
+  Future<void> _loadAppSettings() async {
+    if (_isFetchingSettings) return;
+
+    if (mounted) {
+      setState(() {
+        _isFetchingSettings = true;
+      });
+    }
+
+    try {
+      final response = await ApiService.get('/service/settings/');
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final decoded = ApiService.decodeJson(response.body);
+        
+        // Извлекаем настройки из ответа
+        final appSettings = decoded is Map<String, dynamic>
+            ? (decoded['app'] as Map?)
+            : null;
+        
+        final bool isPaymentVisible = appSettings?['isPaymentVisible'] == true;
+        final bool isPaymentVisibleWorldwide = 
+            appSettings?['isPaymentVisibleWorldwide'] == true;
+
+        // Вычисляем финальное значение видимости с учетом страны пользователя
+        final bool finalVisibility = _calculatePaymentVisibility(
+          isPaymentVisible: isPaymentVisible,
+          isPaymentVisibleWorldwide: isPaymentVisibleWorldwide,
+        );
+
+        // Логирование для отладки
+        final locale = ui.PlatformDispatcher.instance.locale;
+        print('💰 Payment Visibility Settings:');
+        print('  isPaymentVisible: $isPaymentVisible');
+        print('  isPaymentVisibleWorldwide: $isPaymentVisibleWorldwide');
+        print('  User locale: ${locale.toString()}');
+        print('  Is user from Russia: ${_isUserFromRussia()}');
+        print('  Final visibility: $finalVisibility');
+
+        if (mounted) {
+          setState(() {
+            _isPaymentVisible = finalVisibility;
+            _isFetchingSettings = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _isFetchingSettings = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isFetchingSettings = false;
+      });
+    }
   }
 }

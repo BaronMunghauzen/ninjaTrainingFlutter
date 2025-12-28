@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/stopwatch_overlay_provider.dart';
+import '../../providers/timer_overlay_provider.dart';
 import '../../widgets/gif_widget.dart';
 import '../../widgets/auth_image_widget.dart';
+import '../../widgets/video_player_widget.dart';
+import '../../widgets/exercise_info_modal.dart';
 import 'package:provider/provider.dart';
 
 class FreeWorkoutExerciseGroupScreen extends StatefulWidget {
@@ -32,11 +34,37 @@ class _FreeWorkoutExerciseGroupScreenState
   List<Map<String, dynamic>> userExercises = [];
   List<Map<String, dynamic>> lastResults = [];
   bool isLoading = true;
+  String? savedTimerValue;
+
+  void _showExerciseInfo() {
+    final exerciseReferenceUuid = exerciseReference?['uuid'];
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userUuid = authProvider.userUuid;
+
+    if (exerciseReferenceUuid == null || userUuid == null || userUuid.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Не удалось загрузить информацию об упражнении'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => ExerciseInfoModal(
+        exerciseReferenceUuid: exerciseReferenceUuid,
+        userUuid: userUuid,
+      ),
+    );
+  }
 
   @override
   void initState() {
     super.initState();
     _loadExerciseData();
+    _loadTimerValue();
   }
 
   Future<void> _loadExerciseData() async {
@@ -383,12 +411,53 @@ class _FreeWorkoutExerciseGroupScreenState
 
     // Всегда показываем и вес и повторения для свободной тренировки
     if (weight != null) {
-      return '$reps x ${(weight as num).toStringAsFixed(1)} кг';
+      return '$reps x ${(weight as num).toStringAsFixed(2)} кг';
     } else if (reps > 0) {
       return '$reps';
     } else {
       return '--';
     }
+  }
+
+  /// Получает значения повторений и веса из lastResults для конкретного подхода
+  Map<String, dynamic> _getLastResultValues(int setNumber) {
+    final lastResultsForSet = lastResults
+        .where((result) => result['set_number'] == setNumber)
+        .toList();
+
+    if (lastResultsForSet.isEmpty) {
+      return {'reps': 0, 'weight': 0.0};
+    }
+
+    // Берем последний результат
+    final lastResult = lastResultsForSet.last;
+    final reps = lastResult['reps'] ?? 0;
+    final weight = lastResult['weight'];
+
+    return {
+      'reps': reps,
+      'weight': weight != null ? (weight as num).toDouble() : 0.0,
+    };
+  }
+
+  /// Определяет начальные значения для модального окна ввода
+  Map<String, dynamic> _getInitialValues(int index) {
+    // Для первого подхода - используем значения из lastResults
+    if (index == 0) {
+      return _getLastResultValues(1); // set_number начинается с 1
+    }
+
+    // Для остальных подходов - сначала пытаемся взять из предыдущего подхода
+    final previousUe = userExercises[index - 1];
+    final previousReps = previousUe['reps'] ?? 0;
+    final previousWeight = (previousUe['weight'] ?? 0.0).toDouble();
+
+    if (previousReps > 0 || previousWeight > 0) {
+      return {'reps': previousReps, 'weight': previousWeight};
+    }
+
+    // Если предыдущего подхода нет, используем lastResults
+    return _getLastResultValues(index + 1);
   }
 
   @override
@@ -411,24 +480,61 @@ class _FreeWorkoutExerciseGroupScreenState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Изображение/GIF упражнения (показываем только если есть)
+                        // Название упражнения + кнопка информации
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                exerciseData!['caption'] ?? 'Упражнение',
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: _showExerciseInfo,
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.inputBorder.withOpacity(
+                                      0.3,
+                                    ),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: AppColors.inputBorder.withOpacity(
+                                        0.5,
+                                      ),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.info_outline,
+                                    color: AppColors.textPrimary,
+                                    size: 20,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Медиа упражнения (видео/гиф/картинка) — после заголовка
                         if (exerciseReference != null &&
-                            (exerciseReference!['gif_uuid'] != null ||
+                            (exerciseReference!['video_uuid'] != null ||
+                                exerciseReference!['gif_uuid'] != null ||
                                 exerciseReference!['image_uuid'] != null)) ...[
                           _buildExerciseMedia(),
                           const SizedBox(height: 16),
                         ],
-
-                        // Название упражнения
-                        Text(
-                          exerciseData!['caption'] ?? 'Упражнение',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
 
                         // Заголовок таблицы подходов
                         Row(
@@ -510,34 +616,36 @@ class _FreeWorkoutExerciseGroupScreenState
 
                         const SizedBox(height: 16),
 
-                        // Кнопка секундомера
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            final stopwatchProvider =
-                                Provider.of<StopwatchOverlayProvider>(
-                                  context,
-                                  listen: false,
-                                );
-                            if (stopwatchProvider.isVisible) {
-                              stopwatchProvider.hide();
-                            } else {
-                              stopwatchProvider.show();
-                            }
-                          },
-                          icon: Consumer<StopwatchOverlayProvider>(
-                            builder: (context, provider, child) {
-                              return Icon(
-                                provider.isVisible
-                                    ? Icons.timer_off
-                                    : Icons.timer,
-                              );
-                            },
-                          ),
-                          label: const Text('Секундомер'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.surface,
-                            foregroundColor: AppColors.textPrimary,
-                          ),
+                        // Кнопки таймера
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: _showTimerPicker,
+                                icon: const Icon(Icons.timer),
+                                label: Text(
+                                  savedTimerValue != null
+                                      ? 'Таймер ($savedTimerValue)'
+                                      : 'Таймер',
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.surface,
+                                  foregroundColor: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                            if (savedTimerValue != null) ...[
+                              const SizedBox(width: 8),
+                              ElevatedButton(
+                                onPressed: _startTimerWithSavedValue,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.buttonPrimary,
+                                  foregroundColor: Colors.white,
+                                ),
+                                child: const Text('Запустить'),
+                              ),
+                            ],
+                          ],
                         ),
                       ],
                     ),
@@ -582,10 +690,23 @@ class _FreeWorkoutExerciseGroupScreenState
   }
 
   Widget _buildExerciseMedia() {
+    final videoUuid = exerciseReference?['video_uuid'];
     final gifUuid = exerciseReference?['gif_uuid'];
     final imageUuid = exerciseReference?['image_uuid'];
 
-    if (gifUuid != null) {
+    if (videoUuid != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: VideoPlayerWidget(
+          videoUuid: videoUuid,
+          imageUuid: imageUuid,
+          height: 200,
+          width: double.infinity,
+          showControls: true,
+          autoInitialize: true,
+        ),
+      );
+    } else if (gifUuid != null) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: GifWidget(gifUuid: gifUuid, height: 200, width: double.infinity),
@@ -651,7 +772,7 @@ class _FreeWorkoutExerciseGroupScreenState
               onTap: () => _showRepsWeightPicker(index, true),
               child: Center(
                 child: Text(
-                  '$reps x ${weight.toStringAsFixed(1)} кг',
+                  '$reps x ${weight.toStringAsFixed(2)} кг',
                   style: const TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 18,
@@ -682,12 +803,18 @@ class _FreeWorkoutExerciseGroupScreenState
   }
 
   void _showRepsWeightPicker(int index, bool _) {
-    final ue = userExercises[index];
-    final currentReps = ue['reps'] ?? 0;
-    final currentWeight = (ue['weight'] ?? 0.0).toDouble();
+    // Определяем начальные значения
+    final initialValues = _getInitialValues(index);
+    int selectedReps = initialValues['reps'] as int;
+    double selectedWeight = initialValues['weight'] as double;
 
-    int selectedReps = currentReps;
-    double selectedWeight = currentWeight;
+    // Создаем контроллеры для установки начальной позиции
+    final repsController = FixedExtentScrollController(
+      initialItem: selectedReps.clamp(0, 100),
+    );
+    final weightController = FixedExtentScrollController(
+      initialItem: (selectedWeight / 0.25).round().clamp(0, 4000),
+    );
 
     showModalBottomSheet(
       context: context,
@@ -704,7 +831,7 @@ class _FreeWorkoutExerciseGroupScreenState
                       children: [
                         const Text(
                           'Повторения',
-                          style: TextStyle(fontSize: 18),
+                          style: TextStyle(fontSize: 20),
                         ),
                         const SizedBox(height: 8),
                         SizedBox(
@@ -715,9 +842,7 @@ class _FreeWorkoutExerciseGroupScreenState
                             onSelectedItemChanged: (val) {
                               setModalState(() => selectedReps = val);
                             },
-                            controller: FixedExtentScrollController(
-                              initialItem: selectedReps,
-                            ),
+                            controller: repsController,
                             children: List.generate(101, (i) => Text('$i')),
                           ),
                         ),
@@ -728,7 +853,7 @@ class _FreeWorkoutExerciseGroupScreenState
                   Expanded(
                     child: Column(
                       children: [
-                        const Text('Вес (кг)', style: TextStyle(fontSize: 18)),
+                        const Text('Вес (кг)', style: TextStyle(fontSize: 20)),
                         const SizedBox(height: 8),
                         SizedBox(
                           height: 100,
@@ -736,14 +861,12 @@ class _FreeWorkoutExerciseGroupScreenState
                             itemExtent: 40,
                             diameterRatio: 1.5,
                             onSelectedItemChanged: (val) {
-                              setModalState(() => selectedWeight = val * 0.5);
+                              setModalState(() => selectedWeight = val * 0.25);
                             },
-                            controller: FixedExtentScrollController(
-                              initialItem: (selectedWeight / 0.5).round(),
-                            ),
+                            controller: weightController,
                             children: List.generate(
-                              200,
-                              (i) => Text('${i * 0.5} кг'),
+                              4001,
+                              (i) => Text('${(i * 0.25).toStringAsFixed(2)}'),
                             ),
                           ),
                         ),
@@ -768,6 +891,324 @@ class _FreeWorkoutExerciseGroupScreenState
           ),
         ),
       ),
+    ).then((_) {
+      // Освобождаем контроллеры после закрытия модального окна
+      repsController.dispose();
+      weightController.dispose();
+    });
+  }
+
+  Future<void> _loadTimerValue() async {
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final userUuid = authProvider.userUuid;
+
+      if (userUuid == null || userUuid.isEmpty) return;
+
+      final resp = await ApiService.get(
+        '/last-values/',
+        queryParams: {
+          'user_uuid': userUuid,
+          'code': 'timerInFreeTraining',
+          'actual': 'true',
+        },
+      );
+
+      if (resp.statusCode == 200) {
+        final data = ApiService.decodeJson(resp.body);
+        if (data is List && data.isNotEmpty) {
+          final value = data[0]['value'] as String?;
+          if (mounted) {
+            setState(() {
+              savedTimerValue = value;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading timer value: $e');
+    }
+  }
+
+  Future<void> _saveTimerValue(String value) async {
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final userUuid = authProvider.userUuid;
+
+      if (userUuid == null || userUuid.isEmpty) return;
+
+      final body = {
+        'user_uuid': userUuid,
+        'name': 'Значение таймера из свободных тренировок',
+        'code': 'timerInFreeTraining',
+        'value': value,
+      };
+
+      final resp = await ApiService.post('/last-values/', body: body);
+
+      if (resp.statusCode == 200) {
+        // После успешного сохранения загружаем обновленное значение
+        await _loadTimerValue();
+      }
+    } catch (e) {
+      debugPrint('Error saving timer value: $e');
+    }
+  }
+
+  String _formatTime(int totalSeconds) {
+    final minutes = (totalSeconds ~/ 60).toString().padLeft(2, '0');
+    final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
+
+  int _parseTime(String timeString) {
+    try {
+      final parts = timeString.split(':');
+      if (parts.length == 2) {
+        final minutes = int.parse(parts[0]);
+        final seconds = int.parse(parts[1]);
+        return minutes * 60 + seconds;
+      }
+    } catch (e) {
+      debugPrint('Error parsing time: $e');
+    }
+    return 0;
+  }
+
+  void _startTimerWithSavedValue() {
+    if (savedTimerValue == null) return;
+
+    final totalSeconds = _parseTime(savedTimerValue!);
+    if (totalSeconds == 0) return;
+
+    final timerProvider = Provider.of<TimerOverlayProvider>(
+      context,
+      listen: false,
+    );
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userUuid = authProvider.userUuid;
+
+    final exerciseUuid = exerciseData != null ? exerciseData!['uuid'] : null;
+    final exerciseName = exerciseData != null ? exerciseData!['caption'] : null;
+
+    timerProvider.show(
+      totalSeconds,
+      userUuid: userUuid?.isNotEmpty == true ? userUuid : null,
+      exerciseUuid: exerciseUuid is String ? exerciseUuid : null,
+      exerciseName: exerciseName is String ? exerciseName : null,
+    );
+  }
+
+  void _showTimerPicker() {
+    int selectedMinutes = 0;
+    int selectedSeconds = 0;
+
+    final minuteController = FixedExtentScrollController(initialItem: 0);
+    final secondController = FixedExtentScrollController(initialItem: 0);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final textStyle =
+                Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                ) ??
+                const TextStyle(
+                  fontSize: 22,
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                );
+
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Выберите время отдыха',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _TimerPickerColumn(
+                        title: 'Минуты',
+                        controller: minuteController,
+                        onSelectedItemChanged: (value) {
+                          setModalState(() {
+                            selectedMinutes = value;
+                          });
+                        },
+                        textStyle: textStyle,
+                      ),
+                      _TimerPickerColumn(
+                        title: 'Секунды',
+                        controller: secondController,
+                        onSelectedItemChanged: (value) {
+                          setModalState(() {
+                            selectedSeconds = value;
+                          });
+                        },
+                        textStyle: textStyle,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        final totalSeconds =
+                            selectedMinutes * 60 + selectedSeconds;
+                        if (totalSeconds == 0) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Выберите время больше 0 секунд'),
+                            ),
+                          );
+                          return;
+                        }
+
+                        final timerProvider = Provider.of<TimerOverlayProvider>(
+                          this.context,
+                          listen: false,
+                        );
+
+                        final authProvider = Provider.of<AuthProvider>(
+                          this.context,
+                          listen: false,
+                        );
+                        final userUuid = authProvider.userUuid;
+
+                        final exerciseUuid = exerciseData != null
+                            ? exerciseData!['uuid']
+                            : null;
+                        final exerciseName = exerciseData != null
+                            ? exerciseData!['caption']
+                            : null;
+
+                        timerProvider.show(
+                          totalSeconds,
+                          userUuid: userUuid?.isNotEmpty == true
+                              ? userUuid
+                              : null,
+                          exerciseUuid: exerciseUuid is String
+                              ? exerciseUuid
+                              : null,
+                          exerciseName: exerciseName is String
+                              ? exerciseName
+                              : null,
+                        );
+
+                        // Сохраняем значение таймера
+                        final timeValue = _formatTime(totalSeconds);
+                        await _saveTimerValue(timeValue);
+
+                        Navigator.of(context).pop();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.buttonPrimary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Text(
+                        'Запустить таймер',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text(
+                        'Отмена',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _TimerPickerColumn extends StatelessWidget {
+  final String title;
+  final FixedExtentScrollController controller;
+  final ValueChanged<int> onSelectedItemChanged;
+  final TextStyle textStyle;
+
+  const _TimerPickerColumn({
+    Key? key,
+    required this.title,
+    required this.controller,
+    required this.onSelectedItemChanged,
+    required this.textStyle,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final items = List<Widget>.generate(
+      60,
+      (index) => Center(child: Text(index.toString(), style: textStyle)),
+    );
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 160,
+          width: 110,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppColors.inputBorder.withOpacity(0.4)),
+            ),
+            child: ListWheelScrollView.useDelegate(
+              controller: controller,
+              itemExtent: 46,
+              physics: const FixedExtentScrollPhysics(),
+              diameterRatio: 1.3,
+              onSelectedItemChanged: onSelectedItemChanged,
+              childDelegate: ListWheelChildLoopingListDelegate(children: items),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -11,6 +11,9 @@ class VideoPlayerWidget extends StatefulWidget {
   final double? height;
   final bool showControls;
   final String? exerciseReferenceUuid; // UUID упражнения для загрузки файлов
+  final bool autoInitialize; // Инициализировать видео автоматически
+  final bool cacheController; // Кэшировать VideoPlayerController
+  final bool limitActiveLoads; // Ограничивать параллельные инициализации
 
   const VideoPlayerWidget({
     Key? key,
@@ -20,6 +23,9 @@ class VideoPlayerWidget extends StatefulWidget {
     this.height,
     this.showControls = true,
     this.exerciseReferenceUuid,
+    this.autoInitialize = false,
+    this.cacheController = true,
+    this.limitActiveLoads = true,
   }) : super(key: key);
 
   @override
@@ -35,6 +41,9 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   bool _showVideo =
       false; // Новое состояние для переключения между видео и превью
   bool _showVideoControls = false; // Показывать ли кнопки управления видео
+  bool _isFromCache = false; // Контроллер взят из кэша
+  bool _cachedByThisInstance =
+      false; // Контроллер добавлен в кэш этой инстанцией
 
   // Кэш для изображений - предотвращает повторную загрузку
   static final Map<String, ImageProvider> _imageCache = {};
@@ -52,7 +61,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
 
   // Ограничение на количество одновременно загружаемых видео
   static int _activeVideoLoads = 0;
-  static const int _maxActiveVideoLoads = 2;
+  static const int _maxActiveVideoLoads = 1;
 
   /// Очищает кэш изображений для освобождения памяти
   static void clearImageCache() {
@@ -109,7 +118,16 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       // Например, если это новое упражнение
     }
 
-    _initializeVideo();
+    if (widget.autoInitialize) {
+      setState(() {
+        _showVideo = true;
+        _isLoading = true;
+      });
+      _initializeVideo();
+    } else {
+      // Отложенная инициализация до пользовательского действия
+      _isLoading = false;
+    }
   }
 
   Future<void> _initializeVideo() async {
@@ -122,17 +140,37 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
     }
 
     // Проверяем кэш видео
-    if (_videoCache.containsKey(widget.videoUuid)) {
+    if (widget.cacheController && _videoCache.containsKey(widget.videoUuid)) {
       print('Video found in cache: ${widget.videoUuid}');
-      _controller = _videoCache[widget.videoUuid];
+      final cachedController = _videoCache[widget.videoUuid];
 
-      if (mounted) {
-        setState(() {
-          _isInitialized = true;
-          _isLoading = false;
-        });
+      // Проверяем, что контроллер инициализирован и не disposed
+      try {
+        if (cachedController != null && cachedController.value.isInitialized) {
+          _controller = cachedController;
+          _isFromCache = true;
+
+          if (mounted) {
+            setState(() {
+              _isInitialized = true;
+              _isLoading = false;
+            });
+          }
+          return;
+        } else {
+          // Контроллер в кэше не инициализирован - удаляем из кэша и создаем новый
+          print('Cached controller not initialized, removing from cache');
+          _videoCache.remove(widget.videoUuid);
+          cachedController?.dispose();
+        }
+      } catch (e) {
+        // Контроллер в кэше disposed или недоступен - удаляем из кэша
+        print('Cached controller error: $e, removing from cache');
+        _videoCache.remove(widget.videoUuid);
+        try {
+          cachedController?.dispose();
+        } catch (_) {}
       }
-      return;
     }
 
     try {
@@ -141,22 +179,22 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
         _hasError = false;
       });
 
-      // Проверяем ограничение на количество активных загрузок видео
-      if (_activeVideoLoads >= _maxActiveVideoLoads) {
-        print('Too many active video loads, waiting...');
-        await Future.delayed(const Duration(milliseconds: 1000));
+      // Проверяем ограничение на количество активных загрузок видео (опционально)
+      if (widget.limitActiveLoads) {
         if (_activeVideoLoads >= _maxActiveVideoLoads) {
-          print('Still too many active video loads, skipping this video');
-          setState(() {
-            _isLoading = false;
-            _hasError = false; // Показываем превью вместо ошибки
-          });
-          return;
+          print('Too many active video loads, waiting...');
+          await Future.delayed(const Duration(milliseconds: 1000));
+          if (_activeVideoLoads >= _maxActiveVideoLoads) {
+            print('Still too many active video loads, skipping this video');
+            setState(() {
+              _isLoading = false;
+              _hasError = false; // Показываем превью вместо ошибки
+            });
+            return;
+          }
         }
+        _activeVideoLoads++;
       }
-
-      // Увеличиваем счетчик активных загрузок видео
-      _activeVideoLoads++;
 
       try {
         // Очищаем кэш видео если он слишком большой
@@ -198,8 +236,11 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
         // Оптимизация буферизации для больших файлов
         _controller!.setPlaybackSpeed(1.0);
 
-        // Добавляем в кэш
-        _videoCache[widget.videoUuid!] = _controller!;
+        // Добавляем в кэш при необходимости
+        if (widget.cacheController) {
+          _videoCache[widget.videoUuid!] = _controller!;
+          _cachedByThisInstance = true;
+        }
         print('Video added to cache: ${widget.videoUuid}');
 
         if (mounted) {
@@ -210,7 +251,9 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
         }
       } finally {
         // Уменьшаем счетчик активных загрузок видео
-        _activeVideoLoads--;
+        if (widget.limitActiveLoads) {
+          _activeVideoLoads--;
+        }
       }
     } catch (e) {
       print('Video loading error: $e');
@@ -252,6 +295,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
 
       // Добавляем в кэш даже при повторной попытке
       _videoCache[widget.videoUuid!] = _controller!;
+      _cachedByThisInstance = true;
       print('Video added to cache after retry: ${widget.videoUuid}');
 
       if (mounted) {
@@ -278,9 +322,21 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
 
   @override
   void dispose() {
-    // Не удаляем контроллер из кэша, так как он может использоваться другими экземплярами
-    // Просто сбрасываем ссылку
-    _controller = null;
+    try {
+      // Всегда останавливаем и корректно освобождаем контроллер
+      if (_controller != null) {
+        _controller!.pause();
+      }
+      // Если контроллер кэшируется, НЕ удаляем из кэша и не диспоузим, чтобы другие виджеты не сломались
+      final isCachedController =
+          widget.cacheController && (_isFromCache || _cachedByThisInstance);
+
+      if (!isCachedController) {
+        // Контроллер не используется совместно — освобождаем полностью
+        _controller?.dispose();
+        _controller = null;
+      }
+    } catch (_) {}
 
     // Очищаем кэш изображений если он слишком большой
     if (_imageCache.length > _maxImageCacheSize) {
@@ -294,6 +350,31 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
     print('Building preview image, imageUuid: ${widget.imageUuid}');
     if (widget.imageUuid == null) {
       print('No image UUID provided');
+      // Если нет превью, но есть видео
+      if (widget.videoUuid != null) {
+        if (widget.autoInitialize) {
+          // Автоинициализация: показываем первый кадр (пауза) или лоадер пока готовится
+          if (!_isInitialized || _controller == null) {
+            _initializeVideo();
+          }
+          _showVideo = true;
+          return _isInitialized && _controller != null
+              ? _buildVideoPlayer()
+              : _buildLoadingState();
+        } else {
+          // Без автоинициализации: показываем нейтральный плейсхолдер, запуск по клику на ListTile
+          return Container(
+            width: widget.width ?? double.infinity,
+            height: widget.height ?? 200,
+            decoration: BoxDecoration(
+              color: Colors.black,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.inputBorder),
+            ),
+          );
+        }
+      }
+      // Иначе — обычная заглушка для изображения
       return Container(
         width: widget.width ?? double.infinity,
         height: widget.height ?? 200,
@@ -371,13 +452,15 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
                 if (widget.videoUuid != null)
                   Positioned.fill(
                     child: GestureDetector(
-                      onTap: () {
+                      onTap: () async {
                         setState(() {
                           _showVideo = true;
-                          _showVideoControls =
-                              true; // Показываем кнопки управления сразу
+                          _showVideoControls = true;
+                          _isLoading = true;
                         });
-                        // Сразу начинаем воспроизведение видео
+                        if (!_isInitialized || _controller == null) {
+                          await _initializeVideo();
+                        }
                         if (_controller != null && _isInitialized) {
                           _controller!.play();
                         }
@@ -498,28 +581,6 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
             Positioned.fill(child: VideoPlayer(_controller!)),
             // Контролы видео
             if (widget.showControls) _buildVideoControls(),
-            // Кнопка для возврата к превью
-            Positioned(
-              top: 8,
-              right: 8,
-              child: GestureDetector(
-                onTap: () {
-                  _controller?.pause();
-                  setState(() {
-                    _showVideo = false;
-                    _showVideoControls = false;
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.7),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.image, color: Colors.white, size: 20),
-                ),
-              ),
-            ),
           ],
         ),
       ),

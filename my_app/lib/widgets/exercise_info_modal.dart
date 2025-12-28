@@ -3,6 +3,7 @@ import '../models/exercise_statistics_model.dart';
 import '../services/api_service.dart';
 import '../constants/app_colors.dart';
 import '../widgets/gif_widget.dart';
+import '../widgets/video_player_widget.dart';
 import '../widgets/exercise_statistics_table.dart';
 
 class ExerciseInfoModal extends StatefulWidget {
@@ -229,8 +230,19 @@ class _ExerciseInfoModalState extends State<ExerciseInfoModal> {
                             const SizedBox(height: 16),
                           ],
 
-                          // Гифка
-                          if (exerciseReference?['gif_uuid'] != null) ...[
+                          // Медиа: приоритет видео, затем гифка
+                          if (exerciseReference?['video_uuid'] != null) ...[
+                            VideoPlayerWidget(
+                              videoUuid: exerciseReference!['video_uuid'],
+                              imageUuid: exerciseReference!['image_uuid'],
+                              width: double.infinity,
+                              height: 200,
+                              showControls: true,
+                              autoInitialize: true,
+                            ),
+                            const SizedBox(height: 16),
+                          ] else if (exerciseReference?['gif_uuid'] !=
+                              null) ...[
                             GifWidget(
                               gifUuid: exerciseReference!['gif_uuid'],
                               width: double.infinity,

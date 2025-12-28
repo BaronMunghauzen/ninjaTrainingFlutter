@@ -3,6 +3,7 @@ import '../../services/api_service.dart';
 import '../../models/exercise_model.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/gif_widget.dart';
+import '../../widgets/video_player_widget.dart';
 import '../../widgets/exercise_info_modal.dart';
 import '../../constants/app_colors.dart';
 import 'package:my_app/providers/timer_overlay_provider.dart';
@@ -226,14 +227,77 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
     }
   }
 
+  /// Парсит строку lastResult и извлекает значения повторений и веса
+  /// Формат строки: "10 x 2.50 кг" или "10" или "0"
+  Map<String, dynamic> _parseLastResult(String lastResult) {
+    int reps = 0;
+    double weight = 0.0;
+
+    if (lastResult == '0' || lastResult.isEmpty) {
+      return {'reps': reps, 'weight': weight};
+    }
+
+    // Пытаемся найти формат "reps x weight кг"
+    final regex = RegExp(r'^(\d+)\s*x\s*([\d.]+)\s*кг$');
+    final match = regex.firstMatch(lastResult.trim());
+
+    if (match != null) {
+      reps = int.tryParse(match.group(1) ?? '0') ?? 0;
+      weight = double.tryParse(match.group(2) ?? '0') ?? 0.0;
+    } else {
+      // Если нет веса, пытаемся извлечь только повторения
+      reps = int.tryParse(lastResult.trim()) ?? 0;
+    }
+
+    return {'reps': reps, 'weight': weight};
+  }
+
+  /// Определяет начальные значения для модального окна ввода
+  Map<String, dynamic> _getInitialValues(int exIndex, int setIndex) {
+    // Для первого подхода - используем значения из lastResult
+    if (setIndex == 0) {
+      final lastResult = userExerciseRows[exIndex][setIndex].lastResult;
+      final parsed = _parseLastResult(lastResult);
+      return {
+        'reps': parsed['reps'] as int,
+        'weight': parsed['weight'] as double,
+      };
+    }
+
+    // Для остальных подходов - сначала пытаемся взять из предыдущего подхода
+    final previousRow = userExerciseRows[exIndex][setIndex - 1];
+    if (previousRow.reps > 0 || previousRow.weight > 0) {
+      return {'reps': previousRow.reps, 'weight': previousRow.weight};
+    }
+
+    // Если предыдущего подхода нет, используем lastResult
+    final lastResult = userExerciseRows[exIndex][setIndex].lastResult;
+    final parsed = _parseLastResult(lastResult);
+    return {
+      'reps': parsed['reps'] as int,
+      'weight': parsed['weight'] as double,
+    };
+  }
+
   void _showRepsWeightPicker(
     int exIndex,
     int setIndex,
     int maxReps,
     bool withWeight,
   ) async {
-    int selectedReps = userExerciseRows[exIndex][setIndex].reps;
-    double selectedWeight = userExerciseRows[exIndex][setIndex].weight;
+    // Определяем начальные значения
+    final initialValues = _getInitialValues(exIndex, setIndex);
+    int selectedReps = initialValues['reps'] as int;
+    double selectedWeight = initialValues['weight'] as double;
+
+    // Создаем контроллеры для установки начальной позиции
+    final repsController = FixedExtentScrollController(
+      initialItem: selectedReps.clamp(0, maxReps),
+    );
+    final weightController = FixedExtentScrollController(
+      initialItem: (selectedWeight / 0.25).round().clamp(0, 4000),
+    );
+
     await showModalBottomSheet(
       context: context,
       builder: (context) {
@@ -253,6 +317,7 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
                         height: 120,
                         width: 80,
                         child: ListWheelScrollView.useDelegate(
+                          controller: repsController,
                           itemExtent: 40,
                           diameterRatio: 1.2,
                           physics: const FixedExtentScrollPhysics(),
@@ -281,6 +346,7 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
                           height: 120,
                           width: 80,
                           child: ListWheelScrollView.useDelegate(
+                            controller: weightController,
                             itemExtent: 40,
                             diameterRatio: 1.2,
                             physics: const FixedExtentScrollPhysics(),
@@ -294,7 +360,7 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
                                   style: const TextStyle(fontSize: 20),
                                 ),
                               ),
-                              childCount: 2001,
+                              childCount: 4001,
                             ),
                           ),
                         ),
@@ -328,7 +394,11 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
           ),
         );
       },
-    );
+    ).then((_) {
+      // Освобождаем контроллеры после закрытия модального окна
+      repsController.dispose();
+      weightController.dispose();
+    });
   }
 
   String _ending(int n, String one, String many, String few) {
@@ -445,8 +515,26 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
 
   List<Widget> _buildGifSection(ExerciseModel exercise) {
     final exerciseRef = exerciseReferences[exercise.uuid];
+    final videoUuid = exerciseRef?['video_uuid'];
     final gifUuid = exerciseRef?['gif_uuid'];
     final imageUuid = exerciseRef?['image_uuid'];
+
+    // Если есть video_uuid, показываем видео (с превью изображением, если есть)
+    if (videoUuid != null) {
+      return [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: VideoPlayerWidget(
+            videoUuid: videoUuid,
+            imageUuid: imageUuid,
+            width: double.infinity,
+            height: 250,
+            showControls: true,
+            autoInitialize: true,
+          ),
+        ),
+      ];
+    }
 
     // Если есть gif_uuid, показываем гифку
     if (gifUuid != null) {

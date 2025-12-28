@@ -36,6 +36,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   ExerciseModel? _selectedExercise;
   ExerciseStatisticsModel? _exerciseStatistics;
   bool _isLoadingExerciseStatistics = false;
+  bool _isExerciseDropdownOpen = false;
+  bool _isMeasurementTypeDropdownOpen = false;
 
   DateTime? _weightDateFrom;
   DateTime? _weightDateTo;
@@ -432,30 +434,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         // Выпадающий список типов измерений
         Row(
           children: [
-            Expanded(
-              child: DropdownButtonFormField<MeasurementTypeModel>(
-                value: _selectedCustomMeasurementType,
-                decoration: const InputDecoration(
-                  labelText: 'Тип измерения',
-                  border: OutlineInputBorder(),
-                ),
-                items: _userMeasurementTypes.map((type) {
-                  return DropdownMenuItem(
-                    value: type,
-                    child: Text(type.caption),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedCustomMeasurementType = value;
-                    _customMeasurements.clear();
-                  });
-                  if (value != null) {
-                    _loadCustomMeasurements();
-                  }
-                },
-              ),
-            ),
+            Expanded(child: _buildCustomMeasurementTypeDropdown()),
             const SizedBox(width: 16),
             IconButton(
               onPressed: () => _showMeasurementTypeModal(),
@@ -580,6 +559,316 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     );
   }
 
+  Widget _buildCustomMeasurementTypeDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              if (_userMeasurementTypes.isEmpty) return;
+              setState(() {
+                _isMeasurementTypeDropdownOpen =
+                    !_isMeasurementTypeDropdownOpen;
+              });
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: IgnorePointer(
+                child: TextFormField(
+                  readOnly: true,
+                  controller: TextEditingController(
+                    text: _selectedCustomMeasurementType?.caption ?? '',
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Тип измерения',
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 16,
+                    ),
+                    suffixIcon: Icon(
+                      _isMeasurementTypeDropdownOpen
+                          ? Icons.arrow_drop_up
+                          : Icons.arrow_drop_down,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (_isMeasurementTypeDropdownOpen) ...[
+          const SizedBox(height: 4),
+          Container(
+            width: double.infinity,
+            height: _userMeasurementTypes.length > 5 ? 300 : null,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A1A),
+              border: Border.all(color: Colors.grey.shade700, width: 1),
+              borderRadius: BorderRadius.circular(4),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.5),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: _userMeasurementTypes.length > 5
+                ? ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 300),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: _userMeasurementTypes.length,
+                      separatorBuilder: (context, index) =>
+                          Divider(height: 1, color: Colors.grey.shade700),
+                      itemBuilder: (context, index) {
+                        final type = _userMeasurementTypes[index];
+                        return InkWell(
+                          onTap: () {
+                            setState(() {
+                              _selectedCustomMeasurementType = type;
+                              _isMeasurementTypeDropdownOpen = false;
+                              _customMeasurements.clear();
+                            });
+                            _loadCustomMeasurements();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            child: Text(
+                              type.caption,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  )
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: _userMeasurementTypes.map((type) {
+                      return InkWell(
+                        onTap: () {
+                          setState(() {
+                            _selectedCustomMeasurementType = type;
+                            _isMeasurementTypeDropdownOpen = false;
+                            _customMeasurements.clear();
+                          });
+                          _loadCustomMeasurements();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          child: Text(
+                            type.caption,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildCustomDropdown() {
+    print('=== _buildCustomDropdown CALLED ===');
+    print('Dropdown state: $_isExerciseDropdownOpen');
+    print('Exercises count: ${_exercises.length}');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              print('=== DROPDOWN TAPPED (InkWell) ===');
+              print('Exercises count: ${_exercises.length}');
+              print('Current dropdown state: $_isExerciseDropdownOpen');
+              print(
+                'Selected exercise: ${_selectedExercise?.caption ?? 'null'}',
+              );
+
+              if (_exercises.isEmpty) {
+                print('ERROR: Exercises list is empty!');
+                return;
+              }
+
+              print('Toggling dropdown state...');
+              setState(() {
+                _isExerciseDropdownOpen = !_isExerciseDropdownOpen;
+              });
+              print('New dropdown state: $_isExerciseDropdownOpen');
+              print(
+                'Will ${_isExerciseDropdownOpen ? 'SHOW' : 'HIDE'} dropdown list',
+              );
+              print('==================================');
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: IgnorePointer(
+                child: TextFormField(
+                  readOnly: true,
+                  controller: TextEditingController(
+                    text: _selectedExercise?.caption ?? '',
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Выберите упражнение',
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 16,
+                    ),
+                    suffixIcon: Icon(
+                      _isExerciseDropdownOpen
+                          ? Icons.arrow_drop_up
+                          : Icons.arrow_drop_down,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (_isExerciseDropdownOpen) ...[
+          Builder(
+            builder: (context) {
+              print('=== RENDERING DROPDOWN LIST ===');
+              print('Dropdown is open: $_isExerciseDropdownOpen');
+              print('Exercises count: ${_exercises.length}');
+              print(
+                'Container will have height: ${_exercises.length > 5 ? 300 : 'auto'}',
+              );
+              print('===============================');
+              return const SizedBox(height: 4);
+            },
+          ),
+          Container(
+            width: double.infinity,
+            height: _exercises.length > 5 ? 300 : null,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A1A),
+              border: Border.all(color: Colors.grey.shade700, width: 1),
+              borderRadius: BorderRadius.circular(4),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.5),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: _exercises.length > 5
+                ? ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 300),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: _exercises.length,
+                      separatorBuilder: (context, index) =>
+                          Divider(height: 1, color: Colors.grey.shade700),
+                      itemBuilder: (context, index) {
+                        final exercise = _exercises[index];
+                        return InkWell(
+                          onTap: () {
+                            print('=== EXERCISE SELECTED ===');
+                            print('Selected exercise: ${exercise.caption}');
+                            print('Exercise UUID: ${exercise.uuid}');
+                            setState(() {
+                              _selectedExercise = exercise;
+                              _isExerciseDropdownOpen = false;
+                              _exerciseStatistics = null;
+                              _isLoadingExerciseStatistics = false;
+                            });
+                            print('Dropdown closed, loading statistics...');
+                            _loadExerciseStatistics(exercise);
+                            print('==========================');
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            child: Text(
+                              exercise.caption,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  )
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: _exercises.map((exercise) {
+                      return InkWell(
+                        onTap: () {
+                          setState(() {
+                            _selectedExercise = exercise;
+                            _isExerciseDropdownOpen = false;
+                            _exerciseStatistics = null;
+                            _isLoadingExerciseStatistics = false;
+                          });
+                          _loadExerciseStatistics(exercise);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          child: Text(
+                            exercise.caption,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildExerciseStatistics() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -594,29 +883,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         ),
         const SizedBox(height: 16),
 
-        DropdownButtonFormField<ExerciseModel>(
-          value: _selectedExercise,
-          decoration: const InputDecoration(
-            labelText: 'Выберите упражнение',
-            border: OutlineInputBorder(),
-          ),
-          items: _exercises.map((exercise) {
-            return DropdownMenuItem(
-              value: exercise,
-              child: Text(exercise.caption),
-            );
-          }).toList(),
-          onChanged: (value) {
-            setState(() {
-              _selectedExercise = value;
-              _exerciseStatistics = null;
-              _isLoadingExerciseStatistics = false;
-            });
-            if (value != null) {
-              _loadExerciseStatistics(value);
-            }
-          },
-        ),
+        _buildCustomDropdown(),
 
         if (_selectedExercise != null) ...[
           const SizedBox(height: 16),

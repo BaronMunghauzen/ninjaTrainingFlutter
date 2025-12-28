@@ -4,6 +4,7 @@ import '../../services/user_training_service.dart';
 import '../../services/api_service.dart';
 import '../../widgets/gif_widget.dart';
 import '../../widgets/auth_image_widget.dart';
+import '../../widgets/video_player_widget.dart';
 import 'user_exercise_edit_screen.dart';
 
 class UserExerciseGroupDetailScreen extends StatefulWidget {
@@ -32,6 +33,7 @@ class _UserExerciseGroupDetailScreenState
   String? exerciseReferenceName;
   dynamic exerciseReferenceGif;
   dynamic exerciseReferenceImage;
+  dynamic exerciseReferenceVideo;
 
   @override
   void initState() {
@@ -104,6 +106,7 @@ class _UserExerciseGroupDetailScreenState
           exerciseReferenceName = data['caption'] ?? 'Неизвестное упражнение';
           exerciseReferenceGif = data['gif_uuid'] ?? data['gif'];
           exerciseReferenceImage = data['image_uuid'] ?? data['image'];
+          exerciseReferenceVideo = data['video_uuid'] ?? data['video'];
         });
       }
     } catch (e) {
@@ -145,9 +148,20 @@ class _UserExerciseGroupDetailScreenState
   }
 
   Widget? _buildMediaWidget() {
-    // Приоритет: сначала гифка, потом картинка
+    // Приоритет: сначала видео, затем гифка, затем картинка
+    String? videoUuid;
     String? gifUuid;
     String? imageUuid;
+
+    // Извлекаем UUID видео
+    if (exerciseReferenceVideo != null) {
+      if (exerciseReferenceVideo is String &&
+          exerciseReferenceVideo.isNotEmpty) {
+        videoUuid = exerciseReferenceVideo;
+      } else if (exerciseReferenceVideo is Map<String, dynamic>) {
+        videoUuid = exerciseReferenceVideo['uuid'] as String?;
+      }
+    }
 
     // Извлекаем UUID гифки
     if (exerciseReferenceGif != null) {
@@ -166,6 +180,18 @@ class _UserExerciseGroupDetailScreenState
       } else if (exerciseReferenceImage is Map<String, dynamic>) {
         imageUuid = exerciseReferenceImage['uuid'] as String?;
       }
+    }
+
+    // Если есть видео, показываем плеер с превью
+    if (videoUuid != null && videoUuid.isNotEmpty) {
+      return VideoPlayerWidget(
+        videoUuid: videoUuid,
+        imageUuid: imageUuid,
+        height: 250,
+        width: double.infinity,
+        showControls: true,
+        autoInitialize: true,
+      );
     }
 
     // Если есть гифка, показываем её
