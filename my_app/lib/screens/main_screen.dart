@@ -8,6 +8,7 @@ import '../../services/api_service.dart';
 import 'system_program/training_screen.dart';
 import 'achievements_and_statistics/achievements_and_statistics_screen.dart';
 import 'profile/profile_screen.dart';
+import 'food/food_screen.dart';
 import '../widgets/network_status_banner.dart';
 
 class MainScreen extends StatefulWidget {
@@ -70,8 +71,9 @@ class _MainScreenState extends State<MainScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   _buildNavItem(0, 'assets/images/training.png', ''),
-                  _buildNavItem(1, 'assets/images/achivandstat.png', ''),
-                  _buildNavItem(2, 'assets/images/profile.png', ''),
+                  _buildNavItem(1, 'assets/images/food.png', ''),
+                  _buildNavItem(2, 'assets/images/achivandstat.png', ''),
+                  _buildNavItem(3, 'assets/images/profile.png', ''),
                 ],
               ),
             ),
@@ -129,8 +131,10 @@ class _MainScreenState extends State<MainScreen> {
       case 0:
         return const TrainingScreen();
       case 1:
-        return const AchievementsAndStatisticsScreen();
+        return const FoodScreen();
       case 2:
+        return const AchievementsAndStatisticsScreen();
+      case 3:
         return ProfileScreen(isPaymentVisible: _isPaymentVisible);
       default:
         return const TrainingScreen();
@@ -144,7 +148,7 @@ class _MainScreenState extends State<MainScreen> {
       });
     }
 
-    if (index == 2) {
+    if (index == 3) {
       await _loadAppSettings();
     }
   }
@@ -153,9 +157,9 @@ class _MainScreenState extends State<MainScreen> {
   bool _isUserFromRussia() {
     final locale = ui.PlatformDispatcher.instance.locale;
     // Проверяем код страны или языка
-    return locale.countryCode == 'RU' || 
-           locale.languageCode == 'ru' ||
-           locale.toString().toLowerCase().contains('ru');
+    return locale.countryCode == 'RU' ||
+        locale.languageCode == 'ru' ||
+        locale.toString().toLowerCase().contains('ru');
   }
 
   /// Вычисляет, нужно ли показывать блок оплаты на основе настроек и страны пользователя
@@ -198,14 +202,14 @@ class _MainScreenState extends State<MainScreen> {
 
       if (response.statusCode == 200) {
         final decoded = ApiService.decodeJson(response.body);
-        
+
         // Извлекаем настройки из ответа
         final appSettings = decoded is Map<String, dynamic>
             ? (decoded['app'] as Map?)
             : null;
-        
+
         final bool isPaymentVisible = appSettings?['isPaymentVisible'] == true;
-        final bool isPaymentVisibleWorldwide = 
+        final bool isPaymentVisibleWorldwide =
             appSettings?['isPaymentVisibleWorldwide'] == true;
 
         // Вычисляем финальное значение видимости с учетом страны пользователя
