@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/user_training_service.dart';
+import '../../widgets/textured_background.dart';
+import '../../widgets/metal_back_button.dart';
+import '../../widgets/metal_text_field.dart';
+import '../../widgets/metal_button.dart';
+import '../../widgets/metal_message.dart';
+import '../../design/ninja_spacing.dart';
+import '../../design/ninja_typography.dart';
 
 class UserTrainingCreateScreen extends StatefulWidget {
   const UserTrainingCreateScreen({Key? key}) : super(key: key);
@@ -13,11 +19,9 @@ class UserTrainingCreateScreen extends StatefulWidget {
 }
 
 class _UserTrainingCreateScreenState extends State<UserTrainingCreateScreen> {
-  final _formKey = GlobalKey<FormState>();
   final _captionController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _muscleGroupController = TextEditingController();
-  int _difficultyLevel = 1;
   bool _isLoading = false;
 
   @override
@@ -29,9 +33,18 @@ class _UserTrainingCreateScreenState extends State<UserTrainingCreateScreen> {
   }
 
   Future<void> _createTraining() async {
-    if (!_formKey.currentState!.validate()) return;
+    // Валидация - обязательное только название
+    if (_captionController.text.trim().isEmpty) {
+      if (mounted) {
+        MetalMessage.show(
+          context: context,
+          message: 'Пожалуйста, введите название тренировки',
+          type: MetalMessageType.error,
+        );
+      }
+      return;
+    }
 
-    if (!mounted) return;
     setState(() {
       _isLoading = true;
     });
@@ -41,38 +54,56 @@ class _UserTrainingCreateScreenState extends State<UserTrainingCreateScreen> {
       final userUuid = authProvider.userUuid;
 
       if (userUuid == null) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ошибка: не найден userUuid')),
-        );
+        if (mounted) {
+          MetalMessage.show(
+            context: context,
+            message: 'Ошибка: не найден userUuid',
+            type: MetalMessageType.error,
+          );
+        }
+        setState(() {
+          _isLoading = false;
+        });
         return;
       }
 
       final result = await UserTrainingService.createUserTraining(
         userUuid: userUuid,
-        caption: _captionController.text,
-        description: _descriptionController.text,
-        difficultyLevel: _difficultyLevel,
-        muscleGroup: _muscleGroupController.text,
+        caption: _captionController.text.trim(),
+        description: _descriptionController.text.trim().isEmpty
+            ? null
+            : _descriptionController.text.trim(),
+        muscleGroup: _muscleGroupController.text.trim().isEmpty
+            ? null
+            : _muscleGroupController.text.trim(),
       );
 
       if (result != null) {
-        if (!mounted) return;
-        Navigator.of(context).pop(true);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Тренировка создана')));
+        if (mounted) {
+          Navigator.of(context).pop(true);
+          MetalMessage.show(
+            context: context,
+            message: 'Тренировка создана',
+            type: MetalMessageType.success,
+          );
+        }
       } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ошибка при создании тренировки')),
-        );
+        if (mounted) {
+          MetalMessage.show(
+            context: context,
+            message: 'Ошибка при создании тренировки',
+            type: MetalMessageType.error,
+          );
+        }
       }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      if (mounted) {
+        MetalMessage.show(
+          context: context,
+          message: 'Ошибка: $e',
+          type: MetalMessageType.error,
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -85,98 +116,63 @@ class _UserTrainingCreateScreenState extends State<UserTrainingCreateScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Создать тренировку',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        backgroundColor: AppColors.surface,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
+      backgroundColor: Colors.transparent,
+      body: TexturedBackground(
+        child: SafeArea(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TextFormField(
-                controller: _captionController,
-                decoration: const InputDecoration(
-                  labelText: 'Название тренировки',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Пожалуйста, введите название';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Описание',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Пожалуйста, введите описание';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _muscleGroupController,
-                decoration: const InputDecoration(
-                  labelText: 'Группа мышц',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Пожалуйста, введите группу мышц';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<int>(
-                value: _difficultyLevel,
-                decoration: const InputDecoration(
-                  labelText: 'Уровень сложности',
-                  border: OutlineInputBorder(),
-                ),
-                items: [
-                  DropdownMenuItem(value: 1, child: Text('Начинающий')),
-                  DropdownMenuItem(value: 2, child: Text('Средний')),
-                  DropdownMenuItem(value: 3, child: Text('Продвинутый')),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    _difficultyLevel = value!;
-                  });
-                },
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _isLoading ? null : _createTraining,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.buttonPrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: _isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
+              // Верхний раздел с кнопкой назад и названием
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Row(
+                  children: [
+                    const MetalBackButton(),
+                    const SizedBox(width: NinjaSpacing.md),
+                    Expanded(
+                      child: Text(
                         'Создать тренировку',
-                        style: TextStyle(fontSize: 16),
+                        style: NinjaText.title,
+                        textAlign: TextAlign.center,
                       ),
+                    ),
+                    const SizedBox(width: NinjaSpacing.md),
+                    // Пустое место для симметрии
+                    const SizedBox(width: 48),
+                  ],
+                ),
+              ),
+              // Форма
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      MetalTextField(
+                        controller: _captionController,
+                        hint: 'Название тренировки',
+                      ),
+                      const SizedBox(height: NinjaSpacing.lg),
+                      MetalTextField(
+                        controller: _descriptionController,
+                        hint: 'Описание (не обязательно)',
+                        maxLines: 3,
+                      ),
+                      const SizedBox(height: NinjaSpacing.lg),
+                      MetalTextField(
+                        controller: _muscleGroupController,
+                        hint: 'Группа мышц (не обязательно)',
+                      ),
+                      const SizedBox(height: NinjaSpacing.xl),
+                      MetalButton(
+                        label: 'Создать тренировку',
+                        onPressed: _isLoading ? null : _createTraining,
+                        height: 56,
+                        isLoading: _isLoading,
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),

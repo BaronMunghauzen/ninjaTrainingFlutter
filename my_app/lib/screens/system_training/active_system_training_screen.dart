@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import '../../constants/app_colors.dart';
 import '../../services/training_service.dart';
@@ -7,6 +6,13 @@ import '../../services/api_service.dart';
 import 'system_exercise_group_screen.dart';
 import '../../widgets/subscription_error_dialog.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/textured_background.dart';
+import '../../widgets/metal_back_button.dart';
+import '../../widgets/metal_button.dart';
+import '../../widgets/exercise_group_list_item.dart';
+import '../../widgets/metal_message.dart';
+import '../../design/ninja_spacing.dart';
+import '../../design/ninja_typography.dart';
 
 class ActiveSystemTrainingScreen extends StatefulWidget {
   final Map<String, dynamic> userTraining;
@@ -22,8 +28,6 @@ class _ActiveSystemTrainingScreenState
     extends State<ActiveSystemTrainingScreen> {
   List<Map<String, dynamic>> _exerciseGroups = [];
   bool _isLoadingGroups = false;
-  bool _showCongrats = false;
-  String? _authToken;
 
   @override
   void initState() {
@@ -38,7 +42,6 @@ class _ActiveSystemTrainingScreenState
       _checkSubscription();
     });
 
-    _loadAuthToken();
     print('🚀 Вызываем _loadExerciseGroups...');
     _loadExerciseGroups();
     print('🚀 initState() завершен');
@@ -59,15 +62,6 @@ class _ActiveSystemTrainingScreenState
         ),
       );
     }
-  }
-
-  Future<void> _loadAuthToken() async {
-    print('🔐 Начинаем загрузку токена...');
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _authToken = prefs.getString('user_token');
-    });
-    print('🔐 Токен загружен: ${_authToken != null ? "есть" : "нет"}');
   }
 
   Future<void> _loadExerciseGroups() async {
@@ -99,28 +93,53 @@ class _ActiveSystemTrainingScreenState
     }
   }
 
+  Future<ImageProvider?> _loadExerciseGroupImage(String? imageUuid) async {
+    if (imageUuid == null || imageUuid.isEmpty) return null;
+    try {
+      return await ApiService.getImageProvider(imageUuid);
+    } catch (e) {
+      print('[API] exception: $e');
+      return null;
+    }
+  }
+
+  String? _getImageUuid(Map<String, dynamic> group) {
+    final imageUuid = group['image_uuid'];
+    if (imageUuid is String && imageUuid.isNotEmpty) return imageUuid;
+    return null;
+  }
+
   Future<void> _skipTraining() async {
     try {
       final response = await TrainingService.skipUserTrainingWithResponse(
         widget.userTraining['uuid'],
       );
       if (response['success'] == true) {
-        setState(() {
-          _showCongrats = response['next_stage_created'] == true;
-        });
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Тренировка пропущена')));
+        MetalMessage.show(
+          context: context,
+          message: 'Тренировка успешно пропущена',
+          type: MetalMessageType.success,
+          title: 'Тренировка пропущена',
+          description: 'Тренировка успешно пропущена',
+        );
         Navigator.of(context).popUntil((route) => route.isFirst);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ошибка пропуска тренировки')),
+        MetalMessage.show(
+          context: context,
+          message: 'Не удалось пропустить тренировку',
+          type: MetalMessageType.error,
+          title: 'Ошибка',
+          description: 'Ошибка пропуска тренировки',
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      MetalMessage.show(
+        context: context,
+        message: e.toString(),
+        type: MetalMessageType.error,
+        title: 'Ошибка',
+        description: 'Произошла ошибка при пропуске тренировки',
+      );
     }
   }
 
@@ -130,22 +149,31 @@ class _ActiveSystemTrainingScreenState
         widget.userTraining['uuid'],
       );
       if (response['success'] == true) {
-        setState(() {
-          _showCongrats = response['next_stage_created'] == true;
-        });
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Тренировка завершена')));
+        MetalMessage.show(
+          context: context,
+          message: 'Тренировка успешно завершена',
+          type: MetalMessageType.success,
+          title: 'Тренировка завершена',
+          description: 'Тренировка успешно завершена',
+        );
         Navigator.of(context).popUntil((route) => route.isFirst);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ошибка завершения тренировки')),
+        MetalMessage.show(
+          context: context,
+          message: 'Не удалось завершить тренировку',
+          type: MetalMessageType.error,
+          title: 'Ошибка',
+          description: 'Ошибка завершения тренировки',
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      MetalMessage.show(
+        context: context,
+        message: e.toString(),
+        type: MetalMessageType.error,
+        title: 'Ошибка',
+        description: 'Произошла ошибка при завершении тренировки',
+      );
     }
   }
 
@@ -155,293 +183,167 @@ class _ActiveSystemTrainingScreenState
     final isRestDay = widget.userTraining['is_rest_day'] ?? false;
     final status =
         widget.userTraining['status']?.toString().toLowerCase() ?? '';
+    final isActiveTraining = status == 'active';
 
     print('🏗️ Build вызван: isRestDay=$isRestDay, status=$status');
     print('🏗️ Загружаются группы: $_isLoadingGroups');
     print('🏗️ Количество групп: ${_exerciseGroups.length}');
+
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Активная тренировка')),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              training['caption'] ?? '',
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            if (isRestDay)
-              Column(
-                children: [
-                  Icon(Icons.bedtime, size: 80, color: AppColors.textSecondary),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'День отдыха',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Сегодня можно отдохнуть и восстановиться',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: AppColors.textSecondary,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 30),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: _passTraining,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.green,
-                        side: const BorderSide(color: Colors.green, width: 2),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'Завершить',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.green,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                ],
-              )
-            else ...[
-              Expanded(
-                child: _isLoadingGroups
-                    ? const Center(child: CircularProgressIndicator())
-                    : _exerciseGroups.isEmpty
-                    ? const Center(child: Text('Нет групп упражнений'))
-                    : ListView.separated(
-                        itemCount: _exerciseGroups.length,
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(height: 16),
-                        itemBuilder: (context, index) {
-                          final group = _exerciseGroups[index];
-                          print(
-                            '🎨 Отображаем группу $index: ${group['caption']}, image_uuid: ${group['image_uuid']}',
-                          );
-                          return GestureDetector(
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      SystemExerciseGroupScreen(
-                                        exerciseGroupUuid: group['uuid'],
-                                        userTraining: widget.userTraining,
-                                      ),
-                                ),
-                              );
-                            },
-                            child: Container(
-                              width: double.infinity,
-                              height: 100,
-                              decoration: BoxDecoration(
-                                color: AppColors.surface,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: AppColors.inputBorder,
-                                  width: 1,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.03),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Stack(
-                                children: [
-                                  // Фоновое изображение или цвет
-                                  Positioned.fill(
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(16),
-                                      child: group['image_uuid'] != null
-                                          ? Image.network(
-                                              '${ApiService.baseUrl}/files/file/${group['image_uuid']}',
-                                              fit: BoxFit.cover,
-                                              headers: _authToken != null
-                                                  ? {
-                                                      'Cookie':
-                                                          'users_access_token=$_authToken',
-                                                    }
-                                                  : {},
-                                              errorBuilder:
-                                                  (context, error, stackTrace) {
-                                                    return Container(
-                                                      color: Colors.black
-                                                          .withOpacity(0.05),
-                                                      child: const Center(
-                                                        child: Icon(
-                                                          Icons.fitness_center,
-                                                          size: 40,
-                                                          color: AppColors
-                                                              .textSecondary,
-                                                        ),
-                                                      ),
-                                                    );
-                                                  },
-                                              key: ValueKey(
-                                                group['image_uuid'],
-                                              ),
-                                            )
-                                          : Container(
-                                              color: Colors.black.withOpacity(
-                                                0.05,
-                                              ),
-                                              child: const Center(
-                                                child: Icon(
-                                                  Icons.fitness_center,
-                                                  size: 40,
-                                                  color:
-                                                      AppColors.textSecondary,
-                                                ),
-                                              ),
-                                            ),
-                                    ),
-                                  ),
-                                  // Градиент для читаемости текста
-                                  Positioned.fill(
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(16),
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topCenter,
-                                          end: Alignment.bottomCenter,
-                                          colors: [
-                                            Colors.transparent,
-                                            Colors.black.withOpacity(0.7),
-                                          ],
-                                          stops: const [0.4, 1.0],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  // Текст с названием группы
-                                  Positioned(
-                                    bottom: 12,
-                                    left: 12,
-                                    right: 12,
-                                    child: Text(
-                                      group['caption'] ?? '',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        shadows: [
-                                          Shadow(
-                                            offset: Offset(0, 1),
-                                            blurRadius: 2,
-                                            color: Colors.black54,
-                                          ),
-                                        ],
-                                      ),
-                                      textAlign: TextAlign.center,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-              const SizedBox(height: 20),
-              if (status == 'active')
+      backgroundColor: Colors.transparent,
+      body: TexturedBackground(
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Верхняя панель с кнопкой назад и названием тренировки
                 Row(
                   children: [
+                    const MetalBackButton(),
+                    const SizedBox(width: NinjaSpacing.md),
                     Expanded(
-                      child: OutlinedButton(
-                        onPressed: _skipTraining,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red,
-                          side: const BorderSide(color: Colors.red, width: 2),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text(
-                          'Пропустить',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.red,
-                          ),
-                        ),
+                      child: Text(
+                        training['caption'] ?? 'Активная тренировка',
+                        style: NinjaText.title,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _passTraining,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.green,
-                          side: const BorderSide(color: Colors.green, width: 2),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text(
-                          'Завершить',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.green,
-                          ),
-                        ),
-                      ),
-                    ),
+                    const SizedBox(width: NinjaSpacing.md),
+                    // Пустое место для симметрии
+                    const SizedBox(width: 48),
                   ],
                 ),
-              if (status == 'passed')
-                const Padding(
-                  padding: EdgeInsets.only(top: 16.0),
-                  child: Text(
-                    'Тренировка завершена',
-                    style: TextStyle(
-                      color: Colors.green,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    textAlign: TextAlign.center,
+                const SizedBox(height: 16),
+                if (isRestDay)
+                  _buildRestDayContent()
+                else ...[
+                  // Группы упражнений
+                  Expanded(
+                    child: _isLoadingGroups
+                        ? const Center(child: CircularProgressIndicator())
+                        : _exerciseGroups.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'Нет групп упражнений',
+                              style: NinjaText.body,
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: _exerciseGroups.length,
+                            itemBuilder: (context, index) {
+                              final group = _exerciseGroups[index];
+                              final isFirst = index == 0;
+                              final isLast =
+                                  index == _exerciseGroups.length - 1;
+                              return ExerciseGroupListItem(
+                                group: group,
+                                isActive: isActiveTraining,
+                                isFirst: isFirst,
+                                isLast: isLast,
+                                onTap: () {
+                                  if (!isActiveTraining) {
+                                    MetalMessage.show(
+                                      context: context,
+                                      message:
+                                          'Выполните тренировку в назначенное время.',
+                                      type: MetalMessageType.warning,
+                                      title: 'Тренировка не активна',
+                                      description:
+                                          'Выполните тренировку в назначенное время.',
+                                    );
+                                    return;
+                                  }
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          SystemExerciseGroupScreen(
+                                            exerciseGroupUuid: group['uuid'],
+                                            userTraining: widget.userTraining,
+                                          ),
+                                    ),
+                                  );
+                                },
+                                loadImage: _loadExerciseGroupImage,
+                                getImageUuid: _getImageUuid,
+                              );
+                            },
+                          ),
                   ),
-                ),
-              if (status == 'skipped')
-                const Padding(
-                  padding: EdgeInsets.only(top: 16.0),
-                  child: Text(
-                    'Тренировка пропущена',
-                    style: TextStyle(
-                      color: Colors.orange,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
+                  const SizedBox(height: 20),
+                  // Кнопки управления тренировкой или статус
+                  if (status == 'active')
+                    Row(
+                      children: [
+                        Expanded(
+                          child: MetalButton(
+                            label: 'Пропустить',
+                            onPressed: _skipTraining,
+                            height: 56,
+                            fontSize: 16,
+                            position: MetalButtonPosition.first,
+                            topColor: Colors.red,
+                          ),
+                        ),
+                        Expanded(
+                          child: MetalButton(
+                            label: 'Завершить',
+                            onPressed: _passTraining,
+                            height: 56,
+                            fontSize: 16,
+                            position: MetalButtonPosition.last,
+                            topColor: Colors.green,
+                          ),
+                        ),
+                      ],
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-            ],
-          ],
+                  // Сообщения о статусе отображаются через MetalMessage.show в методах _passTraining и _skipTraining
+                ],
+              ],
+            ),
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildRestDayContent() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Spacer(),
+        Icon(Icons.bedtime, size: 80, color: AppColors.textSecondary),
+        const SizedBox(height: 20),
+        const Text(
+          'День отдыха',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'Сегодня можно отдохнуть и восстановиться',
+          style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 30),
+        SizedBox(
+          width: double.infinity,
+          child: MetalButton(
+            label: 'Завершить',
+            onPressed: _passTraining,
+            height: 56,
+            fontSize: 16,
+            topColor: Colors.green,
+          ),
+        ),
+        const SizedBox(height: 30),
+      ],
     );
   }
 }

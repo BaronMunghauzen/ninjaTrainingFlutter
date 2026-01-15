@@ -7,6 +7,13 @@ import 'package:provider/provider.dart';
 import '../user_training_constructor/user_exercise_selector_screen.dart';
 import 'free_workout_exercise_group_screen.dart';
 import '../../widgets/gif_widget.dart';
+import '../../widgets/textured_background.dart';
+import '../../widgets/metal_back_button.dart';
+import '../../widgets/metal_button.dart';
+import '../../widgets/metal_list_item.dart';
+import '../../widgets/metal_modal.dart';
+import '../../design/ninja_spacing.dart';
+import '../../design/ninja_typography.dart';
 // import '../../widgets/video_player_widget.dart';
 
 class FreeWorkoutScreen extends StatefulWidget {
@@ -200,28 +207,46 @@ class _FreeWorkoutScreenState extends State<FreeWorkoutScreen> {
   }
 
   void _showFinishConfirmation() {
-    showDialog(
+    MetalModal.show(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Завершить тренировку?'),
-        content: const Text('Вы уверены, что хотите завершить тренировку?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Отмена'),
-          ),
-          ElevatedButton(
-            onPressed: _finishTraining,
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Завершить'),
-          ),
-        ],
-      ),
+      title: 'Завершить тренировку?',
+      children: [
+        Text(
+          'Вы уверены, что хотите завершить тренировку?',
+          style: NinjaText.body,
+        ),
+        const SizedBox(height: NinjaSpacing.xl),
+        Row(
+          children: [
+            Expanded(
+              child: MetalButton(
+                label: 'Отмена',
+                onPressed: () => Navigator.of(context).pop(),
+                height: 56,
+                fontSize: 16,
+                position: MetalButtonPosition.first,
+              ),
+            ),
+            Expanded(
+              child: MetalButton(
+                label: 'Завершить',
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _finishTraining();
+                },
+                height: 56,
+                fontSize: 16,
+                position: MetalButtonPosition.last,
+                topColor: Colors.green,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
   Future<void> _finishTraining() async {
-    Navigator.of(context).pop(); // Закрываем подтверждение
     try {
       // POST /user_trainings/{user_training_uuid}/pass
       final response = await ApiService.post(
@@ -352,115 +377,117 @@ class _FreeWorkoutScreenState extends State<FreeWorkoutScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text(
-          trainingCaption,
-          style: const TextStyle(color: AppColors.textPrimary),
-        ),
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
-      ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: exerciseGroups.length + 1, // +1 для кнопки
-                    itemBuilder: (context, index) {
-                      // Кнопка "Добавить упражнение" после всех упражнений
-                      if (index == exerciseGroups.length) {
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: ElevatedButton.icon(
-                            onPressed: _addExercise,
-                            icon: const Icon(Icons.add),
-                            label: const Text('Добавить упражнение'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.buttonPrimary,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+      backgroundColor: Colors.transparent,
+      body: TexturedBackground(
+        child: SafeArea(
+          child: isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : Column(
+                  children: [
+                    // Верхняя панель с кнопкой назад и названием тренировки
+                    Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Row(
+                        children: [
+                          const MetalBackButton(),
+                          const SizedBox(width: NinjaSpacing.md),
+                          Expanded(
+                            child: Text(
+                              trainingCaption,
+                              style: NinjaText.title,
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: NinjaSpacing.md),
+                          // Пустое место для симметрии
+                          const SizedBox(width: 48),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        itemCount: exerciseGroups.length + 1, // +1 для кнопки
+                        itemBuilder: (context, index) {
+                          // Кнопка "Добавить упражнение" после всех упражнений
+                          if (index == exerciseGroups.length) {
+                            return Padding(
+                              padding: const EdgeInsets.only(
+                                top: 8,
+                                bottom: 16,
                               ),
-                            ),
-                          ),
-                        );
-                      }
-
-                      final group = exerciseGroups[index];
-                      final userEx = group['user_exercises'] as List? ?? [];
-
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        child: ListTile(
-                          leading: _buildExerciseMedia(group),
-                          title: Text(
-                            group['caption'] ?? '',
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          subtitle: Text(
-                            _formatUserExercises(userEx),
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 12,
-                            ),
-                          ),
-                          trailing: const Icon(
-                            Icons.chevron_right,
-                            color: AppColors.textSecondary,
-                          ),
-                          onTap: () async {
-                            await Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    FreeWorkoutExerciseGroupScreen(
-                                      exerciseGroupUuid: group['uuid'],
-                                      trainingUuid: widget.trainingUuid,
-                                      userTrainingUuid: widget.userTrainingUuid,
-                                    ),
+                              child: MetalButton(
+                                label: 'Добавить упражнение',
+                                icon: Icons.add,
+                                onPressed: _addExercise,
+                                height: 56,
+                                fontSize: 16,
                               ),
                             );
-                            _loadExerciseGroups(); // Обновляем после возврата
-                          },
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 10,
-                        offset: const Offset(0, -2),
+                          }
+
+                          final group = exerciseGroups[index];
+                          final userEx = group['user_exercises'] as List? ?? [];
+                          final formattedExercises = _formatUserExercises(
+                            userEx,
+                          );
+
+                          return MetalListItem(
+                            leading: _buildExerciseMedia(group),
+                            title: Text(
+                              group['caption'] ?? '',
+                              style: NinjaText.body.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: formattedExercises.isNotEmpty
+                                ? Text(
+                                    formattedExercises,
+                                    style: NinjaText.caption,
+                                  )
+                                : null,
+                            trailing: const Icon(
+                              Icons.chevron_right,
+                              color: AppColors.textSecondary,
+                            ),
+                            onTap: () async {
+                              await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      FreeWorkoutExerciseGroupScreen(
+                                        exerciseGroupUuid: group['uuid'],
+                                        trainingUuid: widget.trainingUuid,
+                                        userTrainingUuid:
+                                            widget.userTrainingUuid,
+                                      ),
+                                ),
+                              );
+                              _loadExerciseGroups(); // Обновляем после возврата
+                            },
+                            isFirst: index == 0,
+                            isLast: index == exerciseGroups.length - 1,
+                            removeSpacing: true,
+                          );
+                        },
                       ),
-                    ],
-                  ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _showFinishConfirmation,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: const Text('Завершить'),
                     ),
-                  ),
+                    // Кнопка "Завершить" внизу
+                    Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: MetalButton(
+                        label: 'Завершить',
+                        onPressed: _showFinishConfirmation,
+                        height: 56,
+                        fontSize: 16,
+                        topColor: Colors.green,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+        ),
+      ),
     );
   }
 }

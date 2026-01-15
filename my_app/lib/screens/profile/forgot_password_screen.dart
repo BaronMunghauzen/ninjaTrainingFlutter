@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
-import '../../widgets/custom_text_field.dart';
-import '../../widgets/custom_button.dart';
+import '../../widgets/textured_background.dart';
+import '../../widgets/metal_text_field.dart';
+import '../../widgets/metal_button.dart';
+import '../../widgets/metal_back_button.dart';
+import '../../widgets/metal_message.dart';
+import '../../design/ninja_typography.dart';
+import '../../design/ninja_colors.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({Key? key}) : super(key: key);
@@ -14,7 +18,6 @@ class ForgotPasswordScreen extends StatefulWidget {
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     with TickerProviderStateMixin {
-  final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _tokenController = TextEditingController();
   final _newPasswordController = TextEditingController();
@@ -22,6 +25,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
 
   bool _isLoading = false;
   bool _isTokenSent = false;
+  String? _emailError;
+  String? _tokenError;
+  String? _newPasswordError;
+  String? _confirmPasswordError;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -57,33 +64,49 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   }
 
   Future<void> _sendResetToken() async {
-    if (!_formKey.currentState!.validate()) return;
+    // Валидация
+    setState(() {
+      _emailError = null;
+    });
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (_emailController.text.trim().isEmpty) {
+      setState(() {
+        _emailError = 'Введите email';
+      });
+      return;
+    }
+
+    if (!authProvider.isValidEmail(_emailController.text.trim())) {
+      setState(() {
+        _emailError = 'Введите корректный email';
+      });
+      return;
+    }
 
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final error = await authProvider.sendPasswordResetEmail(
         _emailController.text.trim(),
       );
 
       if (error != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error), backgroundColor: AppColors.error),
+        MetalMessage.show(
+          context: context,
+          message: error,
+          type: MetalMessageType.error,
         );
       } else if (mounted) {
         setState(() {
           _isTokenSent = true;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Инструкции по сбросу пароля отправлены на ваш email',
-            ),
-            backgroundColor: AppColors.success,
-          ),
+        MetalMessage.show(
+          context: context,
+          message: 'Инструкции по сбросу пароля отправлены на ваш email',
+          type: MetalMessageType.success,
         );
       }
     } finally {
@@ -96,24 +119,54 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   }
 
   Future<void> _resetPassword() async {
-    if (!_formKey.currentState!.validate()) return;
+    // Валидация
+    setState(() {
+      _tokenError = null;
+      _newPasswordError = null;
+      _confirmPasswordError = null;
+    });
 
-    if (_newPasswordController.text != _confirmPasswordController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Пароли не совпадают'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-      return;
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    bool hasError = false;
+
+    if (_tokenController.text.trim().isEmpty) {
+      setState(() {
+        _tokenError = 'Введите код из письма';
+        hasError = true;
+      });
     }
+
+    if (_newPasswordController.text.isEmpty) {
+      setState(() {
+        _newPasswordError = 'Введите новый пароль';
+        hasError = true;
+      });
+    } else if (!authProvider.isValidPassword(_newPasswordController.text)) {
+      setState(() {
+        _newPasswordError = 'Пароль должен содержать минимум 6 символов';
+        hasError = true;
+      });
+    }
+
+    if (_confirmPasswordController.text.isEmpty) {
+      setState(() {
+        _confirmPasswordError = 'Подтвердите пароль';
+        hasError = true;
+      });
+    } else if (_confirmPasswordController.text != _newPasswordController.text) {
+      setState(() {
+        _confirmPasswordError = 'Пароли не совпадают';
+        hasError = true;
+      });
+    }
+
+    if (hasError) return;
 
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final error = await authProvider.resetPassword(
         _emailController.text.trim(),
         _tokenController.text.trim(),
@@ -121,15 +174,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
       );
 
       if (error != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error), backgroundColor: AppColors.error),
+        MetalMessage.show(
+          context: context,
+          message: error,
+          type: MetalMessageType.error,
         );
       } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Пароль успешно изменен'),
-            backgroundColor: AppColors.success,
-          ),
+        MetalMessage.show(
+          context: context,
+          message: 'Пароль успешно изменен',
+          type: MetalMessageType.success,
         );
         Navigator.of(context).pop();
       }
@@ -144,204 +198,185 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Сброс пароля'),
+    return TexturedBackground(
+      child: Scaffold(
         backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: AppColors.textPrimary,
-      ),
-      body: Stack(
-        children: [
-          // Фоновый градиент
-          Container(
-            decoration: const BoxDecoration(
-              gradient: AppColors.primaryGradient,
-            ),
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          leading: const MetalBackButton(),
+          title: Text(
+            'Сброс пароля',
+            style: NinjaText.title.copyWith(fontSize: 20),
           ),
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+        ),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: SlideTransition(
+                position: _slideAnimation,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 40),
 
-          // Основной контент
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const SizedBox(height: 40),
-
-                        // Иконка
-                        const Icon(
-                          Icons.lock_reset,
-                          size: 80,
-                          color: AppColors.textPrimary,
-                        ),
-
-                        const SizedBox(height: 24),
-
-                        Text(
-                          _isTokenSent
-                              ? 'Введите код и новый пароль'
-                              : 'Восстановление пароля',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        Text(
-                          _isTokenSent
-                              ? 'Введите код из письма и новый пароль'
-                              : 'Введите email для получения инструкций по сбросу пароля',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: AppColors.textSecondary,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-
-                        const SizedBox(height: 40),
-
-                        if (!_isTokenSent) ...[
-                          // Поле email
-                          CustomTextField(
-                            label: 'Email',
-                            hint: 'Введите ваш email',
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            prefixIcon: const Icon(
-                              Icons.email_outlined,
-                              color: AppColors.textSecondary,
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Введите email';
-                              }
-                              if (!Provider.of<AuthProvider>(
-                                context,
-                                listen: false,
-                              ).isValidEmail(value)) {
-                                return 'Введите корректный email';
-                              }
-                              return null;
-                            },
-                          ),
-                        ] else ...[
-                          // Поле кода
-                          CustomTextField(
-                            label: 'Код',
-                            hint: 'Введите код из письма',
-                            controller: _tokenController,
-                            keyboardType: TextInputType.text,
-                            prefixIcon: const Icon(
-                              Icons.vpn_key_outlined,
-                              color: AppColors.textSecondary,
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Введите код из письма';
-                              }
-                              return null;
-                            },
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // Поле нового пароля
-                          CustomTextField(
-                            label: 'Новый пароль',
-                            hint: 'Введите новый пароль',
-                            controller: _newPasswordController,
-                            isPassword: true,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Введите новый пароль';
-                              }
-                              if (!Provider.of<AuthProvider>(
-                                context,
-                                listen: false,
-                              ).isValidPassword(value)) {
-                                return 'Пароль должен содержать минимум 6 символов';
-                              }
-                              return null;
-                            },
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // Поле подтверждения пароля
-                          CustomTextField(
-                            label: 'Подтвердите пароль',
-                            hint: 'Повторите новый пароль',
-                            controller: _confirmPasswordController,
-                            isPassword: true,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Подтвердите пароль';
-                              }
-                              return null;
-                            },
-                          ),
-                        ],
-
-                        const SizedBox(height: 32),
-
-                        // Кнопка
-                        CustomButton(
-                          text: _isTokenSent
-                              ? 'Сбросить пароль'
-                              : 'Отправить код',
-                          onPressed: _isTokenSent
-                              ? _resetPassword
-                              : _sendResetToken,
-                          isLoading: _isLoading,
-                          icon: _isTokenSent ? Icons.lock_reset : Icons.send,
-                          height: 64,
-                        ),
-
-                        const SizedBox(height: 24),
-
-                        // Кнопка "Назад"
-                        TextButton(
-                          onPressed: () {
-                            if (_isTokenSent) {
-                              setState(() {
-                                _isTokenSent = false;
-                                _tokenController.clear();
-                                _newPasswordController.clear();
-                                _confirmPasswordController.clear();
-                              });
-                            } else {
-                              Navigator.of(context).pop();
-                            }
-                          },
-                          child: Text(
-                            _isTokenSent ? 'Назад' : 'Отмена',
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 40),
-                      ],
+                    // Иконка
+                    Icon(
+                      Icons.lock_reset,
+                      size: 80,
+                      color: NinjaColors.textPrimary,
                     ),
-                  ),
+
+                    const SizedBox(height: 24),
+
+                    Text(
+                      _isTokenSent
+                          ? 'Введите код и новый пароль'
+                          : 'Восстановление пароля',
+                      style: NinjaText.title.copyWith(fontSize: 24),
+                      textAlign: TextAlign.center,
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    Text(
+                      _isTokenSent
+                          ? 'Введите код из письма и новый пароль'
+                          : 'Введите email для получения инструкций по сбросу пароля',
+                      style: NinjaText.body.copyWith(
+                        color: NinjaColors.textSecondary,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+
+                    const SizedBox(height: 40),
+
+                    if (!_isTokenSent) ...[
+                      // Поле email
+                      Text('Email', style: NinjaText.section),
+                      const SizedBox(height: 8),
+                      MetalTextField(
+                        controller: _emailController,
+                        hint: 'Введите ваш email',
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                      if (_emailError != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            _emailError!,
+                            style: NinjaText.caption.copyWith(
+                              color: NinjaColors.error,
+                            ),
+                          ),
+                        ),
+                    ] else ...[
+                      // Поле кода
+                      Text('Код', style: NinjaText.section),
+                      const SizedBox(height: 8),
+                      MetalTextField(
+                        controller: _tokenController,
+                        hint: 'Введите код из письма',
+                        keyboardType: TextInputType.text,
+                      ),
+                      if (_tokenError != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            _tokenError!,
+                            style: NinjaText.caption.copyWith(
+                              color: NinjaColors.error,
+                            ),
+                          ),
+                        ),
+
+                      const SizedBox(height: 20),
+
+                      // Поле нового пароля
+                      Text('Новый пароль', style: NinjaText.section),
+                      const SizedBox(height: 8),
+                      MetalTextField(
+                        controller: _newPasswordController,
+                        hint: 'Введите новый пароль',
+                        isPassword: true,
+                      ),
+                      if (_newPasswordError != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            _newPasswordError!,
+                            style: NinjaText.caption.copyWith(
+                              color: NinjaColors.error,
+                            ),
+                          ),
+                        ),
+
+                      const SizedBox(height: 20),
+
+                      // Поле подтверждения пароля
+                      Text('Подтвердите пароль', style: NinjaText.section),
+                      const SizedBox(height: 8),
+                      MetalTextField(
+                        controller: _confirmPasswordController,
+                        hint: 'Повторите новый пароль',
+                        isPassword: true,
+                      ),
+                      if (_confirmPasswordError != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            _confirmPasswordError!,
+                            style: NinjaText.caption.copyWith(
+                              color: NinjaColors.error,
+                            ),
+                          ),
+                        ),
+                    ],
+
+                    const SizedBox(height: 32),
+
+                    // Кнопка
+                    MetalButton(
+                      label: _isTokenSent
+                          ? 'Сбросить пароль'
+                          : 'Отправить код',
+                      icon: _isTokenSent ? Icons.lock_reset : Icons.send,
+                      onPressed: _isTokenSent
+                          ? _resetPassword
+                          : _sendResetToken,
+                      isLoading: _isLoading,
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Кнопка "Назад"/"Отмена"
+                    MetalButton(
+                      label: _isTokenSent ? 'Назад' : 'Отмена',
+                      onPressed: () {
+                        if (_isTokenSent) {
+                          setState(() {
+                            _isTokenSent = false;
+                            _tokenController.clear();
+                            _newPasswordController.clear();
+                            _confirmPasswordController.clear();
+                          });
+                        } else {
+                          Navigator.of(context).pop();
+                        }
+                      },
+                    ),
+
+                    const SizedBox(height: 40),
+                  ],
                 ),
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }

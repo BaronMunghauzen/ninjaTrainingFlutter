@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 
 class MetalBackButton extends StatefulWidget {
   final VoidCallback? onTap;
+  final IconData? icon;
 
-  const MetalBackButton({super.key, this.onTap});
+  const MetalBackButton({
+    super.key,
+    this.onTap,
+    this.icon,
+  });
 
   @override
   State<MetalBackButton> createState() => _MetalBackButtonState();
@@ -58,7 +63,7 @@ class _MetalBackButtonState extends State<MetalBackButton> {
         child: Transform.translate(
           offset: _pressed ? const Offset(0, 1) : Offset.zero,
           child: Icon(
-            Icons.arrow_back_ios_new_rounded,
+            widget.icon ?? Icons.arrow_back_ios_new_rounded,
             size: 20,
             color: Colors.white.withOpacity(0.6),
           ),

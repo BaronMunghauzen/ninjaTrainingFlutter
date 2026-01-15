@@ -662,36 +662,39 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
               final duration = value.duration;
               final position = value.position;
 
-              return SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  activeTrackColor: AppColors.primary,
-                  inactiveTrackColor: Colors.white.withOpacity(0.3),
-                  thumbColor: AppColors.primary,
-                  overlayColor: AppColors.primary.withOpacity(0.2),
-                  trackHeight: 3,
-                  thumbShape: const RoundSliderThumbShape(
-                    enabledThumbRadius: 6,
+              return Material(
+                color: Colors.transparent,
+                child: SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    activeTrackColor: AppColors.primary,
+                    inactiveTrackColor: Colors.white.withOpacity(0.3),
+                    thumbColor: AppColors.primary,
+                    overlayColor: AppColors.primary.withOpacity(0.2),
+                    trackHeight: 3,
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 6,
+                    ),
                   ),
-                ),
-                child: Slider(
-                  value: position.inMilliseconds.toDouble(),
-                  min: 0.0,
-                  max: duration.inMilliseconds.toDouble(),
-                  onChanged: (value) {
-                    _controller?.seekTo(Duration(milliseconds: value.toInt()));
-                    // Сбрасываем таймер при взаимодействии с ползунком
-                    setState(() {
-                      _showVideoControls = true;
-                    });
-                    // Перезапускаем таймер автоскрытия
-                    Future.delayed(const Duration(seconds: 3), () {
-                      if (mounted && _showVideoControls) {
-                        setState(() {
-                          _showVideoControls = false;
-                        });
-                      }
-                    });
-                  },
+                  child: Slider(
+                    value: position.inMilliseconds.toDouble(),
+                    min: 0.0,
+                    max: duration.inMilliseconds.toDouble(),
+                    onChanged: (value) {
+                      _controller?.seekTo(Duration(milliseconds: value.toInt()));
+                      // Сбрасываем таймер при взаимодействии с ползунком
+                      setState(() {
+                        _showVideoControls = true;
+                      });
+                      // Перезапускаем таймер автоскрытия
+                      Future.delayed(const Duration(seconds: 3), () {
+                        if (mounted && _showVideoControls) {
+                          setState(() {
+                            _showVideoControls = false;
+                          });
+                        }
+                      });
+                    },
+                  ),
                 ),
               );
             },
@@ -993,29 +996,32 @@ class _FullscreenVideoPlayerState extends State<_FullscreenVideoPlayer> {
                                 final duration = value.duration;
                                 final position = value.position;
 
-                                return SliderTheme(
-                                  data: SliderTheme.of(context).copyWith(
-                                    activeTrackColor: AppColors.primary,
-                                    inactiveTrackColor: Colors.white
-                                        .withOpacity(0.3),
-                                    thumbColor: AppColors.primary,
-                                    overlayColor: AppColors.primary.withOpacity(
-                                      0.2,
+                                return Material(
+                                  color: Colors.transparent,
+                                  child: SliderTheme(
+                                    data: SliderTheme.of(context).copyWith(
+                                      activeTrackColor: AppColors.primary,
+                                      inactiveTrackColor: Colors.white
+                                          .withOpacity(0.3),
+                                      thumbColor: AppColors.primary,
+                                      overlayColor: AppColors.primary.withOpacity(
+                                        0.2,
+                                      ),
+                                      trackHeight: 4,
+                                      thumbShape: const RoundSliderThumbShape(
+                                        enabledThumbRadius: 8,
+                                      ),
                                     ),
-                                    trackHeight: 4,
-                                    thumbShape: const RoundSliderThumbShape(
-                                      enabledThumbRadius: 8,
+                                    child: Slider(
+                                      value: position.inMilliseconds.toDouble(),
+                                      min: 0.0,
+                                      max: duration.inMilliseconds.toDouble(),
+                                      onChanged: (value) {
+                                        widget.controller.seekTo(
+                                          Duration(milliseconds: value.toInt()),
+                                        );
+                                      },
                                     ),
-                                  ),
-                                  child: Slider(
-                                    value: position.inMilliseconds.toDouble(),
-                                    min: 0.0,
-                                    max: duration.inMilliseconds.toDouble(),
-                                    onChanged: (value) {
-                                      widget.controller.seekTo(
-                                        Duration(milliseconds: value.toInt()),
-                                      );
-                                    },
                                   ),
                                 );
                               },

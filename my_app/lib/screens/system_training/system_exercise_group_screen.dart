@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../models/exercise_model.dart';
-import '../../widgets/custom_button.dart';
 import '../../widgets/gif_widget.dart';
 import '../../widgets/video_player_widget.dart';
 import '../../widgets/exercise_info_modal.dart';
+import '../../widgets/textured_background.dart';
+import '../../widgets/metal_back_button.dart';
+import '../../widgets/metal_button.dart';
+import '../../widgets/program_exercise_sets_table.dart'
+    show ProgramExerciseSetsTable, UserExerciseRow;
 import '../../constants/app_colors.dart';
-import 'package:my_app/providers/timer_overlay_provider.dart';
-import 'package:provider/provider.dart';
+import '../../design/ninja_spacing.dart';
+import '../../design/ninja_typography.dart';
 
 class SystemExerciseGroupScreen extends StatefulWidget {
   final String exerciseGroupUuid;
@@ -100,9 +104,22 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
           ];
           isLoading = false;
         });
+        // Загружаем user_exercises для каждой строки (основные подходы)
         for (int i = 0; i < loaded.length; i++) {
           for (int set = 0; set < loaded[i].setsCount; set++) {
             _loadUserExercise(i, set, loaded[i].uuid);
+          }
+        }
+
+        // Загружаем дополнительные подходы (если они существуют)
+        for (int i = 0; i < loaded.length; i++) {
+          await _loadAdditionalSets(i, loaded[i]);
+        }
+
+        // Загружаем предыдущие результаты для всех подходов, включая дополнительные
+        for (int i = 0; i < loaded.length; i++) {
+          for (int set = 0; set < userExerciseRows[i].length; set++) {
+            await _loadLastUserExerciseResult(i, set, loaded[i].uuid);
           }
         }
       } else {
@@ -170,7 +187,88 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
         );
       });
     }
-    await _loadLastUserExerciseResult(exIndex, setNumber, exerciseUuid);
+  }
+
+  /// Загружает дополнительные подходы, начиная с setsCount + 1
+  /// Продолжает до тех пор, пока не получит пустой ответ
+  Future<void> _loadAdditionalSets(int exIndex, ExerciseModel ex) async {
+    int setNumber = ex.setsCount; // Начинаем с следующего после setsCount
+
+    while (true) {
+      final exists = await _checkAndLoadUserExercise(
+        exIndex,
+        setNumber,
+        ex.uuid,
+      );
+      if (!exists) {
+        // Пустой ответ - останавливаем загрузку
+        break;
+      }
+      // Подход существует - загружаем предыдущий результат для него
+      await _loadLastUserExerciseResult(exIndex, setNumber, ex.uuid);
+      setNumber++; // Переходим к следующему подходу
+    }
+  }
+
+  /// Проверяет существование подхода и загружает его данные
+  /// Возвращает true, если подход существует, false если нет
+  Future<bool> _checkAndLoadUserExercise(
+    int exIndex,
+    int setNumber,
+    String exerciseUuid,
+  ) async {
+    final userUuid = widget.userTraining['user']?['uuid'] ?? '';
+    final trainingDate = widget.userTraining['training_date'] ?? '';
+    final trainingUuid = widget.userTraining['training']?['uuid'] ?? '';
+
+    try {
+      final resp = await ApiService.get(
+        '/user_exercises/',
+        queryParams: {
+          'user_uuid': userUuid,
+          'set_number': setNumber + 1,
+          'exercise_uuid': exerciseUuid,
+          'training_date': trainingDate,
+          'training_uuid': trainingUuid,
+        },
+      );
+
+      if (resp.statusCode == 200) {
+        final data = ApiService.decodeJson(resp.body);
+        if (data is List && data.isNotEmpty) {
+          // Подход существует
+          final row = data[0];
+          if (mounted) {
+            setState(() {
+              // Убеждаемся, что есть место для этого подхода
+              while (userExerciseRows[exIndex].length <= setNumber) {
+                userExerciseRows[exIndex].add(UserExerciseRow());
+              }
+              // Загружаем данные подхода
+              userExerciseRows[exIndex][setNumber] = UserExerciseRow(
+                userExerciseUuid: row['uuid'],
+                reps: row['reps'] ?? 0,
+                weight: (row['weight'] ?? 0).toDouble(),
+                status: row['status'] ?? 'active',
+                lastResult: userExerciseRows[exIndex][setNumber].lastResult,
+              );
+              // Создаем новую копию списка, чтобы виджет увидел изменение
+              userExerciseRows[exIndex] = List.from(userExerciseRows[exIndex]);
+            });
+          }
+          return true;
+        } else {
+          // Пустой ответ - подхода не существует
+          return false;
+        }
+      } else {
+        // Ошибка - считаем, что подхода нет
+        return false;
+      }
+    } catch (_) {
+      // Ошибка - считаем, что подхода нет
+      return false;
+    }
   }
 
   Future<void> _loadLastUserExerciseResult(
@@ -180,7 +278,6 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
   ) async {
     final userUuid = widget.userTraining['user']?['uuid'] ?? '';
     final trainingDate = widget.userTraining['training_date'] ?? '';
-    final trainingUuid = widget.userTraining['training']?['uuid'] ?? '';
     try {
       final resp = await ApiService.get(
         '/user_exercises/utils/getLastUserExercises',
@@ -227,229 +324,6 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
     }
   }
 
-  /// Парсит строку lastResult и извлекает значения повторений и веса
-  /// Формат строки: "10 x 2.50 кг" или "10" или "0"
-  Map<String, dynamic> _parseLastResult(String lastResult) {
-    int reps = 0;
-    double weight = 0.0;
-
-    if (lastResult == '0' || lastResult.isEmpty) {
-      return {'reps': reps, 'weight': weight};
-    }
-
-    // Пытаемся найти формат "reps x weight кг"
-    final regex = RegExp(r'^(\d+)\s*x\s*([\d.]+)\s*кг$');
-    final match = regex.firstMatch(lastResult.trim());
-
-    if (match != null) {
-      reps = int.tryParse(match.group(1) ?? '0') ?? 0;
-      weight = double.tryParse(match.group(2) ?? '0') ?? 0.0;
-    } else {
-      // Если нет веса, пытаемся извлечь только повторения
-      reps = int.tryParse(lastResult.trim()) ?? 0;
-    }
-
-    return {'reps': reps, 'weight': weight};
-  }
-
-  /// Определяет начальные значения для модального окна ввода
-  Map<String, dynamic> _getInitialValues(int exIndex, int setIndex) {
-    // Для первого подхода - используем значения из lastResult
-    if (setIndex == 0) {
-      final lastResult = userExerciseRows[exIndex][setIndex].lastResult;
-      final parsed = _parseLastResult(lastResult);
-      return {
-        'reps': parsed['reps'] as int,
-        'weight': parsed['weight'] as double,
-      };
-    }
-
-    // Для остальных подходов - сначала пытаемся взять из предыдущего подхода
-    final previousRow = userExerciseRows[exIndex][setIndex - 1];
-    if (previousRow.reps > 0 || previousRow.weight > 0) {
-      return {'reps': previousRow.reps, 'weight': previousRow.weight};
-    }
-
-    // Если предыдущего подхода нет, используем lastResult
-    final lastResult = userExerciseRows[exIndex][setIndex].lastResult;
-    final parsed = _parseLastResult(lastResult);
-    return {
-      'reps': parsed['reps'] as int,
-      'weight': parsed['weight'] as double,
-    };
-  }
-
-  void _showRepsWeightPicker(
-    int exIndex,
-    int setIndex,
-    int maxReps,
-    bool withWeight,
-  ) async {
-    // Определяем начальные значения
-    final initialValues = _getInitialValues(exIndex, setIndex);
-    int selectedReps = initialValues['reps'] as int;
-    double selectedWeight = initialValues['weight'] as double;
-
-    // Создаем контроллеры для установки начальной позиции
-    final repsController = FixedExtentScrollController(
-      initialItem: selectedReps.clamp(0, maxReps),
-    );
-    final weightController = FixedExtentScrollController(
-      initialItem: (selectedWeight / 0.25).round().clamp(0, 4000),
-    );
-
-    await showModalBottomSheet(
-      context: context,
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('Повторения'),
-                      SizedBox(
-                        height: 120,
-                        width: 80,
-                        child: ListWheelScrollView.useDelegate(
-                          controller: repsController,
-                          itemExtent: 40,
-                          diameterRatio: 1.2,
-                          physics: const FixedExtentScrollPhysics(),
-                          onSelectedItemChanged: (val) {
-                            selectedReps = val;
-                          },
-                          childDelegate: ListWheelChildBuilderDelegate(
-                            builder: (context, i) => Center(
-                              child: Text(
-                                '$i',
-                                style: const TextStyle(fontSize: 20),
-                              ),
-                            ),
-                            childCount: maxReps + 1,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (withWeight) ...[
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('Вес (кг)'),
-                        SizedBox(
-                          height: 120,
-                          width: 80,
-                          child: ListWheelScrollView.useDelegate(
-                            controller: weightController,
-                            itemExtent: 40,
-                            diameterRatio: 1.2,
-                            physics: const FixedExtentScrollPhysics(),
-                            onSelectedItemChanged: (val) {
-                              selectedWeight = val * 0.25;
-                            },
-                            childDelegate: ListWheelChildBuilderDelegate(
-                              builder: (context, i) => Center(
-                                child: Text(
-                                  (i * 0.25).toStringAsFixed(2),
-                                  style: const TextStyle(fontSize: 20),
-                                ),
-                              ),
-                              childCount: 4001,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-              const SizedBox(height: 24),
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    setState(() {
-                      userExerciseRows[exIndex][setIndex] = UserExerciseRow(
-                        userExerciseUuid: userExerciseRows[exIndex][setIndex]
-                            .userExerciseUuid,
-                        reps: selectedReps,
-                        weight: selectedWeight,
-                        status: userExerciseRows[exIndex][setIndex].status,
-                        lastResult:
-                            userExerciseRows[exIndex][setIndex].lastResult,
-                      );
-                    });
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text('Сохранить'),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    ).then((_) {
-      // Освобождаем контроллеры после закрытия модального окна
-      repsController.dispose();
-      weightController.dispose();
-    });
-  }
-
-  String _ending(int n, String one, String many, String few) {
-    if (n % 10 == 1 && n % 100 != 11) return one;
-    if ([2, 3, 4].contains(n % 10) && !(n % 100 >= 12 && n % 100 <= 14))
-      return few;
-    return many;
-  }
-
-  void _onSetCompleted(
-    int exIndex,
-    int setIdx,
-    ExerciseModel ex, {
-    bool? value,
-  }) async {
-    final row = userExerciseRows[exIndex][setIdx];
-    final userUuid = widget.userTraining['user']?['uuid'] ?? '';
-    final trainingDate = widget.userTraining['training_date'] ?? '';
-    final trainingUuid = widget.userTraining['training']?['uuid'] ?? '';
-    final exerciseUuid = ex.uuid;
-    if (value == false && row.userExerciseUuid != null) {
-      await ApiService.delete('/user_exercises/delete/${row.userExerciseUuid}');
-      await _loadUserExercise(exIndex, setIdx, exerciseUuid);
-      return;
-    }
-    final body = {
-      'training_uuid': trainingUuid,
-      'user_uuid': userUuid,
-      'exercise_uuid': exerciseUuid,
-      'training_date': trainingDate,
-      'status': 'active',
-      'set_number': setIdx + 1,
-      'weight': row.weight,
-      'reps': row.reps,
-    };
-    await ApiService.post('/user_exercises/add/', body: body);
-    await _loadUserExercise(exIndex, setIdx, exerciseUuid);
-    if (value == true && ex.restTime > 0) {
-      final timerProvider = Provider.of<TimerOverlayProvider>(
-        context,
-        listen: false,
-      );
-      final userUuid = widget.userTraining['user']?['uuid'] ?? '';
-      timerProvider.show(
-        ex.restTime,
-        userUuid: userUuid.isNotEmpty ? userUuid : null,
-        exerciseUuid: ex.uuid,
-        exerciseName: ex.caption,
-      );
-    }
-  }
 
   Future<void> _onFinishExercise(int exIndex, ExerciseModel ex) async {
     // Собираем все user_exercise_uuids для batch запроса
@@ -504,12 +378,11 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
       return;
     }
 
-    showDialog(
+    ExerciseInfoModal.show(
       context: context,
-      builder: (context) => ExerciseInfoModal(
-        exerciseReferenceUuid: exerciseReferenceUuid,
-        userUuid: userUuid,
-      ),
+      exerciseReferenceUuid: exerciseReferenceUuid,
+      userUuid: userUuid,
+      exerciseName: exercise.caption, // Передаем название упражнения
     );
   }
 
@@ -598,361 +471,174 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text(groupData?['caption'] ?? 'Группа упражнений'),
-        backgroundColor: AppColors.background,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
-      ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : exercises.isEmpty
-          ? const Center(child: Text('Нет упражнений'))
-          : Column(
-              children: [
-                // Индикаторы упражнений (точечки) - над галереей
-                if (exercises.length > 1)
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(
-                        exercises.length,
-                        (index) => Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 6),
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: index == currentPage
-                                ? AppColors.textSecondary.withOpacity(0.3)
-                                : AppColors.buttonPrimary,
-                            border: index == currentPage
-                                ? Border.all(
-                                    color: AppColors.textSecondary.withOpacity(
-                                      0.3,
-                                    ),
-                                    width: 2,
-                                  )
-                                : null,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                // Галерея упражнений
-                Expanded(
-                  child: PageView.builder(
-                    itemCount: exercises.length,
-                    onPageChanged: (i) => setState(() => currentPage = i),
-                    itemBuilder: (context, index) {
-                      final ex = exercises[index];
-                      return Stack(
+      backgroundColor: Colors.transparent,
+      body: TexturedBackground(
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : exercises.isEmpty
+                    ? const Center(child: Text('Нет упражнений'))
+                    : Column(
                         children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
-                            child: SingleChildScrollView(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Flexible(
-                                        child: Text(
-                                          ex.caption,
-                                          style: const TextStyle(
-                                            fontSize: 22,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppColors.textPrimary,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Material(
-                                        color: Colors.transparent,
-                                        child: InkWell(
-                                          onTap: () => _showExerciseInfo(ex),
-                                          borderRadius: BorderRadius.circular(
-                                            10,
-                                          ),
-                                          child: Container(
-                                            padding: const EdgeInsets.all(8),
-                                            decoration: BoxDecoration(
-                                              color: AppColors.inputBorder
-                                                  .withOpacity(0.3),
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                              border: Border.all(
-                                                color: AppColors.inputBorder
-                                                    .withOpacity(0.5),
-                                                width: 1,
-                                              ),
-                                            ),
-                                            child: const Icon(
-                                              Icons.info_outline,
-                                              color: AppColors.textPrimary,
-                                              size: 20,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  ..._buildGifSection(ex),
-                                  const SizedBox(height: 20),
-                                  Row(
-                                    children: [
-                                      _InfoSquare(
-                                        text:
-                                            '${ex.setsCount} подход${_ending(ex.setsCount, "а", "ов", "")}',
-                                      ),
-                                      _InfoSquare(
-                                        text:
-                                            '${ex.repsCount} повторени${_ending(ex.repsCount, "е", "й", "я")}',
-                                      ),
-                                      _InfoSquare(
-                                        text: '${ex.restTime} сек отдых',
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 24),
-                                  const SizedBox(height: 24),
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.transparent,
-                                      borderRadius: BorderRadius.circular(12),
+                          // Верхняя панель с кнопкой назад и названием группы
+                          Row(
+                            children: [
+                              const MetalBackButton(),
+                              const SizedBox(width: NinjaSpacing.md),
+                              Expanded(
+                                child: Text(
+                                  groupData?['caption'] ?? 'Группа упражнений',
+                                  style: NinjaText.title,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: NinjaSpacing.md),
+                              // Пустое место для симметрии
+                              const SizedBox(width: 48),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+                          // Индикаторы упражнений (точечки) - над галереей
+                          if (exercises.length > 1)
+                            Container(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: List.generate(
+                                  exercises.length,
+                                  (index) => Container(
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 6,
                                     ),
-                                    child: Column(
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
+                                    width: 10,
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: index == currentPage
+                                          ? AppColors.textSecondary
+                                              .withOpacity(0.3)
+                                          : AppColors.buttonPrimary,
+                                      border: index == currentPage
+                                          ? Border.all(
+                                              color: AppColors.textSecondary
+                                                  .withOpacity(0.3),
+                                              width: 2,
+                                            )
+                                          : null,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          // Галерея упражнений
+                          Expanded(
+                            child: PageView.builder(
+                              itemCount: exercises.length,
+                              onPageChanged: (i) => setState(() => currentPage = i),
+                              itemBuilder: (context, index) {
+                                final ex = exercises[index];
+                                return Stack(
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        16,
+                                        16,
+                                        16,
+                                        90,
+                                      ),
+                                      child: SingleChildScrollView(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
                                           children: [
-                                            Expanded(
-                                              child: Text(
-                                                'Предыдущий результат',
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  color: AppColors.textPrimary,
+                                            // Название упражнения и кнопка i
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Flexible(
+                                                  child: Text(
+                                                    ex.caption,
+                                                    style: const TextStyle(
+                                                      fontSize: 22,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: AppColors.textPrimary,
+                                                    ),
+                                                    textAlign: TextAlign.center,
+                                                  ),
                                                 ),
-                                              ),
+                                                const SizedBox(width: 6),
+                                                SizedBox(
+                                                  width: 36,
+                                                  child: MetalButton(
+                                                    label: '',
+                                                    icon: Icons.info_outline,
+                                                    onPressed: () =>
+                                                        _showExerciseInfo(ex),
+                                                    height: 36,
+                                                    fontSize: 0,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                            Expanded(
-                                              child: Text(
-                                                ex.withWeight
-                                                    ? 'Повторения и вес'
-                                                    : 'Повторения',
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  color: AppColors.textPrimary,
-                                                ),
-                                              ),
-                                            ),
-                                            Expanded(
-                                              child: Text(
-                                                'Выполнено',
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  color: AppColors.textPrimary,
-                                                ),
-                                              ),
+                                            const SizedBox(height: 12),
+                                            // Гифка/видео/изображение
+                                            ..._buildGifSection(ex),
+                                            const SizedBox(height: 20),
+                                            // Таблица подходов
+                                            ProgramExerciseSetsTable(
+                                              exercise: ex,
+                                              initialRows: userExerciseRows[index],
+                                              userUuid: widget.userTraining['user']?['uuid'],
+                                              trainingDate: widget.userTraining['training_date'],
+                                              trainingUuid: widget.userTraining['training']?['uuid'],
+                                              isProgram: false, // Это тренировка, не программа
+                                              onLoadLastResult: (setNumber) async {
+                                                await _loadLastUserExerciseResult(
+                                                  index,
+                                                  setNumber,
+                                                  ex.uuid,
+                                                );
+                                              },
+                                              onRowsChanged: (newRows) {
+                                                setState(() {
+                                                  userExerciseRows[index] = newRows;
+                                                });
+                                              },
                                             ),
                                           ],
                                         ),
-                                        ...List.generate(
-                                          ex.setsCount,
-                                          (setIdx) => Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                              vertical: 10,
-                                            ),
-                                            child: Container(
-                                              decoration: BoxDecoration(
-                                                color: AppColors.inputBorder
-                                                    .withOpacity(0.13),
-                                                borderRadius:
-                                                    BorderRadius.circular(32),
-                                              ),
-                                              child: Row(
-                                                mainAxisAlignment:
-                                                    MainAxisAlignment.center,
-                                                children: [
-                                                  Expanded(
-                                                    child: Center(
-                                                      child: Text(
-                                                        userExerciseRows[index][setIdx]
-                                                            .lastResult,
-                                                        textAlign:
-                                                            TextAlign.center,
-                                                        style: TextStyle(
-                                                          color: AppColors
-                                                              .textPrimary,
-                                                          fontSize: 20,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  Expanded(
-                                                    child: GestureDetector(
-                                                      onTap:
-                                                          userExerciseRows[index][setIdx]
-                                                                  .status ==
-                                                              'passed'
-                                                          ? null
-                                                          : () => _showRepsWeightPicker(
-                                                              index,
-                                                              setIdx,
-                                                              100, // Фиксированное максимальное количество повторений
-                                                              ex.withWeight,
-                                                            ),
-                                                      child: Center(
-                                                        child: ex.withWeight
-                                                            ? Row(
-                                                                mainAxisAlignment:
-                                                                    MainAxisAlignment
-                                                                        .center,
-                                                                mainAxisSize:
-                                                                    MainAxisSize
-                                                                        .min,
-                                                                children: [
-                                                                  Text(
-                                                                    '${userExerciseRows[index][setIdx].reps}',
-                                                                    style: TextStyle(
-                                                                      color: AppColors
-                                                                          .textPrimary,
-                                                                      fontSize:
-                                                                          20,
-                                                                    ),
-                                                                  ),
-                                                                  const SizedBox(
-                                                                    width: 10,
-                                                                  ),
-                                                                  Text(
-                                                                    '${userExerciseRows[index][setIdx].weight.toStringAsFixed(2)} кг',
-                                                                    style: TextStyle(
-                                                                      color: AppColors
-                                                                          .textPrimary,
-                                                                      fontSize:
-                                                                          20,
-                                                                    ),
-                                                                  ),
-                                                                ],
-                                                              )
-                                                            : Text(
-                                                                '${userExerciseRows[index][setIdx].reps}',
-                                                                style: TextStyle(
-                                                                  color: AppColors
-                                                                      .textPrimary,
-                                                                  fontSize: 20,
-                                                                ),
-                                                              ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  Expanded(
-                                                    child: Center(
-                                                      child: (() {
-                                                        final row =
-                                                            userExerciseRows[index][setIdx];
-                                                        if (row.status ==
-                                                            'passed') {
-                                                          return IgnorePointer(
-                                                            ignoring: true,
-                                                            child: const Icon(
-                                                              Icons
-                                                                  .check_circle,
-                                                              color:
-                                                                  Colors.green,
-                                                              size: 34,
-                                                            ),
-                                                          );
-                                                        } else {
-                                                          return _RoundCheckbox(
-                                                            value:
-                                                                row.userExerciseUuid !=
-                                                                null,
-                                                            onChanged: (val) {
-                                                              _onSetCompleted(
-                                                                index,
-                                                                setIdx,
-                                                                ex,
-                                                                value: val,
-                                                              );
-                                                            },
-                                                          );
-                                                        }
-                                                      })(),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ], //children
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: CustomButton(
-                                text: 'Завершить упражнение',
-                                onPressed:
-                                    userExerciseRows[index].every(
-                                      (row) => row.status == 'passed',
-                                    )
-                                    ? null
-                                    : () => _onFinishExercise(index, ex),
-                                height: 64,
-                              ),
+                                    // Кнопка закреплена внизу
+                                    Positioned(
+                                      left: 0,
+                                      right: 0,
+                                      bottom: 0,
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(16),
+                                        child: MetalButton(
+                                          label: 'Завершить упражнение',
+                                          onPressed: userExerciseRows[index].every(
+                                                (row) => row.status == 'passed',
+                                              )
+                                              ? null
+                                              : () => _onFinishExercise(index, ex),
+                                          height: 64,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
                             ),
                           ),
                         ],
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-    );
-  }
-}
-
-class _InfoSquare extends StatelessWidget {
-  final String text;
-  const _InfoSquare({required this.text});
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        height: 60,
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        decoration: BoxDecoration(
-          color: AppColors.inputBorder,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Center(
-          child: Text(
-            text,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
-            textAlign: TextAlign.center,
+                      ),
           ),
         ),
       ),
@@ -960,43 +646,3 @@ class _InfoSquare extends StatelessWidget {
   }
 }
 
-class UserExerciseRow {
-  String? userExerciseUuid;
-  int reps;
-  double weight;
-  String status;
-  String lastResult; // Новое поле для предыдущего результата
-  UserExerciseRow({
-    this.userExerciseUuid,
-    this.reps = 0,
-    this.weight = 0.0,
-    this.status = 'active',
-    this.lastResult = '0',
-  });
-}
-
-class _RoundCheckbox extends StatelessWidget {
-  final bool value;
-  final ValueChanged<bool?>? onChanged;
-  const _RoundCheckbox({required this.value, this.onChanged});
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(24),
-      onTap: onChanged == null ? null : () => onChanged!(!value),
-      child: Container(
-        width: 34,
-        height: 34,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: value ? Colors.green : Colors.grey,
-            width: 2.5,
-          ),
-          color: value ? Colors.white : Colors.transparent,
-        ),
-        child: null,
-      ),
-    );
-  }
-}

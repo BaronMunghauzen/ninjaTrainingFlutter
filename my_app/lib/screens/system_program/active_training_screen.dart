@@ -9,6 +9,15 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../widgets/subscription_error_dialog.dart';
+import '../../widgets/textured_background.dart';
+import '../../widgets/metal_card.dart';
+import '../../widgets/metal_button.dart';
+import '../../widgets/metal_back_button.dart';
+import '../../widgets/metal_modal.dart';
+import '../../widgets/exercise_group_list_item.dart';
+import '../../widgets/metal_message.dart';
+import '../../design/ninja_spacing.dart';
+import '../../design/ninja_typography.dart';
 
 class ActiveTrainingScreen extends StatefulWidget {
   final Map<String, dynamic> userProgramData;
@@ -69,114 +78,133 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
       _loadExerciseGroups(_currentTraining!['training']['uuid']);
     }
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Верхняя панель с кнопкой назад и заголовком
-              Row(
-                children: [
-                  // Кнопка "Назад"
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(
-                      Icons.arrow_back,
-                      color: AppColors.textPrimary,
-                      size: 24,
-                    ),
-                  ),
-                  const Spacer(),
-                  // Заголовок по центру
-                  Expanded(
-                    child: Text(
-                      widget.userProgramData['caption'] ??
-                          'Активная тренировка',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+      backgroundColor: Colors.transparent,
+      body: TexturedBackground(
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Верхняя панель с кнопкой назад и заголовком
+                Row(
+                  children: [
+                    // Кнопка "Назад"
+                    const MetalBackButton(),
+                    const SizedBox(width: NinjaSpacing.md),
+                    // Заголовок по центру
+                    Expanded(
+                      child: Text(
+                        widget.userProgramData['caption'] ??
+                            'Активная тренировка',
+                        style: NinjaText.title,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  const Spacer(),
-                  // Кнопка "Завершить программу"
-                  IconButton(
-                    onPressed: () async {
-                      final confirmed = await showDialog<bool>(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Завершить программу'),
-                          content: const Text(
-                            'Вы уверены, что хотите завершить программу?',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(false),
-                              child: const Text('Отмена'),
+                    const SizedBox(width: NinjaSpacing.md),
+                    // Кнопка "Завершить программу"
+                    MetalBackButton(
+                      icon: Icons.stop,
+                      onTap: () async {
+                        final confirmed = await MetalModal.show<bool>(
+                          context: context,
+                          title: 'Завершить программу',
+                          children: [
+                            const Text(
+                              'Вы уверены, что хотите завершить программу?',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                              ),
                             ),
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(true),
-                              child: const Text('Завершить'),
+                            const SizedBox(height: 24),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                GestureDetector(
+                                  onTap: () => Navigator.of(context).pop(false),
+                                  child: const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                    child: Text(
+                                      'Отмена',
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                MetalButton(
+                                  label: 'Завершить',
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(true),
+                                ),
+                              ],
                             ),
                           ],
-                        ),
-                      );
+                        );
 
-                      if (confirmed == true) {
-                        try {
-                          final success =
-                              await TrainingService.finishUserProgram(
-                                widget.userProgramData['uuid'],
+                        if (confirmed == true) {
+                          try {
+                            final success =
+                                await TrainingService.finishUserProgram(
+                                  widget.userProgramData['uuid'],
+                                );
+                            if (success) {
+                              Navigator.of(context).pop();
+                            } else {
+                              MetalMessage.show(
+                                context: context,
+                                message: 'Не удалось завершить программу',
+                                type: MetalMessageType.error,
+                                title: 'Ошибка',
+                                description: 'Ошибка завершения программы',
                               );
-                          if (success) {
-                            Navigator.of(context).pop();
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Ошибка завершения программы'),
-                              ),
+                            }
+                          } catch (e) {
+                            MetalMessage.show(
+                              context: context,
+                              message: e.toString(),
+                              type: MetalMessageType.error,
+                              title: 'Ошибка',
+                              description: 'Произошла ошибка при завершении программы',
                             );
                           }
-                        } catch (e) {
-                          ScaffoldMessenger.of(
-                            context,
-                          ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
                         }
-                      }
-                    },
-                    icon: const Icon(
-                      Icons.stop,
-                      color: AppColors.error,
-                      size: 24,
+                      },
                     ),
-                    tooltip: 'Завершить программу',
+                  ],
+                ),
+
+                const SizedBox(height: 30),
+
+                // Навигация по неделям и дням
+                Container(
+                  margin: const EdgeInsets.all(16),
+                  child: MetalCard(
+                    child: WeeksDaysNavigation(
+                      key: _navigationKey,
+                      weeksCount: 4,
+                      daysCount: 7,
+                      isActiveProgram: true,
+                      userProgramUuid: widget.userProgramData['uuid'],
+                      onTrainingSelected: _onTrainingSelected,
+                    ),
                   ),
-                ],
-              ),
+                ),
 
-              const SizedBox(height: 30),
+                const SizedBox(height: 30),
 
-              // Навигация по неделям и дням
-              WeeksDaysNavigation(
-                key: _navigationKey,
-                weeksCount: 4,
-                daysCount: 7,
-                isActiveProgram: true,
-                userProgramUuid: widget.userProgramData['uuid'],
-                onTrainingSelected: _onTrainingSelected,
-              ),
-
-              const SizedBox(height: 30),
-
-              // Контент тренировки
-              Expanded(child: _buildTrainingContent()),
-            ],
+                // Контент тренировки
+                Expanded(child: _buildTrainingContent()),
+              ],
+            ),
           ),
         ),
       ),
@@ -389,24 +417,12 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
             if (status == 'active')
               SizedBox(
                 width: double.infinity,
-                child: OutlinedButton(
+                child: MetalButton(
+                  label: 'Завершить',
                   onPressed: () => _passTraining(),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.green,
-                    side: const BorderSide(color: Colors.green, width: 2),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Завершить',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.green,
-                    ),
-                  ),
+                  height: 56,
+                  fontSize: 16,
+                  topColor: Colors.green,
                 ),
               ),
             if (status == 'active') const SizedBox(height: 30),
@@ -442,28 +458,29 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
                   return const SizedBox.shrink();
                 }
               }
-              return ListView.separated(
+              final isActiveTraining =
+                  _currentTraining?['status']?.toString().toLowerCase() ==
+                  'active';
+              return ListView.builder(
                 itemCount: _exerciseGroups.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 16),
                 itemBuilder: (context, index) {
                   final group = _exerciseGroups[index];
-                  return GestureDetector(
+                  final isFirst = index == 0;
+                  final isLast = index == _exerciseGroups.length - 1;
+                  return ExerciseGroupListItem(
+                    group: group,
+                    isActive: isActiveTraining,
+                    isFirst: isFirst,
+                    isLast: isLast,
                     onTap: () {
                       // Проверяем статус тренировки - можно переходить только если тренировка активна
-                      final trainingStatus =
-                          _currentTraining?['status']
-                              ?.toString()
-                              .toLowerCase() ??
-                          '';
-                      if (trainingStatus != 'active') {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Тренировка не активна. Выполните тренировку в назначенное время.',
-                            ),
-                            backgroundColor: Colors.orange,
-                          ),
+                      if (!isActiveTraining) {
+                        MetalMessage.show(
+                          context: context,
+                          message: 'Выполните тренировку в назначенное время.',
+                          type: MetalMessageType.warning,
+                          title: 'Тренировка не активна',
+                          description: 'Выполните тренировку в назначенное время.',
                         );
                         return;
                       }
@@ -492,135 +509,8 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
                         ),
                       );
                     },
-                    child: Container(
-                      width: double.infinity,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        color:
-                            _currentTraining?['status']
-                                    ?.toString()
-                                    .toLowerCase() ==
-                                'active'
-                            ? AppColors.surface
-                            : Colors.grey[300],
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color:
-                              _currentTraining?['status']
-                                      ?.toString()
-                                      .toLowerCase() ==
-                                  'active'
-                              ? AppColors.inputBorder
-                              : Colors.grey[400]!,
-                          width: 1,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color:
-                                _currentTraining?['status']
-                                        ?.toString()
-                                        .toLowerCase() ==
-                                    'active'
-                                ? Colors.black.withOpacity(0.03)
-                                : Colors.black.withOpacity(0.01),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Stack(
-                        children: [
-                          // Фото группы упражнений
-                          Positioned.fill(
-                            child: FutureBuilder<ImageProvider?>(
-                              future: _loadExerciseGroupImage(
-                                _getImageUuid(group),
-                              ),
-                              builder: (context, snapshot) {
-                                final image = snapshot.data;
-                                if (image != null) {
-                                  return Stack(
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(16),
-                                        child: Image(
-                                          image: image,
-                                          fit: BoxFit.cover,
-                                          width: double.infinity,
-                                          height: double.infinity,
-                                        ),
-                                      ),
-                                      // Затемнение если тренировка неактивна
-                                      if (_currentTraining?['status']
-                                              ?.toString()
-                                              .toLowerCase() !=
-                                          'active')
-                                        Container(
-                                          decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(
-                                              16,
-                                            ),
-                                            color: Colors.black.withOpacity(
-                                              0.4,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  );
-                                } else {
-                                  // Заглушка если нет изображения
-                                  return Container(
-                                    color: Colors.black.withOpacity(0.05),
-                                    child: const Center(
-                                      child: Icon(
-                                        Icons.image,
-                                        color: Colors.grey,
-                                        size: 48,
-                                      ),
-                                    ),
-                                  );
-                                }
-                              },
-                            ),
-                          ),
-                          Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color:
-                                    _currentTraining?['status']
-                                            ?.toString()
-                                            .toLowerCase() ==
-                                        'active'
-                                    ? Colors.black.withOpacity(0.5)
-                                    : Colors.black.withOpacity(0.3),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                group['caption'] ?? '',
-                                style: TextStyle(
-                                  color:
-                                      _currentTraining?['status']
-                                              ?.toString()
-                                              .toLowerCase() ==
-                                          'active'
-                                      ? Colors.white
-                                      : Colors.grey[300],
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    loadImage: _loadExerciseGroupImage,
+                    getImageUuid: _getImageUuid,
                   );
                 },
               );
@@ -681,47 +571,24 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
             children: [
               // Кнопка "Пропустить"
               Expanded(
-                child: OutlinedButton(
+                child: MetalButton(
+                  label: 'Пропустить',
                   onPressed: () => _skipTraining(),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.red,
-                    side: const BorderSide(color: Colors.red, width: 2),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Пропустить',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.red,
-                    ),
-                  ),
+                  height: 56,
+                  fontSize: 16,
+                  position: MetalButtonPosition.first,
+                  topColor: Colors.red,
                 ),
               ),
-              const SizedBox(width: 16),
               // Кнопка "Завершить"
               Expanded(
-                child: OutlinedButton(
+                child: MetalButton(
+                  label: 'Завершить',
                   onPressed: () => _passTraining(),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.green,
-                    side: const BorderSide(color: Colors.green, width: 2),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Завершить',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.green,
-                    ),
-                  ),
+                  height: 56,
+                  fontSize: 16,
+                  position: MetalButtonPosition.last,
+                  topColor: Colors.green,
                 ),
               ),
             ],
@@ -804,24 +671,12 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
         // Кнопка "Завершить" для дня отдыха
         SizedBox(
           width: double.infinity,
-          child: OutlinedButton(
+          child: MetalButton(
+            label: 'Завершить',
             onPressed: () => _passTraining(),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.green,
-              side: const BorderSide(color: Colors.green, width: 2),
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text(
-              'Завершить',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Colors.green,
-              ),
-            ),
+            height: 56,
+            fontSize: 16,
+            topColor: Colors.green,
           ),
         ),
         const SizedBox(height: 30),
@@ -904,9 +759,13 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
         setState(() {
           _showCongrats = nextStageCreated;
         });
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Тренировка пропущена')));
+        MetalMessage.show(
+          context: context,
+          message: 'Тренировка успешно пропущена',
+          type: MetalMessageType.success,
+          title: 'Тренировка пропущена',
+          description: 'Тренировка успешно пропущена',
+        );
 
         TrainingService.clearTrainingsCache(widget.userProgramData['uuid']);
         print('[SKIP] До refreshTrainings');
@@ -918,14 +777,22 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
           _navigationKey.currentState?.goToActiveTraining();
         });
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ошибка пропуска тренировки')),
+        MetalMessage.show(
+          context: context,
+          message: 'Не удалось пропустить тренировку',
+          type: MetalMessageType.error,
+          title: 'Ошибка',
+          description: 'Ошибка пропуска тренировки',
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      MetalMessage.show(
+        context: context,
+        message: e.toString(),
+        type: MetalMessageType.error,
+        title: 'Ошибка',
+        description: 'Произошла ошибка при пропуске тренировки',
+      );
     }
   }
 
@@ -946,9 +813,13 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
         setState(() {
           _showCongrats = nextStageCreated;
         });
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Тренировка завершена')));
+        MetalMessage.show(
+          context: context,
+          message: 'Тренировка успешно завершена',
+          type: MetalMessageType.success,
+          title: 'Тренировка завершена',
+          description: 'Тренировка успешно завершена',
+        );
 
         TrainingService.clearTrainingsCache(widget.userProgramData['uuid']);
         print('[PASS] До refreshTrainings');
@@ -960,14 +831,22 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
           _navigationKey.currentState?.goToActiveTraining();
         });
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ошибка завершения тренировки')),
+        MetalMessage.show(
+          context: context,
+          message: 'Не удалось завершить тренировку',
+          type: MetalMessageType.error,
+          title: 'Ошибка',
+          description: 'Ошибка завершения тренировки',
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      MetalMessage.show(
+        context: context,
+        message: e.toString(),
+        type: MetalMessageType.error,
+        title: 'Ошибка',
+        description: 'Произошла ошибка при завершении тренировки',
+      );
     }
   }
 
@@ -1009,16 +888,22 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
           ),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Ошибка обновления программы и расписания'),
-          ),
+        MetalMessage.show(
+          context: context,
+          message: 'Не удалось обновить программу и расписание',
+          type: MetalMessageType.error,
+          title: 'Ошибка',
+          description: 'Ошибка обновления программы и расписания',
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      MetalMessage.show(
+        context: context,
+        message: e.toString(),
+        type: MetalMessageType.error,
+        title: 'Ошибка',
+        description: 'Произошла ошибка при обновлении программы и расписания',
+      );
     }
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../constants/app_colors.dart';
 import '../../models/program_model.dart';
 import '../../models/search_result_model.dart';
@@ -10,15 +11,21 @@ import '../../providers/auth_provider.dart';
 import '../../screens/admin_program_constructor/program_constructor_screen.dart';
 import 'inactive_training_screen.dart';
 import '../../services/api_service.dart';
-import 'system_training_list_widget.dart'; // Added import for SystemTrainingListWidget
+import '../../widgets/system_training_list_widget.dart'; // Added import for SystemTrainingListWidget
 import '../../screens/admin_training_constructor/admin_training_constructor_screen.dart'; // Added import for AdminTrainingConstructorScreen
 import '../my_training/my_training_list_widget.dart'; // Added import for MyTrainingListWidget
 import 'dart:async';
 import '../system_training/active_system_training_screen.dart'; // Added import for ActiveSystemTrainingScreen
 import '../system_training/system_training_detail_screen.dart'; // Added import for SystemTrainingDetailScreen
-import '../user_training_constructor/user_exercise_reference_detail_screen.dart';
+import '../user_training_constructor/exercise_reference_card_screen.dart';
 import '../free_workout/free_workout_screen.dart';
-import '../free_workout/free_training_name_modal.dart';
+import '../../widgets/textured_background.dart';
+import '../../widgets/metal_button.dart';
+import '../../widgets/metal_modal.dart';
+import '../../widgets/metal_text_field.dart';
+import '../../widgets/metal_message.dart';
+import '../../design/ninja_spacing.dart';
+import '../../design/ninja_typography.dart';
 
 class TrainingScreen extends StatefulWidget {
   const TrainingScreen({Key? key}) : super(key: key);
@@ -281,7 +288,9 @@ class _TrainingScreenState extends State<TrainingScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) =>
-            UserExerciseReferenceDetailScreen(exercise: exercise),
+            ExerciseReferenceCardScreen(
+              exerciseReferenceUuid: exercise.uuid,
+            ),
       ),
     );
   }
@@ -410,10 +419,11 @@ class _TrainingScreenState extends State<TrainingScreen> {
       );
       return;
     }
-    // Запрашиваем название
-    final name = await showDialog<String>(
+    // Запрашиваем название через MetalModal
+    final name = await MetalModal.show<String>(
       context: context,
-      builder: (context) => const FreeTrainingNameModal(),
+      title: 'Новая тренировка',
+      children: [const _FreeTrainingNameModalContent()],
     );
     if (name == null || name.trim().isEmpty) return;
 
@@ -563,36 +573,50 @@ class _TrainingScreenState extends State<TrainingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.transparent, AppColors.background],
-            stops: [0.0, 0.9], // Еще более плавный градиент
-          ),
-        ),
-        child: Container(
-          decoration: const BoxDecoration(
-            image: DecorationImage(
-              image: AssetImage('assets/images/training_background.png'),
-              fit: BoxFit.contain, // Картинка уменьшается, а не обрезается
-              alignment: Alignment.topCenter,
-            ),
-          ),
-          child: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.transparent, AppColors.background],
-                stops: [
-                  0.2,
-                  1.0,
-                ], // Градиент начинается с 20% для более плавного перехода
+      backgroundColor: Colors.transparent,
+      body: TexturedBackground(
+        child: Stack(
+          children: [
+            // Верхний слой: training_background.png с градиентами
+            Positioned.fill(
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, AppColors.background],
+                    stops: [0.0, 0.9], // Еще более плавный градиент
+                  ),
+                ),
+                child: Container(
+                  decoration: const BoxDecoration(
+                    image: DecorationImage(
+                      image: AssetImage(
+                        'assets/images/training_background.png',
+                      ),
+                      fit: BoxFit
+                          .contain, // Картинка уменьшается, а не обрезается
+                      alignment: Alignment.topCenter,
+                    ),
+                  ),
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, AppColors.background],
+                        stops: [
+                          0.2,
+                          1.0,
+                        ], // Градиент начинается с 20% для более плавного перехода
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
-            child: SafeArea(
+            // Контент поверх фонов
+            SafeArea(
               child: Stack(
                 children: [
                   // Основной контент страницы
@@ -633,19 +657,19 @@ class _TrainingScreenState extends State<TrainingScreen> {
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                    color: AppColors.inputBorder,
+                                    color: Color(0xE6B5BF94).withOpacity(0.3),
                                   ),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                    color: AppColors.inputBorder,
+                                    color: Color(0xE6B5BF94).withOpacity(0.3),
                                   ),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                    color: AppColors.inputFocused,
+                                    color: Color(0xE6B5BF94).withOpacity(0.3),
                                     width: 2,
                                   ),
                                 ),
@@ -830,7 +854,9 @@ class _TrainingScreenState extends State<TrainingScreen> {
                                                 borderRadius:
                                                     BorderRadius.circular(12),
                                                 border: Border.all(
-                                                  color: AppColors.inputBorder,
+                                                  color: Color(
+                                                    0xE6B5BF94,
+                                                  ).withOpacity(0.3),
                                                   width: 1,
                                                 ),
                                               ),
@@ -947,6 +973,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
                               });
                             },
                           ),
+                          const SizedBox(height: 65),
                         ],
                       ),
                     ),
@@ -956,40 +983,23 @@ class _TrainingScreenState extends State<TrainingScreen> {
                     left: 24,
                     right: 24,
                     bottom: 24,
-                    child: SafeArea(
-                      top: false,
-                      child: Builder(
-                        builder: (context) {
-                          final hasActive = _activeFreeUserTraining != null;
-                          return ElevatedButton(
-                            onPressed: () async {
-                              if (hasActive) {
-                                await _continueFreeTrainingFlow();
-                              } else {
-                                await _startNewFreeTrainingFlow();
-                              }
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.buttonPrimary,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              elevation: 6,
-                            ),
-                            child: Text(
-                              hasActive
-                                  ? 'Продолжить свободную тренировку'
-                                  : 'Начать свободную тренировку',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                    child: Builder(
+                      builder: (context) {
+                        final hasActive = _activeFreeUserTraining != null;
+                        return MetalButton(
+                          label: hasActive
+                              ? 'Продолжить свободную тренировку'
+                              : 'Начать свободную тренировку',
+                          onPressed: () async {
+                            if (hasActive) {
+                              await _continueFreeTrainingFlow();
+                            } else {
+                              await _startNewFreeTrainingFlow();
+                            }
+                          },
+                          height: 56,
+                        );
+                      },
                     ),
                   ),
                   // Overlay с результатами поиска - теперь поверх всего
@@ -1092,9 +1102,99 @@ class _TrainingScreenState extends State<TrainingScreen> {
                 ],
               ),
             ),
-          ),
+          ],
         ),
       ),
+    );
+  }
+}
+
+// Виджет для содержимого модального окна создания свободной тренировки
+class _FreeTrainingNameModalContent extends StatefulWidget {
+  const _FreeTrainingNameModalContent();
+
+  @override
+  State<_FreeTrainingNameModalContent> createState() =>
+      _FreeTrainingNameModalContentState();
+}
+
+class _FreeTrainingNameModalContentState
+    extends State<_FreeTrainingNameModalContent> {
+  late final TextEditingController _nameController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        MetalTextField(
+          controller: _nameController,
+          hint: 'Например: Тренировка ног',
+          inputFormatters: [LengthLimitingTextInputFormatter(50)],
+        ),
+        const SizedBox(height: NinjaSpacing.lg),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            GestureDetector(
+              onTap: () {
+                if (!mounted) return;
+                FocusScope.of(context).unfocus();
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    Navigator.of(context).pop();
+                  }
+                });
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child: Text('Отмена', style: NinjaText.body),
+              ),
+            ),
+            const SizedBox(width: NinjaSpacing.md),
+            MetalButton(
+              label: 'Создать',
+              onPressed: () {
+                if (!mounted) return;
+                FocusScope.of(context).unfocus();
+                final name = _nameController.text.trim();
+                if (name.isEmpty) {
+                  if (mounted) {
+                    MetalMessage.show(
+                      context: context,
+                      message: 'Введите название тренировки',
+                      type: MetalMessageType.error,
+                    );
+                  }
+                  return;
+                }
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    Navigator.of(context).pop(name);
+                  }
+                });
+              },
+              height: 48,
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

@@ -3,11 +3,15 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:typed_data';
-import '../../constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
-import '../../widgets/custom_button.dart';
-import '../../widgets/avatar_modal.dart';
+import '../../widgets/metal_button.dart';
 import '../../services/api_service.dart';
+import '../../widgets/textured_background.dart';
+import '../../widgets/metal_card.dart';
+import '../../widgets/metal_modal.dart';
+import '../../widgets/metal_message.dart';
+import '../../design/ninja_typography.dart';
+import '../../design/ninja_colors.dart';
 import 'edit_profile_screen.dart';
 import 'contact_screen.dart';
 import 'auth_screen.dart';
@@ -40,348 +44,352 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1A1A1A),
-        title: const Text(
-          'Профиль',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
+    return TexturedBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          title: Text('Профиль', style: NinjaText.title.copyWith(fontSize: 24)),
+          centerTitle: true,
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          actions: [
+            PopupMenuButton<_ProfileMenuAction>(
+              icon: const Icon(Icons.more_vert, color: NinjaColors.textPrimary),
+              color: NinjaColors.metalMid,
+              onSelected: (action) {
+                switch (action) {
+                  case _ProfileMenuAction.deleteProfile:
+                    _confirmDeleteProfile();
+                    break;
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: _ProfileMenuAction.deleteProfile,
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_forever, color: NinjaColors.error),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Удалить профиль',
+                        style: NinjaText.body.copyWith(
+                          color: NinjaColors.error,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
-        centerTitle: true,
-        elevation: 0,
-        actions: [
-          PopupMenuButton<_ProfileMenuAction>(
-            icon: const Icon(Icons.more_vert, color: Colors.white),
-            color: const Color(0xFF2A2A2A),
-            onSelected: (action) {
-              switch (action) {
-                case _ProfileMenuAction.deleteProfile:
-                  _confirmDeleteProfile();
-                  break;
-              }
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem(
-                value: _ProfileMenuAction.deleteProfile,
-                child: Row(
+        body: Consumer<AuthProvider>(
+          builder: (context, authProvider, child) {
+            if (authProvider.isLoadingProfile || _isRefreshing) {
+              return const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(NinjaColors.accent),
+                ),
+              );
+            }
+
+            final userProfile = authProvider.userProfile;
+            if (userProfile == null && !_isRefreshing) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.delete_forever, color: Colors.red),
-                    SizedBox(width: 12),
+                    Icon(
+                      Icons.error_outline,
+                      color: NinjaColors.error,
+                      size: 64,
+                    ),
+                    const SizedBox(height: 16),
                     Text(
-                      'Удалить профиль',
-                      style: TextStyle(color: Colors.white),
+                      'Не удалось загрузить профиль',
+                      style: NinjaText.title.copyWith(color: NinjaColors.error),
+                    ),
+                    const SizedBox(height: 16),
+                    MetalButton(
+                      label: 'Попробовать снова',
+                      onPressed: () async {
+                        setState(() {
+                          _isRefreshing = true;
+                        });
+
+                        try {
+                          final success = await authProvider
+                              .refreshUserProfileSilently();
+                          if (success) {
+                            setState(() {});
+                          }
+                        } catch (e) {
+                          print('Error retrying profile load: $e');
+                          if (mounted) {
+                            MetalMessage.show(
+                              context: context,
+                              message: 'Ошибка загрузки профиля: $e',
+                              type: MetalMessageType.error,
+                            );
+                          }
+                        } finally {
+                          setState(() {
+                            _isRefreshing = false;
+                          });
+                        }
+                      },
                     ),
                   ],
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      body: Consumer<AuthProvider>(
-        builder: (context, authProvider, child) {
-          if (authProvider.isLoadingProfile || _isRefreshing) {
-            return const Center(
-              child: CircularProgressIndicator(color: const Color(0xFF1F2121)),
-            );
-          }
+              );
+            }
 
-          final userProfile = authProvider.userProfile;
-          if (userProfile == null && !_isRefreshing) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.red, size: 64),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Не удалось загрузить профиль',
-                    style: TextStyle(color: Colors.white, fontSize: 18),
-                  ),
-                  const SizedBox(height: 16),
-                  CustomButton(
-                    text: 'Попробовать снова',
-                    onPressed: () async {
-                      setState(() {
-                        _isRefreshing = true;
-                      });
+            // Проверяем, что профиль загружен
+            if (userProfile == null) {
+              return const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(NinjaColors.accent),
+                ),
+              );
+            }
 
-                      try {
-                        final success = await authProvider
-                            .refreshUserProfileSilently();
-                        if (success) {
-                          setState(() {});
-                        }
-                      } catch (e) {
-                        print('Error retrying profile load: $e');
-                      } finally {
-                        setState(() {
-                          _isRefreshing = false;
-                        });
-                      }
-                    },
-                  ),
-                ],
-              ),
-            );
-          }
-
-          // Проверяем, что профиль загружен
-          if (userProfile == null) {
-            return const Center(
-              child: CircularProgressIndicator(color: Color(0xFF1F2121)),
-            );
-          }
-
-          return RefreshIndicator(
-            onRefresh: () async {
-              // Обновляем профиль при pull-to-refresh
-              setState(() {
-                _isRefreshing = true;
-              });
-
-              try {
-                final success = await authProvider.refreshUserProfileSilently();
-                if (success) {
-                  // Принудительно обновляем UI
-                  setState(() {});
-                }
-              } catch (e) {
-                print('Error refreshing profile: $e');
-              } finally {
+            return RefreshIndicator(
+              onRefresh: () async {
+                // Обновляем профиль при pull-to-refresh
                 setState(() {
-                  _isRefreshing = false;
+                  _isRefreshing = true;
                 });
-              }
-            },
-            color: const Color(0xFF1F2121),
-            backgroundColor: const Color(0xFF2A2A2A),
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                children: [
-                  // Аватар
-                  GestureDetector(
-                    onTap: () => _showAvatarModal(
-                      context,
-                      userProfile.avatarUuid != null,
-                    ),
-                    child: Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.grey[600],
+
+                try {
+                  final success = await authProvider
+                      .refreshUserProfileSilently();
+                  if (success) {
+                    // Принудительно обновляем UI
+                    setState(() {});
+                  }
+                } catch (e) {
+                  print('Error refreshing profile: $e');
+                  if (mounted) {
+                    MetalMessage.show(
+                      context: context,
+                      message: 'Ошибка обновления профиля: $e',
+                      type: MetalMessageType.error,
+                    );
+                  }
+                } finally {
+                  setState(() {
+                    _isRefreshing = false;
+                  });
+                }
+              },
+              color: NinjaColors.accent,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  children: [
+                    // Аватар
+                    GestureDetector(
+                      onTap: () => _showAvatarModal(
+                        context,
+                        userProfile.avatarUuid != null,
                       ),
-                      child: userProfile.avatarUuid != null
-                          ? ClipOval(
-                              child: FutureBuilder<Uint8List?>(
-                                future: ApiService.getFile(
-                                  userProfile.avatarUuid!,
-                                  forceRefresh: true, // Принудительно обновляем
-                                ),
-                                builder: (context, snapshot) {
-                                  if (snapshot.connectionState ==
-                                      ConnectionState.waiting) {
-                                    return const Center(
-                                      child: CircularProgressIndicator(
-                                        color: Color(0xFF1F2121),
-                                        strokeWidth: 2,
+                      child: Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: NinjaColors.metalMid,
+                        ),
+                        child: userProfile.avatarUuid != null
+                            ? ClipOval(
+                                child: FutureBuilder<Uint8List?>(
+                                  future: ApiService.getFile(
+                                    userProfile.avatarUuid!,
+                                    forceRefresh:
+                                        true, // Принудительно обновляем
+                                  ),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.connectionState ==
+                                        ConnectionState.waiting) {
+                                      return const Center(
+                                        child: CircularProgressIndicator(
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                NinjaColors.accent,
+                                              ),
+                                          strokeWidth: 2,
+                                        ),
+                                      );
+                                    }
+
+                                    if (snapshot.hasError ||
+                                        !snapshot.hasData) {
+                                      print(
+                                        'Avatar loading error: ${snapshot.error}',
+                                      );
+                                      return const Icon(
+                                        Icons.person,
+                                        size: 60,
+                                        color: NinjaColors.textPrimary,
+                                      );
+                                    }
+
+                                    return Image.memory(
+                                      snapshot.data!,
+                                      width: 120,
+                                      height: 120,
+                                      fit: BoxFit.cover,
+                                      key: ValueKey(
+                                        '${userProfile.avatarUuid}_${DateTime.now().millisecondsSinceEpoch}',
                                       ),
                                     );
-                                  }
-
-                                  if (snapshot.hasError || !snapshot.hasData) {
-                                    print(
-                                      'Avatar loading error: ${snapshot.error}',
-                                    );
-                                    return const Icon(
-                                      Icons.person,
-                                      size: 60,
-                                      color: Colors.white,
-                                    );
-                                  }
-
-                                  return Image.memory(
-                                    snapshot.data!,
-                                    width: 120,
-                                    height: 120,
-                                    fit: BoxFit.cover,
-                                    key: ValueKey(
-                                      '${userProfile.avatarUuid}_${DateTime.now().millisecondsSinceEpoch}',
-                                    ),
-                                  );
-                                },
-                              ),
-                            )
-                          : const Icon(
-                              Icons.person,
-                              size: 60,
-                              color: Colors.white,
-                            ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Имя пользователя
-                  Text(
-                    userProfile.firstName != null &&
-                            userProfile.lastName != null
-                        ? '${userProfile.firstName} ${userProfile.lastName}'
-                        : userProfile.login,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Email
-                  Text(
-                    userProfile.email,
-                    style: TextStyle(color: Colors.grey[400], fontSize: 16),
-                  ),
-                  const SizedBox(height: 32),
-
-                  // Подписка (показываем весь блок в зависимости от isPaymentVisible)
-                  if (widget.isPaymentVisible)
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2A2A2A),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'Подписка',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                                  },
                                 ),
+                              )
+                            : const Icon(
+                                Icons.person,
+                                size: 60,
+                                color: NinjaColors.textPrimary,
                               ),
-                              _buildSubscriptionStatus(
-                                userProfile.subscriptionStatus,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          if (userProfile.subscriptionUntil != null) ...[
-                            Text(
-                              'Истекает: ${_formatDate(userProfile.subscriptionUntil!)}',
-                              style: TextStyle(
-                                color: Colors.grey[400],
-                                fontSize: 14,
-                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Имя пользователя
+                    Text(
+                      userProfile.firstName != null &&
+                              userProfile.lastName != null
+                          ? '${userProfile.firstName} ${userProfile.lastName}'
+                          : userProfile.login,
+                      style: NinjaText.title.copyWith(fontSize: 24),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Email
+                    Text(
+                      userProfile.email,
+                      style: NinjaText.body.copyWith(
+                        color: NinjaColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+
+                    // Подписка (показываем весь блок в зависимости от isPaymentVisible)
+                    if (widget.isPaymentVisible)
+                      MetalCard(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Подписка',
+                                  style: NinjaText.section.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                _buildSubscriptionStatus(
+                                  userProfile.subscriptionStatus,
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 8),
+                            if (userProfile.subscriptionUntil != null) ...[
+                              Text(
+                                'Истекает: ${_formatDate(userProfile.subscriptionUntil!)}',
+                                style: NinjaText.caption,
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            _buildSubscriptionButton(
+                              userProfile.subscriptionStatus,
+                            ),
                           ],
-                          _buildSubscriptionButton(
-                            userProfile.subscriptionStatus,
+                        ),
+                      ),
+                    const SizedBox(height: 20),
+
+                    // Кнопка "Мой профиль"
+                    MetalButton(
+                      label: 'Мой профиль',
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const EditProfileScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Дополнительные опции
+                    MetalCard(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          _buildMenuItem(
+                            'Связаться с нами',
+                            Icons.contact_support,
+                            () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const ContactScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          const Divider(
+                            color: NinjaColors.metalEdgeSoft,
+                            height: 24,
+                          ),
+                          _buildMenuItem(
+                            'Политика конфиденциальности',
+                            Icons.privacy_tip_outlined,
+                            () async {
+                              final Uri url = Uri.parse(
+                                'https://ninjatraining.ru/privacy',
+                              );
+                              if (await canLaunchUrl(url)) {
+                                await launchUrl(
+                                  url,
+                                  mode: LaunchMode.externalApplication,
+                                );
+                              } else {
+                                if (context.mounted) {
+                                  MetalMessage.show(
+                                    context: context,
+                                    message: 'Не удалось открыть ссылку',
+                                    type: MetalMessageType.error,
+                                  );
+                                }
+                              }
+                            },
                           ),
                         ],
                       ),
                     ),
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 20),
 
-                  // Кнопка "Мой профиль" с увеличенной высотой
-                  CustomButton(
-                    text: 'Мой профиль',
-                    height: 72, // Увеличиваем высоту до 72
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const EditProfileScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Дополнительные опции
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2A2A2A),
-                      borderRadius: BorderRadius.circular(12),
+                    // Кнопка выхода
+                    MetalButton(
+                      label: 'Выйти',
+                      onPressed: () async {
+                        await _confirmSignOut();
+                      },
                     ),
-                    child: Column(
-                      children: [
-                        _buildMenuItem(
-                          'Связаться с нами',
-                          Icons.contact_support,
-                          () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const ContactScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        const Divider(color: Color(0xFF3A3A3A), height: 24),
-                        _buildMenuItem(
-                          'Политика конфиденциальности',
-                          Icons.privacy_tip_outlined,
-                          () async {
-                            final Uri url = Uri.parse(
-                              'https://ninjatraining.ru/privacy',
-                            );
-                            if (await canLaunchUrl(url)) {
-                              await launchUrl(
-                                url,
-                                mode: LaunchMode.externalApplication,
-                              );
-                            } else {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Не удалось открыть ссылку'),
-                                  ),
-                                );
-                              }
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Кнопка выхода с увеличенной высотой
-                  CustomButton(
-                    text: 'Выйти',
-                    height: 72, // Увеличиваем высоту до 72
-                    onPressed: () async {
-                      await authProvider.signOut();
-                      if (mounted) {
-                        Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(
-                            builder: (context) => const AuthScreen(),
-                          ),
-                        );
-                      }
-                    },
-                    isSecondary: true,
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
@@ -394,22 +402,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     switch (status) {
       case 'active':
-        color = const Color(0xFF4CAF50); // Светло-зеленый
+        color = NinjaColors.success;
         text = 'Активна';
         icon = Icons.check_circle;
         break;
       case 'pending':
-        color = const Color(0xFFFF9800); // Светло-оранжевый
+        color = NinjaColors.warning;
         text = 'Ожидает';
         icon = Icons.pending;
         break;
       case 'expired':
-        color = const Color(0xFFF44336); // Светло-красный
+        color = NinjaColors.error;
         text = 'Истекла';
         icon = Icons.cancel;
         break;
       default:
-        color = const Color(0xFF9E9E9E); // Светло-серый
+        color = NinjaColors.textMuted;
         text = 'Неизвестно';
         icon = Icons.help;
     }
@@ -428,9 +436,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(width: 4),
           Text(
             text,
-            style: TextStyle(
+            style: NinjaText.caption.copyWith(
               color: color,
-              fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -490,11 +497,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return SizedBox(
       width: double.infinity,
-      child: CustomButton(
-        text: buttonText,
-        onPressed: onPressed,
-        height: 64, // Увеличиваем высоту с 56 до 64
-      ),
+      child: MetalButton(label: buttonText, onPressed: onPressed),
     );
   }
 
@@ -506,19 +509,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
           children: [
-            Icon(icon, color: Colors.grey[400], size: 24),
+            Icon(icon, color: NinjaColors.textSecondary, size: 24),
             const SizedBox(width: 16),
-            Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+            Expanded(child: Text(title, style: NinjaText.body)),
+            Icon(
+              Icons.arrow_forward_ios,
+              color: NinjaColors.textSecondary,
+              size: 16,
             ),
-            Icon(Icons.arrow_forward_ios, color: Colors.grey[400], size: 16),
           ],
         ),
       ),
@@ -548,23 +546,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // Принудительно обновляем UI после успешной загрузки
             setState(() {});
 
-            // Дополнительная проверка перед показом SnackBar
+            // Дополнительная проверка перед показом сообщения
             if (mounted && context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Фото успешно загружено',
-                    style: TextStyle(color: AppColors.textPrimary),
-                  ),
-                  backgroundColor: Color(0xFF1F2121),
-                ),
+              MetalMessage.show(
+                context: context,
+                message: 'Фото успешно загружено',
+                type: MetalMessageType.success,
               );
             }
           } else {
-            // Дополнительная проверка перед показом SnackBar
+            // Дополнительная проверка перед показом сообщения
             if (mounted && context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(error), backgroundColor: Colors.red),
+              MetalMessage.show(
+                context: context,
+                message: error,
+                type: MetalMessageType.error,
               );
             }
           }
@@ -582,12 +578,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               'Доступ к галерее не предоставлен. Пожалуйста, разрешите доступ в настройках приложения.';
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
+        MetalMessage.show(
+          context: context,
+          message: errorMessage,
+          type: MetalMessageType.error,
+          duration: const Duration(seconds: 4),
         );
       }
     }
@@ -595,84 +590,167 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // Метод для показа модального окна аватара
   void _showAvatarModal(BuildContext context, bool hasAvatar) {
-    showModalBottomSheet(
+    MetalModal.show(
       context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => AvatarModal(
-        hasAvatar: hasAvatar,
-        onUploadPhoto: () async {
+      title: 'Аватар',
+      children: [
+        _buildAvatarOption('Загрузить фото', Icons.photo_camera, () async {
+          Navigator.of(context).pop();
           await _pickImageFromGallery();
-        },
-        onDeletePhoto: hasAvatar
-            ? () async {
-                // Сохраняем ссылку на AuthProvider до начала асинхронной операции
-                final authProvider = context.read<AuthProvider>();
-                final error = await authProvider.deleteAvatar();
+        }),
+        if (hasAvatar) ...[
+          const SizedBox(height: 8),
+          _buildAvatarOption('Удалить фото', Icons.delete, () async {
+            Navigator.of(context).pop();
+            // Сохраняем ссылку на AuthProvider до начала асинхронной операции
+            final authProvider = context.read<AuthProvider>();
+            final error = await authProvider.deleteAvatar();
 
-                // Проверяем, что виджет все еще активен и контекст доступен
+            // Проверяем, что виджет все еще активен и контекст доступен
+            if (mounted && context.mounted) {
+              if (error == null) {
+                // Принудительно обновляем UI после успешного удаления
+                setState(() {});
+
+                // Дополнительная проверка перед показом сообщения
                 if (mounted && context.mounted) {
-                  if (error == null) {
-                    // Принудительно обновляем UI после успешного удаления
-                    setState(() {});
-
-                    // Дополнительная проверка перед показом SnackBar
-                    if (mounted && context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Аватар успешно удален',
-                            style: TextStyle(color: AppColors.textPrimary),
-                          ),
-                          backgroundColor: Color(0xFF1F2121),
-                        ),
-                      );
-                    }
-                  } else {
-                    // Дополнительная проверка перед показом SnackBar
-                    if (mounted && context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(error),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  }
+                  MetalMessage.show(
+                    context: context,
+                    message: 'Аватар успешно удален',
+                    type: MetalMessageType.success,
+                  );
+                }
+              } else {
+                // Дополнительная проверка перед показом сообщения
+                if (mounted && context.mounted) {
+                  MetalMessage.show(
+                    context: context,
+                    message: error,
+                    type: MetalMessageType.error,
+                  );
                 }
               }
-            : null,
+            }
+          }, isDestructive: true),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildAvatarOption(
+    String title,
+    IconData icon,
+    VoidCallback onTap, {
+    bool isDestructive = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: BoxDecoration(
+          color: isDestructive
+              ? NinjaColors.error.withOpacity(0.1)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: isDestructive
+                  ? NinjaColors.error
+                  : NinjaColors.textSecondary,
+              size: 24,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                title,
+                style: NinjaText.body.copyWith(
+                  color: isDestructive
+                      ? NinjaColors.error
+                      : NinjaColors.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  Future<void> _confirmSignOut() async {
+    final shouldSignOut = await MetalModal.show<bool>(
+      context: context,
+      title: 'Выйти из аккаунта?',
+      children: [
+        Text(
+          'Вы уверены, что хотите выйти из аккаунта?',
+          style: NinjaText.body.copyWith(color: NinjaColors.textSecondary),
+        ),
+        const SizedBox(height: 24),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text('Отмена', style: NinjaText.body),
+            ),
+            const SizedBox(width: 16),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(foregroundColor: NinjaColors.accent),
+              child: Text(
+                'Выйти',
+                style: NinjaText.body.copyWith(
+                  color: NinjaColors.accent,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    if (shouldSignOut == true) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await authProvider.signOut();
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const AuthScreen()),
+        );
+      }
+    }
   }
 
   Future<void> _confirmDeleteProfile() async {
     if (_isDeletingProfile) return;
 
-    final shouldDelete = await showDialog<bool>(
+    final shouldDelete = await MetalModal.show<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF2A2A2A),
-        title: const Text(
-          'Удалить профиль?',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: const Text(
+      title: 'Удалить профиль?',
+      children: [
+        Text(
           'Это действие нельзя отменить. Все данные будут удалены без возможности восстановления.',
-          style: TextStyle(color: Colors.white70),
+          style: NinjaText.body.copyWith(color: NinjaColors.textSecondary),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Отмена'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Удалить'),
-          ),
-        ],
-      ),
+        const SizedBox(height: 24),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            MetalButton(
+              label: 'Отмена',
+              onPressed: () => Navigator.of(context).pop(false),
+            ),
+            const SizedBox(width: 16),
+            MetalButton(
+              label: 'Удалить',
+              onPressed: () => Navigator.of(context).pop(true),
+            ),
+          ],
+        ),
+      ],
     );
 
     if (shouldDelete == true) {
@@ -704,17 +782,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final message =
             _extractErrorMessage(response.body) ??
             'Не удалось удалить профиль. Попробуйте позже.';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message), backgroundColor: Colors.red),
+        MetalMessage.show(
+          context: context,
+          message: message,
+          type: MetalMessageType.error,
         );
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Ошибка удаления профиля: $e'),
-          backgroundColor: Colors.red,
-        ),
+      MetalMessage.show(
+        context: context,
+        message: 'Ошибка удаления профиля: $e',
+        type: MetalMessageType.error,
       );
     } finally {
       if (mounted) {

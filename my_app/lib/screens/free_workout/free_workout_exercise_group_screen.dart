@@ -7,6 +7,16 @@ import '../../widgets/gif_widget.dart';
 import '../../widgets/auth_image_widget.dart';
 import '../../widgets/video_player_widget.dart';
 import '../../widgets/exercise_info_modal.dart';
+import '../../widgets/textured_background.dart';
+import '../../widgets/metal_back_button.dart';
+import '../../widgets/metal_button.dart';
+import '../../widgets/metal_message.dart';
+import '../../widgets/metal_modal.dart';
+import '../../widgets/program_exercise_sets_table.dart'
+    show ProgramExerciseSetsTable, UserExerciseRow;
+import '../../models/exercise_model.dart';
+import '../../design/ninja_typography.dart';
+import '../../design/ninja_spacing.dart';
 import 'package:provider/provider.dart';
 
 class FreeWorkoutExerciseGroupScreen extends StatefulWidget {
@@ -33,6 +43,8 @@ class _FreeWorkoutExerciseGroupScreenState
   Map<String, dynamic>? groupData;
   List<Map<String, dynamic>> userExercises = [];
   List<Map<String, dynamic>> lastResults = [];
+  List<UserExerciseRow> userExerciseRows = [];
+  ExerciseModel? exerciseModel;
   bool isLoading = true;
   String? savedTimerValue;
 
@@ -40,6 +52,7 @@ class _FreeWorkoutExerciseGroupScreenState
     final exerciseReferenceUuid = exerciseReference?['uuid'];
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final userUuid = authProvider.userUuid;
+    final exerciseName = exerciseData?['caption'] ?? 'Упражнение';
 
     if (exerciseReferenceUuid == null || userUuid == null || userUuid.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -51,12 +64,11 @@ class _FreeWorkoutExerciseGroupScreenState
       return;
     }
 
-    showDialog(
+    ExerciseInfoModal.show(
       context: context,
-      builder: (context) => ExerciseInfoModal(
-        exerciseReferenceUuid: exerciseReferenceUuid,
-        userUuid: userUuid,
-      ),
+      exerciseReferenceUuid: exerciseReferenceUuid,
+      userUuid: userUuid,
+      exerciseName: exerciseName, // Передаем название упражнения
     );
   }
 
@@ -95,6 +107,9 @@ class _FreeWorkoutExerciseGroupScreenState
               }
             }
 
+            // Создаем ExerciseModel
+            exerciseModel = ExerciseModel.fromJson(exerciseData!);
+
             // Загружаем user_exercises
             final userExResp = await ApiService.get(
               '/user_exercises/',
@@ -111,10 +126,41 @@ class _FreeWorkoutExerciseGroupScreenState
                 return setA.compareTo(setB);
               });
               userExercises = loaded;
+              
+              // Преобразуем в UserExerciseRow
+              userExerciseRows = loaded.map((ue) {
+                return UserExerciseRow(
+                  userExerciseUuid: ue['uuid'],
+                  reps: ue['reps'] ?? 0,
+                  weight: (ue['weight'] ?? 0).toDouble(),
+                  status: ue['status'] ?? 'active',
+                  lastResult: '0',
+                );
+              }).toList();
+              
+              // Если подходов нет, создаем один пустой
+              if (userExerciseRows.isEmpty) {
+                userExerciseRows = [UserExerciseRow()];
+              }
+            } else {
+              // Если нет подходов, создаем один пустой
+              userExerciseRows = [UserExerciseRow()];
             }
 
             // Загружаем предыдущие результаты для каждого подхода
             await _loadAllLastResults(exerciseUuid);
+            
+            // Обновляем lastResult в userExerciseRows
+            for (int i = 0; i < userExerciseRows.length; i++) {
+              final lastResultText = _getLastResultText(i + 1);
+              userExerciseRows[i] = UserExerciseRow(
+                userExerciseUuid: userExerciseRows[i].userExerciseUuid,
+                reps: userExerciseRows[i].reps,
+                weight: userExerciseRows[i].weight,
+                status: userExerciseRows[i].status,
+                lastResult: lastResultText,
+              );
+            }
           }
         }
       }
@@ -124,199 +170,20 @@ class _FreeWorkoutExerciseGroupScreenState
     setState(() => isLoading = false);
   }
 
-  void _addSet() async {
-    final newIndex = userExercises.length;
-    setState(() {
-      userExercises.add({'reps': 0, 'weight': 0.0, 'completed': false});
-    });
-
-    // Загружаем предыдущий результат для нового подхода
-    if (exerciseData != null) {
-      final exerciseUuid = exerciseData!['uuid'];
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final userUuid = authProvider.userUuid;
-      if (userUuid != null) {
-        await _loadLastResult(exerciseUuid, userUuid, newIndex + 1);
-      }
-    }
-  }
-
-  void _updateSet(int index, int? reps, double? weight, bool? completed) async {
-    if (reps != null) {
-      setState(() {
-        userExercises[index]['reps'] = reps;
-      });
-    }
-    if (weight != null) {
-      setState(() {
-        userExercises[index]['weight'] = weight;
-      });
-    }
-    if (completed != null) {
-      final ue = userExercises[index];
-      // Если пытаемся отметить выполненным и uuid еще нет - создаем user_exercise
-      if (completed && ue['uuid'] == null) {
-        await _saveSet(index);
-      }
-      // При снятии отметки ничего не делаем - не удаляем user_exercise
-    }
-  }
-
-  Future<void> _deleteAllSets() async {
-    // Собираем все uuid подходов
-    final uuids = userExercises
-        .where((ue) => ue['uuid'] != null)
-        .map((ue) => ue['uuid'] as String)
-        .toList();
-
-    if (uuids.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Нет выполненных подходов для удаления')),
-      );
-      return;
-    }
-
-    // Подтверждение удаления
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Подтверждение'),
-        content: Text(
-          'Вы уверены, что хотите удалить все ${uuids.length} подходов?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Отмена'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Удалить'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    try {
-      // Удаляем каждый подход
-      int deletedCount = 0;
-      for (final uuid in uuids) {
-        try {
-          final response = await ApiService.delete(
-            '/user_exercises/delete/$uuid',
-          );
-          if (response.statusCode == 200) {
-            deletedCount++;
-          }
-        } catch (e) {
-          debugPrint('Ошибка удаления подхода $uuid: $e');
-        }
-      }
-
-      // Обновляем UI
-      setState(() {
-        for (var ue in userExercises) {
-          ue.remove('uuid');
-        }
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Удалено подходов: $deletedCount')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Ошибка удаления: $e')));
-      }
-    }
-  }
-
-  Future<void> _saveSet(int index) async {
-    if (exerciseData == null) return;
-
-    final ue = userExercises[index];
-    final exerciseUuid = exerciseData!['uuid'];
-
-    try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final userUuid = authProvider.userUuid;
-
-      if (userUuid == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ошибка: не найден userUuid')),
-        );
-        return;
-      }
-
-      final reps = ue['reps'] ?? 0;
-      final weight = ue['weight'] ?? 0.0;
-
-      // Формируем body для запроса
-      final body = <String, dynamic>{
-        'training_uuid': widget.trainingUuid,
-        'user_uuid': userUuid,
-        'exercise_uuid': exerciseUuid,
-        'training_date': DateTime.now().toIso8601String().split('T')[0],
-        'status': 'active',
-        'set_number': index + 1,
-        'reps': reps,
-      };
-
-      // Добавляем weight только если он не 0 и не null
-      if (weight != 0 && weight != null) {
-        body['weight'] = weight;
-      }
-
-      final response = await ApiService.post(
-        '/user_exercises/add/',
-        body: body,
-      );
-      if (response.statusCode == 200) {
-        final data = ApiService.decodeJson(response.body);
-        setState(() {
-          userExercises[index]['uuid'] = data['uuid'];
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Ошибка сохранения: $e')));
-      }
-    }
-  }
-
-  bool _shouldShowDeleteButton() {
-    // Кнопка не показывается, если нет ни одного user_exercise
-    final hasUserExercises = userExercises.any((ue) => ue['uuid'] != null);
-    if (!hasUserExercises) return false;
-
-    // Кнопка не показывается, если есть хотя бы один подход со статусом PASSED
-    final hasPassed = userExercises.any((ue) => ue['status'] == 'passed');
-    if (hasPassed) return false;
-
-    return true;
-  }
 
   Future<void> _saveResults() async {
     try {
       // Собираем все UUID user_exercises, которые имеют uuid
-      final userExerciseUuids = userExercises
-          .where((ue) => ue['uuid'] != null)
-          .map((ue) => ue['uuid'] as String)
+      final userExerciseUuids = userExerciseRows
+          .where((row) => row.userExerciseUuid != null)
+          .map((row) => row.userExerciseUuid!)
           .toList();
 
       if (userExerciseUuids.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Нет выполненных подходов для сохранения'),
-          ),
+        MetalMessage.show(
+          context: context,
+          message: 'Нет выполненных подходов для сохранения',
+          type: MetalMessageType.warning,
         );
         return;
       }
@@ -331,17 +198,21 @@ class _FreeWorkoutExerciseGroupScreenState
 
       if (response.statusCode == 200) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Результаты сохранены')));
+          MetalMessage.show(
+            context: context,
+            message: 'Результаты сохранены',
+            type: MetalMessageType.success,
+          );
           Navigator.of(context).pop(true);
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Ошибка сохранения: $e')));
+        MetalMessage.show(
+          context: context,
+          message: 'Ошибка сохранения: $e',
+          type: MetalMessageType.error,
+        );
       }
     }
   }
@@ -355,7 +226,7 @@ class _FreeWorkoutExerciseGroupScreenState
 
       // Загружаем последние результаты для всех подходов
       // Загружаем для каждого подхода отдельно (от 1 до количества подходов)
-      for (int i = 0; i < userExercises.length; i++) {
+      for (int i = 0; i < userExerciseRows.length; i++) {
         await _loadLastResult(exerciseUuid, userUuid, i + 1);
       }
     } catch (e) {
@@ -397,6 +268,33 @@ class _FreeWorkoutExerciseGroupScreenState
     }
   }
 
+  /// Загружает предыдущий результат для подхода (используется в ProgramExerciseSetsTable)
+  Future<void> _loadLastUserExerciseResult(int setNumber) async {
+    if (exerciseData == null) return;
+    
+    final exerciseUuid = exerciseData!['uuid'];
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userUuid = authProvider.userUuid;
+    
+    if (userUuid == null) return;
+    
+    await _loadLastResult(exerciseUuid, userUuid, setNumber + 1);
+    
+    // Обновляем lastResult в userExerciseRows
+    if (setNumber < userExerciseRows.length) {
+      final lastResultText = _getLastResultText(setNumber + 1);
+      setState(() {
+        userExerciseRows[setNumber] = UserExerciseRow(
+          userExerciseUuid: userExerciseRows[setNumber].userExerciseUuid,
+          reps: userExerciseRows[setNumber].reps,
+          weight: userExerciseRows[setNumber].weight,
+          status: userExerciseRows[setNumber].status,
+          lastResult: lastResultText,
+        );
+      });
+    }
+  }
+
   String _getLastResultText(int setNumber) {
     final lastResultsForSet = lastResults
         .where((result) => result['set_number'] == setNumber)
@@ -419,273 +317,336 @@ class _FreeWorkoutExerciseGroupScreenState
     }
   }
 
-  /// Получает значения повторений и веса из lastResults для конкретного подхода
-  Map<String, dynamic> _getLastResultValues(int setNumber) {
-    final lastResultsForSet = lastResults
-        .where((result) => result['set_number'] == setNumber)
+  bool _shouldShowDeleteButton() {
+    // Кнопка не показывается, если нет ни одного user_exercise
+    final hasUserExercises = userExerciseRows.any((row) => row.userExerciseUuid != null);
+    if (!hasUserExercises) return false;
+
+    // Кнопка не показывается, если есть хотя бы один подход со статусом PASSED
+    final hasPassed = userExerciseRows.any((row) => row.status == 'passed');
+    if (hasPassed) return false;
+
+    return true;
+  }
+
+  Future<void> _deleteAllSets() async {
+    // Собираем все uuid подходов
+    final uuids = userExerciseRows
+        .where((row) => row.userExerciseUuid != null)
+        .map((row) => row.userExerciseUuid!)
         .toList();
 
-    if (lastResultsForSet.isEmpty) {
-      return {'reps': 0, 'weight': 0.0};
+    if (uuids.isEmpty) {
+      MetalMessage.show(
+        context: context,
+        message: 'Нет выполненных подходов для удаления',
+        type: MetalMessageType.warning,
+      );
+      return;
     }
 
-    // Берем последний результат
-    final lastResult = lastResultsForSet.last;
-    final reps = lastResult['reps'] ?? 0;
-    final weight = lastResult['weight'];
+    // Подтверждение удаления
+    final confirm = await MetalModal.show<bool>(
+      context: context,
+      title: 'Подтверждение',
+      children: [
+        Text(
+          'Вы уверены, что хотите удалить все ${uuids.length} подходов?',
+          style: NinjaText.body,
+        ),
+        const SizedBox(height: NinjaSpacing.xl),
+        Row(
+          children: [
+            Expanded(
+              child: MetalButton(
+                label: 'Отмена',
+                onPressed: () => Navigator.of(context).pop(false),
+                height: 56,
+                fontSize: 16,
+                position: MetalButtonPosition.first,
+              ),
+            ),
+            Expanded(
+              child: MetalButton(
+                label: 'Удалить',
+                onPressed: () => Navigator.of(context).pop(true),
+                height: 56,
+                fontSize: 16,
+                position: MetalButtonPosition.last,
+                topColor: Colors.red,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
 
-    return {
-      'reps': reps,
-      'weight': weight != null ? (weight as num).toDouble() : 0.0,
-    };
+    if (confirm != true) return;
+
+    try {
+      // Удаляем каждый подход
+      int deletedCount = 0;
+      for (final uuid in uuids) {
+        try {
+          final response = await ApiService.delete(
+            '/user_exercises/delete/$uuid',
+          );
+          if (response.statusCode == 200) {
+            deletedCount++;
+          }
+        } catch (e) {
+          debugPrint('Ошибка удаления подхода $uuid: $e');
+        }
+      }
+
+      // Перезагружаем данные подходов из API
+      if (exerciseData != null && mounted) {
+        final exerciseUuid = exerciseData!['uuid'];
+        
+        // Загружаем user_exercises заново
+        final userExResp = await ApiService.get(
+          '/user_exercises/',
+          queryParams: {'exercise_uuid': exerciseUuid},
+        );
+        
+        if (userExResp.statusCode == 200 && mounted) {
+          final loaded = List<Map<String, dynamic>>.from(
+            ApiService.decodeJson(userExResp.body) ?? [],
+          );
+          
+          // Сортируем подходы по set_number
+          loaded.sort((a, b) {
+            final setA = a['set_number'] ?? 0;
+            final setB = b['set_number'] ?? 0;
+            return setA.compareTo(setB);
+          });
+          
+          // Обновляем userExerciseRows
+          setState(() {
+            // Если есть загруженные подходы, обновляем их
+            if (loaded.isNotEmpty) {
+              userExerciseRows = loaded.map((ue) {
+                return UserExerciseRow(
+                  userExerciseUuid: ue['uuid'],
+                  reps: ue['reps'] ?? 0,
+                  weight: (ue['weight'] ?? 0).toDouble(),
+                  status: ue['status'] ?? 'active',
+                  lastResult: '0',
+                );
+              }).toList();
+              
+              // Обновляем lastResult для каждого подхода
+              for (int i = 0; i < userExerciseRows.length; i++) {
+                final lastResultText = _getLastResultText(i + 1);
+                userExerciseRows[i] = UserExerciseRow(
+                  userExerciseUuid: userExerciseRows[i].userExerciseUuid,
+                  reps: userExerciseRows[i].reps,
+                  weight: userExerciseRows[i].weight,
+                  status: userExerciseRows[i].status,
+                  lastResult: lastResultText,
+                );
+              }
+            } else {
+              // Если подходов нет, оставляем один пустой
+              userExerciseRows = [UserExerciseRow()];
+            }
+            
+            // Синхронизируем с userExercises
+            userExercises = userExerciseRows.asMap().entries.map((entry) {
+              final index = entry.key;
+              final row = entry.value;
+              return {
+                'uuid': row.userExerciseUuid,
+                'reps': row.reps,
+                'weight': row.weight,
+                'status': row.status,
+                'set_number': index + 1,
+              };
+            }).toList();
+          });
+        }
+      }
+
+      if (mounted) {
+        MetalMessage.show(
+          context: context,
+          message: 'Удалено подходов: $deletedCount',
+          type: MetalMessageType.success,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        MetalMessage.show(
+          context: context,
+          message: 'Ошибка удаления: $e',
+          type: MetalMessageType.error,
+        );
+      }
+    }
   }
 
-  /// Определяет начальные значения для модального окна ввода
-  Map<String, dynamic> _getInitialValues(int index) {
-    // Для первого подхода - используем значения из lastResults
-    if (index == 0) {
-      return _getLastResultValues(1); // set_number начинается с 1
-    }
-
-    // Для остальных подходов - сначала пытаемся взять из предыдущего подхода
-    final previousUe = userExercises[index - 1];
-    final previousReps = previousUe['reps'] ?? 0;
-    final previousWeight = (previousUe['weight'] ?? 0.0).toDouble();
-
-    if (previousReps > 0 || previousWeight > 0) {
-      return {'reps': previousReps, 'weight': previousWeight};
-    }
-
-    // Если предыдущего подхода нет, используем lastResults
-    return _getLastResultValues(index + 1);
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(groupData?['caption'] ?? 'Упражнение'),
-        backgroundColor: AppColors.background,
-        foregroundColor: AppColors.textPrimary,
-      ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : exerciseData == null
-          ? const Center(child: Text('Упражнение не найдено'))
-          : Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: Colors.transparent,
+      body: TexturedBackground(
+        child: SafeArea(
+          child: isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : exerciseData == null
+                  ? const Center(child: Text('Упражнение не найдено'))
+                  : Column(
                       children: [
-                        // Название упражнения + кнопка информации
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                exerciseData!['caption'] ?? 'Упражнение',
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                onTap: _showExerciseInfo,
-                                borderRadius: BorderRadius.circular(10),
-                                child: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.inputBorder.withOpacity(
-                                      0.3,
-                                    ),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: AppColors.inputBorder.withOpacity(
-                                        0.5,
-                                      ),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: const Icon(
-                                    Icons.info_outline,
-                                    color: AppColors.textPrimary,
-                                    size: 20,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-
-                        // Медиа упражнения (видео/гиф/картинка) — после заголовка
-                        if (exerciseReference != null &&
-                            (exerciseReference!['video_uuid'] != null ||
-                                exerciseReference!['gif_uuid'] != null ||
-                                exerciseReference!['image_uuid'] != null)) ...[
-                          _buildExerciseMedia(),
-                          const SizedBox(height: 16),
-                        ],
-
-                        // Заголовок таблицы подходов
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Предыдущий результат',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: Text(
-                                'Повторения и вес',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: Text(
-                                'Выполнено',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Список подходов
-                        ...userExercises.asMap().entries.map((entry) {
-                          final index = entry.key;
-                          final ue = entry.value;
-                          return _buildSetRow(index, ue);
-                        }),
-
-                        const SizedBox(height: 16),
-
-                        // Кнопка добавления подхода
-                        ElevatedButton.icon(
-                          onPressed: _addSet,
-                          icon: const Icon(Icons.add),
-                          label: const Text('Добавить подход'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.buttonPrimary,
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-
-                        const SizedBox(height: 8),
-
-                        // Кнопка удаления всех подходов (отображается только если есть подходящие подходы)
-                        if (_shouldShowDeleteButton())
-                          OutlinedButton.icon(
-                            onPressed: _deleteAllSets,
-                            icon: const Icon(
-                              Icons.delete_outline,
-                              color: Colors.red,
-                            ),
-                            label: const Text('Удалить все подходы'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.red,
-                              side: const BorderSide(
-                                color: Colors.red,
-                                width: 2,
-                              ),
-                            ),
-                          ),
-
-                        const SizedBox(height: 16),
-
-                        // Кнопки таймера
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: _showTimerPicker,
-                                icon: const Icon(Icons.timer),
-                                label: Text(
-                                  savedTimerValue != null
-                                      ? 'Таймер ($savedTimerValue)'
-                                      : 'Таймер',
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.surface,
-                                  foregroundColor: AppColors.textPrimary,
-                                ),
-                              ),
-                            ),
-                            if (savedTimerValue != null) ...[
-                              const SizedBox(width: 8),
-                              ElevatedButton(
-                                onPressed: _startTimerWithSavedValue,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.buttonPrimary,
-                                  foregroundColor: Colors.white,
-                                ),
-                                child: const Text('Запустить'),
-                              ),
+                        // Верхняя панель с кнопкой назад
+                        Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Row(
+                            children: [
+                              const MetalBackButton(),
+                              const Spacer(),
+                              // Пустое место для симметрии
+                              const SizedBox(width: 48),
                             ],
-                          ],
+                          ),
+                        ),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Название упражнения + кнопка информации
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        exerciseData!['caption'] ?? 'Упражнение',
+                                        style: NinjaText.title,
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    SizedBox(
+                                      width: 36,
+                                      child: MetalButton(
+                                        label: '',
+                                        icon: Icons.info_outline,
+                                        onPressed: _showExerciseInfo,
+                                        height: 36,
+                                        fontSize: 0,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 24),
+
+                                // Медиа упражнения (видео/гиф/картинка) — после заголовка
+                                if (exerciseReference != null &&
+                                    (exerciseReference!['video_uuid'] != null ||
+                                        exerciseReference!['gif_uuid'] != null ||
+                                        exerciseReference!['image_uuid'] != null)) ...[
+                                  _buildExerciseMedia(),
+                                  const SizedBox(height: 16),
+                                ],
+
+                                // Таблица подходов
+                                if (exerciseModel != null) ...[
+                                  ProgramExerciseSetsTable(
+                                    exercise: exerciseModel!,
+                                    initialRows: userExerciseRows,
+                                    userUuid: Provider.of<AuthProvider>(context, listen: false).userUuid,
+                                    trainingDate: DateTime.now().toIso8601String().split('T')[0],
+                                    trainingUuid: widget.trainingUuid,
+                                    isProgram: false,
+                                    isFreeWorkout: true, // Указываем, что это свободная тренировка
+                                    onLoadLastResult: (setNumber) async {
+                                      await _loadLastUserExerciseResult(setNumber);
+                                    },
+                                    onRowsChanged: (newRows) {
+                                      setState(() {
+                                        userExerciseRows = newRows;
+                                        // Синхронизируем с userExercises для совместимости
+                                        userExercises = newRows.asMap().entries.map((entry) {
+                                          final index = entry.key;
+                                          final row = entry.value;
+                                          return {
+                                            'uuid': row.userExerciseUuid,
+                                            'reps': row.reps,
+                                            'weight': row.weight,
+                                            'status': row.status,
+                                            'set_number': index + 1,
+                                          };
+                                        }).toList();
+                                      });
+                                    },
+                                  ),
+                                  // Кнопка удаления всех подходов (отображается только если есть подходящие подходы)
+                                  if (_shouldShowDeleteButton()) ...[
+                                    const SizedBox(height: 8),
+                                    MetalButton(
+                                      label: 'Удалить все подходы',
+                                      icon: Icons.delete_outline,
+                                      onPressed: _deleteAllSets,
+                                      height: 56,
+                                      fontSize: 16,
+                                      topColor: Colors.red,
+                                    ),
+                                  ],
+                                ],
+
+                                const SizedBox(height: 16),
+
+                                // Кнопки таймера
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: MetalButton(
+                                        label: savedTimerValue != null
+                                            ? 'Таймер ($savedTimerValue)'
+                                            : 'Таймер',
+                                        icon: Icons.timer,
+                                        onPressed: _showTimerPicker,
+                                        height: 56,
+                                        fontSize: 16,
+                                        position: savedTimerValue != null
+                                            ? MetalButtonPosition.first
+                                            : MetalButtonPosition.single,
+                                      ),
+                                    ),
+                                    if (savedTimerValue != null)
+                                      Expanded(
+                                        child: MetalButton(
+                                          label: 'Запустить',
+                                          onPressed: _startTimerWithSavedValue,
+                                          height: 56,
+                                          fontSize: 16,
+                                          position: MetalButtonPosition.last,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 24),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // Кнопка завершения внизу
+                        Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: MetalButton(
+                            label: 'Завершить упражнение',
+                            onPressed: _saveResults,
+                            height: 56,
+                            fontSize: 16,
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                ),
-
-                // Кнопка сохранения внизу
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 10,
-                        offset: const Offset(0, -2),
-                      ),
-                    ],
-                  ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _saveResults,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.buttonPrimary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: const Text(
-                        'Сохранить результаты',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+        ),
+      ),
     );
   }
 
@@ -734,169 +695,6 @@ class _FreeWorkoutExerciseGroupScreenState
     }
   }
 
-  Widget _buildSetRow(int index, Map<String, dynamic> ue) {
-    final reps = ue['reps'] ?? 0;
-    final weight = (ue['weight'] ?? 0.0).toDouble();
-    // Отметка активна если существует uuid (user_exercise уже создан)
-    final completed = ue['uuid'] != null;
-    final isPassed = ue['status'] == 'passed';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: completed
-            ? isPassed
-                  ? Colors.green.withOpacity(0.1)
-                  : AppColors.buttonPrimary.withOpacity(0.1)
-            : AppColors.inputBorder.withOpacity(0.13),
-        borderRadius: BorderRadius.circular(32),
-      ),
-      child: Row(
-        children: [
-          // Колонка "Предыдущий результат"
-          Expanded(
-            child: Center(
-              child: Text(
-                _getLastResultText(index + 1),
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 16,
-                ),
-              ),
-            ),
-          ),
-          // Колонка "Повторения и вес"
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _showRepsWeightPicker(index, true),
-              child: Center(
-                child: Text(
-                  '$reps x ${weight.toStringAsFixed(2)} кг',
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 18,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: Center(
-              child: IconButton(
-                icon: completed
-                    ? Icon(
-                        isPassed ? Icons.verified : Icons.check_circle,
-                        color: isPassed ? Colors.green.shade700 : Colors.green,
-                        size: 32,
-                      )
-                    : const Icon(Icons.radio_button_unchecked, size: 32),
-                onPressed: isPassed
-                    ? null // Кнопка неактивна для PASSED подходов
-                    : () => _updateSet(index, null, null, !completed),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showRepsWeightPicker(int index, bool _) {
-    // Определяем начальные значения
-    final initialValues = _getInitialValues(index);
-    int selectedReps = initialValues['reps'] as int;
-    double selectedWeight = initialValues['weight'] as double;
-
-    // Создаем контроллеры для установки начальной позиции
-    final repsController = FixedExtentScrollController(
-      initialItem: selectedReps.clamp(0, 100),
-    );
-    final weightController = FixedExtentScrollController(
-      initialItem: (selectedWeight / 0.25).round().clamp(0, 4000),
-    );
-
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Container(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      children: [
-                        const Text(
-                          'Повторения',
-                          style: TextStyle(fontSize: 20),
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          height: 100,
-                          child: ListWheelScrollView(
-                            itemExtent: 40,
-                            diameterRatio: 1.5,
-                            onSelectedItemChanged: (val) {
-                              setModalState(() => selectedReps = val);
-                            },
-                            controller: repsController,
-                            children: List.generate(101, (i) => Text('$i')),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        const Text('Вес (кг)', style: TextStyle(fontSize: 20)),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          height: 100,
-                          child: ListWheelScrollView(
-                            itemExtent: 40,
-                            diameterRatio: 1.5,
-                            onSelectedItemChanged: (val) {
-                              setModalState(() => selectedWeight = val * 0.25);
-                            },
-                            controller: weightController,
-                            children: List.generate(
-                              4001,
-                              (i) => Text('${(i * 0.25).toStringAsFixed(2)}'),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () {
-                  _updateSet(index, selectedReps, selectedWeight, null);
-                  Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.buttonPrimary,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Готово'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ).then((_) {
-      // Освобождаем контроллеры после закрытия модального окна
-      repsController.dispose();
-      weightController.dispose();
-    });
-  }
 
   Future<void> _loadTimerValue() async {
     try {
@@ -1001,158 +799,139 @@ class _FreeWorkoutExerciseGroupScreenState
   }
 
   void _showTimerPicker() {
-    int selectedMinutes = 0;
-    int selectedSeconds = 0;
+    // Парсим сохраненное значение для предзаполнения
+    int initialMinutes = 0;
+    int initialSeconds = 0;
+    
+    if (savedTimerValue != null) {
+      final totalSeconds = _parseTime(savedTimerValue!);
+      initialMinutes = totalSeconds ~/ 60;
+      initialSeconds = totalSeconds % 60;
+    }
 
-    final minuteController = FixedExtentScrollController(initialItem: 0);
-    final secondController = FixedExtentScrollController(initialItem: 0);
+    int selectedMinutes = initialMinutes;
+    int selectedSeconds = initialSeconds;
 
-    showModalBottomSheet(
+    final minuteController = FixedExtentScrollController(initialItem: initialMinutes);
+    final secondController = FixedExtentScrollController(initialItem: initialSeconds);
+
+    MetalModal.show(
       context: context,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
+      title: 'Выберите время отдыха',
+      children: [
+        StatefulBuilder(
           builder: (context, setModalState) {
-            final textStyle =
-                Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.bold,
-                ) ??
-                const TextStyle(
-                  fontSize: 22,
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.bold,
-                );
+            final textStyle = const TextStyle(
+              fontSize: 16,
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.bold,
+            );
 
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Выберите время отдыха',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _TimerPickerColumn(
-                        title: 'Минуты',
-                        controller: minuteController,
-                        onSelectedItemChanged: (value) {
-                          setModalState(() {
-                            selectedMinutes = value;
-                          });
-                        },
-                        textStyle: textStyle,
-                      ),
-                      _TimerPickerColumn(
-                        title: 'Секунды',
-                        controller: secondController,
-                        onSelectedItemChanged: (value) {
-                          setModalState(() {
-                            selectedSeconds = value;
-                          });
-                        },
-                        textStyle: textStyle,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        final totalSeconds =
-                            selectedMinutes * 60 + selectedSeconds;
-                        if (totalSeconds == 0) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Выберите время больше 0 секунд'),
-                            ),
-                          );
-                          return;
-                        }
-
-                        final timerProvider = Provider.of<TimerOverlayProvider>(
-                          this.context,
-                          listen: false,
-                        );
-
-                        final authProvider = Provider.of<AuthProvider>(
-                          this.context,
-                          listen: false,
-                        );
-                        final userUuid = authProvider.userUuid;
-
-                        final exerciseUuid = exerciseData != null
-                            ? exerciseData!['uuid']
-                            : null;
-                        final exerciseName = exerciseData != null
-                            ? exerciseData!['caption']
-                            : null;
-
-                        timerProvider.show(
-                          totalSeconds,
-                          userUuid: userUuid?.isNotEmpty == true
-                              ? userUuid
-                              : null,
-                          exerciseUuid: exerciseUuid is String
-                              ? exerciseUuid
-                              : null,
-                          exerciseName: exerciseName is String
-                              ? exerciseName
-                              : null,
-                        );
-
-                        // Сохраняем значение таймера
-                        final timeValue = _formatTime(totalSeconds);
-                        await _saveTimerValue(timeValue);
-
-                        Navigator.of(context).pop();
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: NinjaSpacing.md),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _TimerPickerColumn(
+                      title: 'Минуты',
+                      controller: minuteController,
+                      onSelectedItemChanged: (value) {
+                        setModalState(() {
+                          selectedMinutes = value;
+                        });
                       },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.buttonPrimary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: const Text(
-                        'Запустить таймер',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      textStyle: textStyle,
+                    ),
+                    _TimerPickerColumn(
+                      title: 'Секунды',
+                      controller: secondController,
+                      onSelectedItemChanged: (value) {
+                        setModalState(() {
+                          selectedSeconds = value;
+                        });
+                      },
+                      textStyle: textStyle,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: NinjaSpacing.xl),
+                Row(
+                  children: [
+                    Expanded(
+                      child: MetalButton(
+                        label: 'Отмена',
+                        onPressed: () => Navigator.of(context).pop(),
+                        height: 56,
+                        fontSize: 16,
+                        position: MetalButtonPosition.first,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text(
-                        'Отмена',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: AppColors.textSecondary,
-                        ),
+                    Expanded(
+                      child: MetalButton(
+                        label: 'Запустить таймер',
+                        onPressed: () async {
+                          final totalSeconds =
+                              selectedMinutes * 60 + selectedSeconds;
+                          if (totalSeconds == 0) {
+                            MetalMessage.show(
+                              context: context,
+                              message: 'Выберите время больше 0 секунд',
+                              type: MetalMessageType.warning,
+                            );
+                            return;
+                          }
+
+                          final timerProvider = Provider.of<TimerOverlayProvider>(
+                            context,
+                            listen: false,
+                          );
+
+                          final authProvider = Provider.of<AuthProvider>(
+                            context,
+                            listen: false,
+                          );
+                          final userUuid = authProvider.userUuid;
+
+                          final exerciseUuid = exerciseData != null
+                              ? exerciseData!['uuid']
+                              : null;
+                          final exerciseName = exerciseData != null
+                              ? exerciseData!['caption']
+                              : null;
+
+                          timerProvider.show(
+                            totalSeconds,
+                            userUuid: userUuid?.isNotEmpty == true
+                                ? userUuid
+                                : null,
+                            exerciseUuid: exerciseUuid is String
+                                ? exerciseUuid
+                                : null,
+                            exerciseName: exerciseName is String
+                                ? exerciseName
+                                : null,
+                          );
+
+                          // Сохраняем значение таймера
+                          final timeValue = _formatTime(totalSeconds);
+                          await _saveTimerValue(timeValue);
+
+                          Navigator.of(context).pop();
+                        },
+                        height: 56,
+                        fontSize: 16,
+                        position: MetalButtonPosition.last,
                       ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             );
           },
-        );
-      },
+        ),
+      ],
     );
   }
 }
@@ -1184,7 +963,7 @@ class _TimerPickerColumn extends StatelessWidget {
         Text(
           title,
           style: const TextStyle(
-            fontSize: 18,
+            fontSize: 16,
             fontWeight: FontWeight.w500,
             color: AppColors.textSecondary,
           ),
@@ -1196,7 +975,6 @@ class _TimerPickerColumn extends StatelessWidget {
           child: DecoratedBox(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: AppColors.inputBorder.withOpacity(0.4)),
             ),
             child: ListWheelScrollView.useDelegate(
               controller: controller,

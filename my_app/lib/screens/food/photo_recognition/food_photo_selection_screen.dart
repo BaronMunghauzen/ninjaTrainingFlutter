@@ -2,13 +2,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../design/ninja_colors.dart';
-import '../../../design/ninja_gradients.dart';
 import '../../../design/ninja_radii.dart';
-import '../../../design/ninja_shadows.dart';
 import '../../../design/ninja_spacing.dart';
 import '../../../design/ninja_typography.dart';
 import '../../../widgets/textured_background.dart';
 import '../../../widgets/metal_button.dart';
+import '../../../widgets/metal_card.dart';
+import '../../../widgets/metal_back_button.dart';
+import '../../../widgets/metal_text_field.dart';
 import '../../../utils/ninja_route.dart' show ninjaRouteReplacement;
 import 'food_recognition_result_screen.dart';
 import '../../../models/food_recognition_model.dart';
@@ -177,124 +178,126 @@ class _FoodPhotoSelectionScreenState extends State<FoodPhotoSelectionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Text('Сканирование еды', style: NinjaText.title),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: NinjaColors.textPrimary),
-      ),
       body: TexturedBackground(
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(NinjaSpacing.lg),
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => FocusScope.of(context).unfocus(),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Область для изображения
-                GestureDetector(
-                  onTap: _showImageSourceDialog,
-                  child: Container(
-                    height: 300,
-                    decoration: BoxDecoration(
-                      gradient: NinjaGradients.metalSoft,
-                      borderRadius: BorderRadius.circular(NinjaRadii.sm),
-                      boxShadow: NinjaShadows.card,
-                      border: Border.all(
-                        color: NinjaColors.metalEdgeSoft,
-                        width: 0.6,
-                      ),
-                    ),
-                    child: _selectedImage != null
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(NinjaRadii.sm),
-                            child: Image.file(
-                              _selectedImage!,
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                            ),
-                          )
-                        : Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.add_photo_alternate,
-                                size: 64,
-                                color: NinjaColors.textSecondary,
-                              ),
-                              const SizedBox(height: NinjaSpacing.lg),
-                              Text(
-                                'Нажмите, чтобы выбрать фото',
-                                style: NinjaText.body.copyWith(
-                                  color: NinjaColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                  ),
-                ),
-                const SizedBox(height: NinjaSpacing.xl),
-
-                // Поле для комментария
+                // Кастомный заголовок с фоном как у экрана
                 Container(
-                  decoration: BoxDecoration(
-                    gradient: NinjaGradients.metalSoft,
-                    borderRadius: BorderRadius.circular(NinjaRadii.sm),
-                    border: Border.all(
-                      color: NinjaColors.metalEdgeSoft,
-                      width: 0.6,
-                    ),
-                    boxShadow: NinjaShadows.card,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: NinjaSpacing.lg,
+                    vertical: NinjaSpacing.md,
                   ),
-                  child: TextField(
-                    controller: _commentController,
-                    style: NinjaText.body,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      hintText: 'Комментарий (необязательно)',
-                      hintStyle: NinjaText.body.copyWith(
-                        color: NinjaColors.textMuted,
-                      ),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.all(NinjaSpacing.md),
-                    ),
+                  child: Row(
+                    children: [
+                      const MetalBackButton(),
+                      const SizedBox(width: NinjaSpacing.md),
+                      Text('Сканирование', style: NinjaText.title),
+                    ],
                   ),
                 ),
-                const SizedBox(height: NinjaSpacing.xl),
-
-                // Кнопка отправки
-                MetalButton(
-                  label: _isUploading
-                      ? 'Отправка...'
-                      : 'Отправить на сканирование',
-                  icon: _isUploading ? null : Icons.send,
-                  onPressed: _sendForRecognition,
-                  height: 56,
-                  isLoading: _isUploading,
-                ),
-
-                // Лоадер при загрузке
-                if (_isUploading) ...[
-                  const SizedBox(height: NinjaSpacing.xl),
-                  Center(
+                // Контент
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(NinjaSpacing.lg),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            NinjaColors.textPrimary,
+                        // Область для изображения
+                        GestureDetector(
+                          onTap: _showImageSourceDialog,
+                          child: MetalCard(
+                            padding: EdgeInsets.zero,
+                            child: Container(
+                              height: 300,
+                              width: double.infinity,
+                              child: _selectedImage != null
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(24),
+                                      child: Image.file(
+                                        _selectedImage!,
+                                        fit: BoxFit.cover,
+                                        width: double.infinity,
+                                      ),
+                                    )
+                                  : Center(
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.add_photo_alternate,
+                                            size: 64,
+                                            color: NinjaColors.textSecondary,
+                                          ),
+                                          const SizedBox(
+                                              height: NinjaSpacing.lg),
+                                          Text(
+                                            'Нажмите, чтобы выбрать фото еды',
+                                            style: NinjaText.body.copyWith(
+                                              color: NinjaColors.textSecondary,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                            ),
                           ),
                         ),
-                        const SizedBox(height: NinjaSpacing.lg),
-                        Text(
-                          'Пожалуйста, ожидайте завершения сканирования',
-                          style: NinjaText.body.copyWith(
-                            color: NinjaColors.textSecondary,
-                          ),
-                          textAlign: TextAlign.center,
+                        const SizedBox(height: NinjaSpacing.xl),
+
+                        // Поле для комментария
+                        MetalTextField(
+                          controller: _commentController,
+                          hint: 'Комментарий (необязательно)',
+                          maxLines: 3,
                         ),
+                        const SizedBox(height: NinjaSpacing.xl),
+
+                        // Кнопка отправки
+                        MetalButton(
+                          label: _isUploading
+                              ? 'Отправка...'
+                              : 'Отправить на сканирование',
+                          icon: _isUploading ? null : Icons.send,
+                          onPressed: _sendForRecognition,
+                          height: 56,
+                          isLoading: _isUploading,
+                        ),
+
+                        // Лоадер при загрузке
+                        if (_isUploading) ...[
+                          const SizedBox(height: NinjaSpacing.xl),
+                          Center(
+                            child: Column(
+                              children: [
+                                const CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    NinjaColors.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: NinjaSpacing.lg),
+                                Text(
+                                  'Пожалуйста, ожидайте завершения сканирования',
+                                  style: NinjaText.body.copyWith(
+                                    color: NinjaColors.textSecondary,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
-                ],
+                ),
               ],
             ),
           ),

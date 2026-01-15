@@ -9,11 +9,13 @@ class TrainingCalendar extends StatefulWidget {
     List<UserTrainingModel> trainingsForDate,
   )
   onDateSelected;
+  final bool transparentBackground;
 
   const TrainingCalendar({
     super.key,
     required this.trainings,
     required this.onDateSelected,
+    this.transparentBackground = false,
   });
 
   @override
@@ -62,12 +64,16 @@ class _TrainingCalendarState extends State<TrainingCalendar> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.background,
+        color: widget.transparentBackground
+            ? Colors.transparent
+            : AppColors.background,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.textSecondary.withOpacity(0.3),
-          width: 1,
-        ),
+        border: widget.transparentBackground
+            ? Border.all(color: Colors.transparent, width: 0)
+            : Border.all(
+                color: AppColors.textSecondary.withOpacity(0.3),
+                width: 1,
+              ),
       ),
       child: Column(
         children: [

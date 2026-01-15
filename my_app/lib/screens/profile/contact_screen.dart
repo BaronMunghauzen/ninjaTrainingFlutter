@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../widgets/custom_button.dart';
-import '../../widgets/custom_text_field.dart';
-import '../../constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../widgets/textured_background.dart';
+import '../../widgets/metal_text_field.dart';
+import '../../widgets/metal_dropdown.dart';
+import '../../widgets/metal_button.dart';
+import '../../widgets/metal_back_button.dart';
+import '../../widgets/metal_message.dart';
+import '../../design/ninja_typography.dart';
+import '../../design/ninja_colors.dart';
 
 class ContactScreen extends StatefulWidget {
   const ContactScreen({super.key});
@@ -14,10 +19,10 @@ class ContactScreen extends StatefulWidget {
 }
 
 class _ContactScreenState extends State<ContactScreen> {
-  final _formKey = GlobalKey<FormState>();
   final _messageController = TextEditingController();
   String _selectedType = 'Сообщить об ошибке';
   bool _isSending = false;
+  String? _messageError;
 
   final List<String> _contactTypes = [
     'Сообщить об ошибке',
@@ -32,7 +37,24 @@ class _ContactScreenState extends State<ContactScreen> {
   }
 
   Future<void> _sendMessage() async {
-    if (!_formKey.currentState!.validate()) return;
+    // Валидация
+    setState(() {
+      _messageError = null;
+    });
+
+    if (_messageController.text.trim().isEmpty) {
+      setState(() {
+        _messageError = 'Поле обязательно для заполнения';
+      });
+      return;
+    }
+
+    if (_messageController.text.trim().length < 10) {
+      setState(() {
+        _messageError = 'Минимум 10 символов';
+      });
+      return;
+    }
 
     if (mounted) {
       setState(() {
@@ -47,11 +69,10 @@ class _ContactScreenState extends State<ContactScreen> {
 
       if (userUuid == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Ошибка: пользователь не найден'),
-              backgroundColor: Colors.red,
-            ),
+          MetalMessage.show(
+            context: context,
+            message: 'Ошибка: пользователь не найден',
+            type: MetalMessageType.error,
           );
         }
         return;
@@ -78,14 +99,10 @@ class _ContactScreenState extends State<ContactScreen> {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Сообщение успешно отправлено',
-                style: TextStyle(color: AppColors.textPrimary),
-              ),
-              backgroundColor: const Color(0xFF1F2121),
-            ),
+          MetalMessage.show(
+            context: context,
+            message: 'Сообщение успешно отправлено',
+            type: MetalMessageType.success,
           );
           Navigator.pop(context);
         }
@@ -95,8 +112,10 @@ class _ContactScreenState extends State<ContactScreen> {
             data['detail']?.toString() ?? 'Ошибка отправки сообщения';
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+          MetalMessage.show(
+            context: context,
+            message: errorMessage,
+            type: MetalMessageType.error,
           );
         }
       }
@@ -106,11 +125,10 @@ class _ContactScreenState extends State<ContactScreen> {
           _isSending = false;
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Ошибка сети: $e'),
-            backgroundColor: Colors.red,
-          ),
+        MetalMessage.show(
+          context: context,
+          message: 'Ошибка сети: $e',
+          type: MetalMessageType.error,
         );
       }
     }
@@ -118,68 +136,43 @@ class _ContactScreenState extends State<ContactScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1A1A1A),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Связаться с нами',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+    return TexturedBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          leading: const MetalBackButton(),
+          title: Text(
+            'Связаться с нами',
+            style: NinjaText.title.copyWith(fontSize: 20),
           ),
+          centerTitle: true,
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
         ),
-        centerTitle: true,
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Form(
-            key: _formKey,
+        body: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Тип обращения
-                const Text(
-                  'Тип обращения',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text('Тип обращения', style: NinjaText.section),
                 const SizedBox(height: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2A2A2A),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: DropdownButtonFormField<String>(
+                SizedBox(
+                  width: double.infinity,
+                  child: MetalDropdown<String>(
                     value: _selectedType,
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 16,
-                      ),
-                    ),
-                    dropdownColor: const Color(0xFF2A2A2A),
-                    style: const TextStyle(color: Colors.white),
                     items: _contactTypes.map((String type) {
-                      return DropdownMenuItem<String>(
+                      return MetalDropdownItem<String>(
                         value: type,
-                        child: Text(type),
+                        label: type,
                       );
                     }).toList(),
-                    onChanged: (String? newValue) {
+                    onChanged: (String newValue) {
                       setState(() {
-                        _selectedType = newValue!;
+                        _selectedType = newValue;
                       });
                     },
                   ),
@@ -187,39 +180,32 @@ class _ContactScreenState extends State<ContactScreen> {
                 const SizedBox(height: 24),
 
                 // Сообщение
-                const Text(
-                  'Сообщение',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text('Сообщение', style: NinjaText.section),
                 const SizedBox(height: 8),
-                CustomTextField(
-                  label: '',
-                  hint: 'Опишите вашу проблему или предложение...',
+                MetalTextField(
                   controller: _messageController,
+                  hint: 'Опишите вашу проблему или предложение...',
                   maxLines: 5,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Поле обязательно для заполнения';
-                    }
-                    if (value.trim().length < 10) {
-                      return 'Минимум 10 символов';
-                    }
-                    return null;
-                  },
                 ),
+                if (_messageError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      _messageError!,
+                      style: NinjaText.caption.copyWith(
+                        color: NinjaColors.error,
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: 32),
 
-                // Кнопка отправки с увеличенной высотой
+                // Кнопка отправки
                 SizedBox(
                   width: double.infinity,
-                  child: CustomButton(
-                    text: _isSending ? 'Отправка...' : 'Отправить',
-                    height: 64, // Увеличиваем высоту с 56 до 64
+                  child: MetalButton(
+                    label: _isSending ? 'Отправка...' : 'Отправить',
                     onPressed: _isSending ? null : _sendMessage,
+                    isLoading: _isSending,
                   ),
                 ),
 
@@ -231,19 +217,25 @@ class _ContactScreenState extends State<ContactScreen> {
                     children: [
                       Text(
                         'ИП Маглатова Валерия Максимовна',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 11),
+                        style: NinjaText.caption.copyWith(
+                          color: NinjaColors.textMuted,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'ИНН 503829337132',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 11),
+                        style: NinjaText.caption.copyWith(
+                          color: NinjaColors.textMuted,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 2),
                       Text(
                         'ОГРНИП 325508100238252',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 11),
+                        style: NinjaText.caption.copyWith(
+                          color: NinjaColors.textMuted,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     ],

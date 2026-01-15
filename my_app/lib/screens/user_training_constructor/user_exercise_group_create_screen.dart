@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/user_training_service.dart';
 import '../../models/search_result_model.dart' as search_models;
+import '../../widgets/textured_background.dart';
+import '../../widgets/metal_back_button.dart';
+import '../../widgets/metal_text_field.dart';
+import '../../widgets/metal_button.dart';
+import '../../widgets/metal_toggle_switch.dart';
+import '../../widgets/metal_message.dart';
+import '../../design/ninja_spacing.dart';
+import '../../design/ninja_typography.dart';
 import 'user_exercise_selector_screen.dart';
 
 class UserExerciseGroupCreateScreen extends StatefulWidget {
@@ -19,10 +26,6 @@ class UserExerciseGroupCreateScreen extends StatefulWidget {
 
 class _UserExerciseGroupCreateScreenState
     extends State<UserExerciseGroupCreateScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _captionController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final _muscleGroupController = TextEditingController();
   final _setsCountController = TextEditingController();
   final _repsCountController = TextEditingController();
   final _restTimeController = TextEditingController();
@@ -38,9 +41,6 @@ class _UserExerciseGroupCreateScreenState
 
   @override
   void dispose() {
-    _captionController.dispose();
-    _descriptionController.dispose();
-    _muscleGroupController.dispose();
     _setsCountController.dispose();
     _repsCountController.dispose();
     _restTimeController.dispose();
@@ -72,20 +72,92 @@ class _UserExerciseGroupCreateScreenState
 
       setState(() {
         selectedExercise = userExerciseRef;
-        // Заполняем поля названия, описания и группы мышц из выбранного упражнения
-        _captionController.text = searchExerciseRef.caption;
-        _descriptionController.text = searchExerciseRef.description;
-        _muscleGroupController.text = searchExerciseRef.muscleGroup;
       });
     }
   }
 
   Future<void> _createExerciseGroup() async {
-    if (!_formKey.currentState!.validate()) return;
+    // Валидация выбора упражнения
     if (selectedExercise == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Пожалуйста, выберите упражнение')),
-      );
+      if (mounted) {
+        MetalMessage.show(
+          context: context,
+          message: 'Пожалуйста, выберите упражнение',
+          type: MetalMessageType.error,
+        );
+      }
+      return;
+    }
+
+    // Валидация полей
+    if (_setsCountController.text.trim().isEmpty) {
+      if (mounted) {
+        MetalMessage.show(
+          context: context,
+          message: 'Пожалуйста, введите количество подходов',
+          type: MetalMessageType.error,
+        );
+      }
+      return;
+    }
+
+    if (_repsCountController.text.trim().isEmpty) {
+      if (mounted) {
+        MetalMessage.show(
+          context: context,
+          message: 'Пожалуйста, введите количество повторений',
+          type: MetalMessageType.error,
+        );
+      }
+      return;
+    }
+
+    if (_restTimeController.text.trim().isEmpty) {
+      if (mounted) {
+        MetalMessage.show(
+          context: context,
+          message: 'Пожалуйста, введите время отдыха',
+          type: MetalMessageType.error,
+        );
+      }
+      return;
+    }
+
+    // Проверка, что значения - числа
+    final setsCount = int.tryParse(_setsCountController.text.trim());
+    final repsCount = int.tryParse(_repsCountController.text.trim());
+    final restTime = int.tryParse(_restTimeController.text.trim());
+
+    if (setsCount == null) {
+      if (mounted) {
+        MetalMessage.show(
+          context: context,
+          message: 'Количество подходов должно быть числом',
+          type: MetalMessageType.error,
+        );
+      }
+      return;
+    }
+
+    if (repsCount == null) {
+      if (mounted) {
+        MetalMessage.show(
+          context: context,
+          message: 'Количество повторений должно быть числом',
+          type: MetalMessageType.error,
+        );
+      }
+      return;
+    }
+
+    if (restTime == null) {
+      if (mounted) {
+        MetalMessage.show(
+          context: context,
+          message: 'Время отдыха должно быть числом',
+          type: MetalMessageType.error,
+        );
+      }
       return;
     }
 
@@ -98,21 +170,33 @@ class _UserExerciseGroupCreateScreenState
       final userUuid = authProvider.userUuid;
 
       if (userUuid == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ошибка: не найден userUuid')),
-        );
+        if (mounted) {
+          MetalMessage.show(
+            context: context,
+            message: 'Ошибка: не найден userUuid',
+            type: MetalMessageType.error,
+          );
+        }
+        setState(() {
+          _isLoading = false;
+        });
         return;
       }
+
+      // Используем данные из выбранного упражнения
+      final caption = selectedExercise!.caption;
+      final description = selectedExercise!.description;
+      final muscleGroup = selectedExercise!.muscleGroup;
 
       // Создаем упражнение
       final exerciseResult = await UserTrainingService.createExercise(
         userUuid: userUuid,
-        caption: _captionController.text,
-        description: _descriptionController.text,
-        muscleGroup: _muscleGroupController.text,
-        setsCount: int.parse(_setsCountController.text),
-        repsCount: int.parse(_repsCountController.text),
-        restTime: int.parse(_restTimeController.text),
+        caption: caption,
+        description: description,
+        muscleGroup: muscleGroup,
+        setsCount: setsCount,
+        repsCount: repsCount,
+        restTime: restTime,
         withWeight: withWeight,
         weight: 0,
         exerciseReferenceUuid: selectedExercise!.uuid,
@@ -122,288 +206,202 @@ class _UserExerciseGroupCreateScreenState
         // Создаем группу упражнений
         final groupResult = await UserTrainingService.createExerciseGroup(
           trainingUuid: widget.trainingUuid,
-          caption: _captionController.text,
-          description: _descriptionController.text,
-          muscleGroup: _muscleGroupController.text,
+          caption: caption,
+          description: description,
+          muscleGroup: muscleGroup,
           exercises: [exerciseResult['uuid']],
         );
 
         if (groupResult != null) {
-          Navigator.of(context).pop(true);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Группа упражнений создана')),
-          );
+          if (mounted) {
+            Navigator.of(context).pop(true);
+            MetalMessage.show(
+              context: context,
+              message: 'Группа упражнений создана',
+              type: MetalMessageType.success,
+            );
+          }
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Ошибка при создании группы упражнений'),
-            ),
-          );
+          if (mounted) {
+            MetalMessage.show(
+              context: context,
+              message: 'Ошибка при создании группы упражнений',
+              type: MetalMessageType.error,
+            );
+          }
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ошибка при создании упражнения')),
-        );
+        if (mounted) {
+          MetalMessage.show(
+            context: context,
+            message: 'Ошибка при создании упражнения',
+            type: MetalMessageType.error,
+          );
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      if (mounted) {
+        MetalMessage.show(
+          context: context,
+          message: 'Ошибка: $e',
+          type: MetalMessageType.error,
+        );
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Добавить упражнение',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        backgroundColor: AppColors.surface,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Выбор упражнения из справочника
-                Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2A2A2A),
-                    border: Border.all(color: AppColors.inputBorder),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: ListTile(
-                    title: Text(
-                      selectedExercise != null
-                          ? selectedExercise!.caption
-                          : 'Выберите упражнение',
-                      style: TextStyle(
-                        color: selectedExercise != null
-                            ? Colors.white
-                            : Colors.grey[400],
-                      ),
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (selectedExercise != null)
-                          IconButton(
-                            icon: const Icon(Icons.close, color: Colors.red),
-                            onPressed: () {
-                              setState(() {
-                                selectedExercise = null;
-                                // Очищаем поля названия, описания и группы мышц при удалении упражнения
-                                _captionController.clear();
-                                _descriptionController.clear();
-                                _muscleGroupController.clear();
-                              });
-                            },
-                          ),
-                        IconButton(
-                          icon: const Icon(Icons.search),
-                          onPressed: _selectExercise,
-                        ),
-                      ],
-                    ),
-                    onTap: _selectExercise,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _captionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Название',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Пожалуйста, введите название';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Описание',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Пожалуйста, введите описание';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _muscleGroupController,
-                  decoration: const InputDecoration(
-                    labelText: 'Группа мышц',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Пожалуйста, введите группу мышц';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                Row(
+      backgroundColor: Colors.transparent,
+      body: TexturedBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Верхний раздел с кнопкой назад и названием
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Row(
                   children: [
+                    const MetalBackButton(),
+                    const SizedBox(width: NinjaSpacing.md),
                     Expanded(
-                      child: TextFormField(
-                        controller: _setsCountController,
-                        decoration: const InputDecoration(
-                          labelText: 'Количество подходов',
-                          border: OutlineInputBorder(),
-                        ),
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Обязательно';
-                          }
-                          if (int.tryParse(value) == null) {
-                            return 'Должно быть числом';
-                          }
-                          return null;
-                        },
+                      child: Text(
+                        'Добавить упражнение',
+                        style: NinjaText.title,
+                        textAlign: TextAlign.center,
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _repsCountController,
-                        decoration: const InputDecoration(
-                          labelText: 'Количество повторений',
-                          border: OutlineInputBorder(),
-                        ),
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Обязательно';
-                          }
-                          if (int.tryParse(value) == null) {
-                            return 'Должно быть числом';
-                          }
-                          return null;
-                        },
-                      ),
+                    const SizedBox(width: NinjaSpacing.md),
+                    // Кнопка выбора упражнения справа
+                    MetalBackButton(
+                      icon: Icons.search,
+                      onTap: _selectExercise,
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _restTimeController,
-                  decoration: const InputDecoration(
-                    labelText: 'Время отдыха (секунды)',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Пожалуйста, введите время отдыха';
-                    }
-                    if (int.tryParse(value) == null) {
-                      return 'Должно быть числом';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'С весом',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        print('🔄 Custom Switch tapped: ${!withWeight}');
-                        setState(() {
-                          withWeight = !withWeight;
-                        });
-                      },
-                      child: Container(
-                        width: 60,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(17),
-                          color: withWeight
-                              ? AppColors.textSecondary.withOpacity(0.3)
-                              : AppColors.buttonPrimary.withOpacity(0.3),
-                          border: Border.all(
-                            color: withWeight
-                                ? AppColors.textSecondary
-                                : AppColors.buttonPrimary,
-                            width: 2,
+              ),
+              // Форма
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Выбор упражнения из справочника
+                      GestureDetector(
+                        onTap: _selectExercise,
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.05),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.1),
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  selectedExercise != null
+                                      ? selectedExercise!.caption
+                                      : 'Выберите упражнение',
+                                  style: selectedExercise != null
+                                      ? NinjaText.body
+                                      : NinjaText.body.copyWith(
+                                          color: Colors.white.withOpacity(0.5),
+                                        ),
+                                ),
+                              ),
+                              if (selectedExercise != null)
+                                GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      selectedExercise = null;
+                                    });
+                                  },
+                                  behavior: HitTestBehavior.opaque,
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(4),
+                                    child: Icon(
+                                      Icons.close,
+                                      color: Colors.white70,
+                                      size: 20,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
-                        child: AnimatedAlign(
-                          duration: const Duration(milliseconds: 200),
-                          alignment: withWeight
-                              ? Alignment.centerRight
-                              : Alignment.centerLeft,
-                          child: Container(
-                            width: 28,
-                            height: 28,
-                            margin: const EdgeInsets.all(3),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: withWeight
-                                  ? AppColors.textSecondary
-                                  : AppColors.buttonPrimary,
-                              border: Border.all(
-                                color: withWeight
-                                    ? AppColors.buttonPrimary
-                                    : AppColors.textSecondary,
-                                width: 2,
-                              ),
+                      ),
+                      const SizedBox(height: NinjaSpacing.lg),
+                      // Количество подходов и повторений в одной строке
+                      Row(
+                        children: [
+                          Expanded(
+                            child: MetalTextField(
+                              controller: _setsCountController,
+                              hint: 'Подходы',
+                              keyboardType: TextInputType.number,
                             ),
                           ),
-                        ),
+                          const SizedBox(width: NinjaSpacing.md),
+                          Expanded(
+                            child: MetalTextField(
+                              controller: _repsCountController,
+                              hint: 'Повторения',
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _createExerciseGroup,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.buttonPrimary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                      const SizedBox(height: NinjaSpacing.lg),
+                      MetalTextField(
+                        controller: _restTimeController,
+                        hint: 'Время отдыха (секунды)',
+                        keyboardType: TextInputType.number,
+                      ),
+                      const SizedBox(height: NinjaSpacing.lg),
+                      // Переключатель "С весом"
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'С весом',
+                            style: NinjaText.body,
+                          ),
+                          SizedBox(
+                            width: 120,
+                            child: MetalToggleSwitch(
+                              value: withWeight,
+                              onChanged: (value) {
+                                setState(() {
+                                  withWeight = value;
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: NinjaSpacing.xl),
+                      MetalButton(
+                        label: 'Добавить упражнение',
+                        onPressed: _isLoading ? null : _createExerciseGroup,
+                        height: 56,
+                        isLoading: _isLoading,
+                      ),
+                    ],
                   ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                          'Добавить упражнение',
-                          style: TextStyle(fontSize: 16),
-                        ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

@@ -7,6 +7,7 @@ class MeasurementChart extends StatelessWidget {
   final String measurementTypeCaption;
   final VoidCallback onAddMeasurement;
   final VoidCallback onViewList;
+  final bool transparentBackground;
 
   const MeasurementChart({
     super.key,
@@ -14,18 +15,22 @@ class MeasurementChart extends StatelessWidget {
     required this.measurementTypeCaption,
     required this.onAddMeasurement,
     required this.onViewList,
+    this.transparentBackground = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final transparent = transparentBackground;
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.background,
+        color: transparent ? Colors.transparent : AppColors.background,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.textSecondary.withOpacity(0.3),
-          width: 1,
-        ),
+        border: transparent
+            ? Border.all(color: Colors.transparent, width: 0)
+            : Border.all(
+                color: AppColors.textSecondary.withOpacity(0.3),
+                width: 1,
+              ),
       ),
       child: Column(
         children: [

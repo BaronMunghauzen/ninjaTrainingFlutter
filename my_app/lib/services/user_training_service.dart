@@ -98,7 +98,7 @@ class UserTrainingService {
   static Future<Map<String, dynamic>?> createUserExercise({
     required String userUuid,
     required String caption,
-    required String description,
+    String? description,
     required String muscleGroup,
     String? equipmentName,
   }) async {
@@ -109,7 +109,7 @@ class UserTrainingService {
           'exercise_type': 'user',
           'user_uuid': userUuid,
           'caption': caption,
-          'description': description,
+          'description': description ?? '',
           'muscle_group': muscleGroup,
           'equipment_name': equipmentName ?? 'Без оборудования',
         },
@@ -161,22 +161,30 @@ class UserTrainingService {
   static Future<Map<String, dynamic>?> createUserTraining({
     required String userUuid,
     required String caption,
-    required String description,
-    required int difficultyLevel,
-    required String muscleGroup,
+    String? description,
+    int? difficultyLevel,
+    String? muscleGroup,
   }) async {
     try {
+      final body = <String, dynamic>{
+        'training_type': 'user',
+        'user_uuid': userUuid,
+        'caption': caption,
+        'actual': true,
+      };
+      // Добавляем описание только если оно заполнено
+      if (description != null && description.isNotEmpty) {
+        body['description'] = description;
+      }
+      // Добавляем группу мышц только если она заполнена
+      if (muscleGroup != null && muscleGroup.isNotEmpty) {
+        body['muscle_group'] = muscleGroup;
+      }
+      // difficulty_level не отправляется на бэк
+      
       final response = await ApiService.post(
         '/trainings/add/',
-        body: {
-          'training_type': 'user',
-          'user_uuid': userUuid,
-          'caption': caption,
-          'description': description,
-          'difficulty_level': difficultyLevel,
-          'muscle_group': muscleGroup,
-          'actual': true,
-        },
+        body: body,
       );
 
       if (response.statusCode == 200) {
@@ -193,19 +201,26 @@ class UserTrainingService {
   static Future<Map<String, dynamic>?> updateUserTraining({
     required String trainingUuid,
     required String caption,
-    required String description,
-    required int difficultyLevel,
-    required String muscleGroup,
+    String? description,
+    String? muscleGroup,
   }) async {
     try {
+      final body = {
+        'caption': caption,
+        // Отправляем явно null, если поля пустые
+        'description': (description != null && description.trim().isNotEmpty)
+            ? description.trim()
+            : null,
+        'muscle_group': (muscleGroup != null && muscleGroup.trim().isNotEmpty)
+            ? muscleGroup.trim()
+            : null,
+      };
+      
+      // difficulty_level больше не отправляется
+      
       final response = await ApiService.put(
         '/trainings/update/$trainingUuid',
-        body: {
-          'caption': caption,
-          'description': description,
-          'difficulty_level': difficultyLevel,
-          'muscle_group': muscleGroup,
-        },
+        body: body,
       );
 
       if (response.statusCode == 200) {

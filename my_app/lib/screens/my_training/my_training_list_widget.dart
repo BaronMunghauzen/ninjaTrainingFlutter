@@ -191,115 +191,114 @@ class _MyTrainingListWidgetState extends State<MyTrainingListWidget> {
                           color: AppColors.surface,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: AppColors.inputBorder,
+                            color: Color(0xE6B5BF94).withOpacity(0.3),
                             width: 1,
                           ),
                         ),
-                        child: FutureBuilder<ImageProvider?>(
-                          future: _loadTrainingImage(training.imageUuid),
-                          builder: (context, snapshot) {
-                            final image = snapshot.data;
-                            return Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                // Картинка тренировки
-                                if (image != null)
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Image(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: FutureBuilder<ImageProvider?>(
+                            future: _loadTrainingImage(training.imageUuid),
+                            builder: (context, snapshot) {
+                              final image = snapshot.data;
+                              return Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  // Картинка тренировки
+                                  if (image != null)
+                                    Image(
                                       image: image,
                                       width: 140,
                                       height: 140,
                                       fit: BoxFit.cover,
-                                    ),
-                                  )
-                                else if (snapshot.connectionState ==
-                                    ConnectionState.waiting)
-                                  Container(
-                                    color: AppColors.surface,
-                                    child: const Center(
-                                      child: CircularProgressIndicator(
+                                    )
+                                  else if (snapshot.connectionState ==
+                                      ConnectionState.waiting)
+                                    Container(
+                                      color: AppColors.surface,
+                                      child: const Center(
+                                        child: CircularProgressIndicator(
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    )
+                                  else
+                                    Container(
+                                      color: AppColors.surface,
+                                      child: const Icon(
+                                        Icons.fitness_center,
+                                        size: 60,
                                         color: AppColors.textSecondary,
                                       ),
                                     ),
-                                  )
-                                else
+                                  // Полупрозрачный оверлей для лучшей читаемости текста
                                   Container(
-                                    color: AppColors.surface,
-                                    child: const Icon(
-                                      Icons.fitness_center,
-                                      size: 60,
-                                      color: AppColors.textSecondary,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          Colors.transparent,
+                                          Colors.black.withOpacity(0.7),
+                                        ],
+                                        stops: const [0.4, 1.0],
+                                      ),
                                     ),
                                   ),
-                                // Полупрозрачный оверлей для лучшей читаемости текста
-                                Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(12),
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                      colors: [
-                                        Colors.transparent,
-                                        Colors.black.withOpacity(0.7),
-                                      ],
-                                      stops: const [0.4, 1.0],
-                                    ),
-                                  ),
-                                ),
-                                // Текст поверх картинки
-                                Positioned(
-                                  bottom: 0,
-                                  left: 0,
-                                  right: 0,
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(12),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          training.caption,
-                                          style: const TextStyle(
-                                            color: AppColors.textPrimary,
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                            shadows: [
-                                              Shadow(
-                                                offset: Offset(0, 1),
-                                                blurRadius: 2,
-                                                color: Colors.black54,
-                                              ),
-                                            ],
+                                  // Текст поверх картинки
+                                  Positioned(
+                                    bottom: 0,
+                                    left: 0,
+                                    right: 0,
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(12),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            training.caption,
+                                            style: const TextStyle(
+                                              color: AppColors.textPrimary,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              shadows: [
+                                                Shadow(
+                                                  offset: Offset(0, 1),
+                                                  blurRadius: 2,
+                                                  color: Colors.black54,
+                                                ),
+                                              ],
+                                            ),
+                                            textAlign: TextAlign.center,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                          textAlign: TextAlign.center,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          training.muscleGroup,
-                                          style: const TextStyle(
-                                            color: AppColors.textSecondary,
-                                            fontSize: 12,
-                                            shadows: [
-                                              Shadow(
-                                                offset: Offset(0, 1),
-                                                blurRadius: 2,
-                                                color: Colors.black54,
-                                              ),
-                                            ],
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            training.muscleGroup,
+                                            style: const TextStyle(
+                                              color: AppColors.textSecondary,
+                                              fontSize: 12,
+                                              shadows: [
+                                                Shadow(
+                                                  offset: Offset(0, 1),
+                                                  blurRadius: 2,
+                                                  color: Colors.black54,
+                                                ),
+                                              ],
+                                            ),
+                                            textAlign: TextAlign.center,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                          textAlign: TextAlign.center,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            );
-                          },
+                                ],
+                              );
+                            },
+                          ),
                         ),
                       ),
                     );

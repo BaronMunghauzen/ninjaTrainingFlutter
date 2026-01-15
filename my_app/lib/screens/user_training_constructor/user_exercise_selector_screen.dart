@@ -5,9 +5,18 @@ import '../../constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/search_service.dart';
 import '../../services/api_service.dart';
+import '../../widgets/textured_background.dart';
+import '../../widgets/metal_back_button.dart';
+import '../../widgets/metal_search_bar.dart';
+import '../../widgets/metal_list_item.dart';
+import '../../widgets/metal_button.dart';
+import '../../widgets/metal_modal.dart';
+import '../../widgets/metal_message.dart';
 import '../../widgets/gif_widget.dart';
 import '../../widgets/auth_image_widget.dart';
 import '../../widgets/video_player_widget.dart';
+import '../../design/ninja_spacing.dart';
+import '../../design/ninja_typography.dart';
 import '../../models/search_result_model.dart' as search_models;
 import '../../services/user_training_service.dart';
 
@@ -21,7 +30,6 @@ class UserExerciseSelectorScreen extends StatefulWidget {
 
 class _UserExerciseSelectorScreenState
     extends State<UserExerciseSelectorScreen> {
-  String? _activeVideoUuid;
   List<dynamic> userExercises = [];
   List<dynamic> searchResults = [];
   bool isLoading = true;
@@ -274,7 +282,6 @@ class _UserExerciseSelectorScreenState
 
     setState(() {
       _selectedExercise = exerciseRef;
-      _activeVideoUuid = exerciseRef.video;
     });
   }
 
@@ -335,19 +342,20 @@ class _UserExerciseSelectorScreenState
       } else {
         // Показываем сообщение об ошибке
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Ошибка при изменении статуса избранного'),
-              backgroundColor: Colors.red,
-            ),
+          MetalMessage.show(
+            context: context,
+            message: 'Ошибка при изменении статуса избранного',
+            type: MetalMessageType.error,
           );
         }
       }
     } catch (e) {
       print('Error toggling favorite: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
+        MetalMessage.show(
+          context: context,
+          message: 'Ошибка: $e',
+          type: MetalMessageType.error,
         );
       }
     }
@@ -365,122 +373,141 @@ class _UserExerciseSelectorScreenState
       return; // Неизвестный тип
     }
 
-    showDialog(
+    MetalModal.show(
       context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          width: MediaQuery.of(context).size.width * 0.9,
-          height: MediaQuery.of(context).size.height * 0.8,
-          child: Column(
-            children: [
-              // Заголовок с кнопкой закрытия
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: Colors.grey, width: 0.5),
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Детали упражнения',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close),
-                    ),
-                  ],
+      title: exerciseRef.caption,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (exerciseRef.description.isNotEmpty) ...[
+              Text(
+                'Описание',
+                style: NinjaText.caption.copyWith(
+                  color: AppColors.textSecondary,
                 ),
               ),
-              // Контент
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Название: ${exerciseRef.caption}',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text('Описание: ${exerciseRef.description}'),
-                      const SizedBox(height: 8),
-                      Text('Мышечная группа: ${exerciseRef.muscleGroup}'),
-                      // Оборудование
-                      const SizedBox(height: 8),
-                      Text(
-                        'Оборудование: ${exerciseRef.equipmentName ?? 'Без оборудования'}',
-                      ),
-                      // Медиа (гифка или картинка)
-                      const SizedBox(height: 16),
-                      Center(child: _buildExerciseMediaForModal(exerciseRef)),
-                      if (exerciseRef.techniqueDescription != null &&
-                          exerciseRef.techniqueDescription!.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Техника выполнения:',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(exerciseRef.techniqueDescription!),
-                      ],
-                      const SizedBox(height: 24),
-                    ],
-                  ),
+              const SizedBox(height: 4),
+              Text(
+                exerciseRef.description,
+                style: NinjaText.body,
+              ),
+              const SizedBox(height: 16),
+            ],
+            Text(
+              'Мышечная группа',
+              style: NinjaText.caption.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              exerciseRef.muscleGroup,
+              style: NinjaText.body,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Оборудование',
+              style: NinjaText.caption.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              exerciseRef.equipmentName ?? 'Без оборудования',
+              style: NinjaText.body,
+            ),
+            // Медиа (гифка или картинка)
+            if (_buildExerciseMediaForModal(exerciseRef) != null) ...[
+              const SizedBox(height: 16),
+              Center(child: _buildExerciseMediaForModal(exerciseRef)),
+            ],
+            if (exerciseRef.techniqueDescription != null &&
+                exerciseRef.techniqueDescription!.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Техника выполнения',
+                style: NinjaText.caption.copyWith(
+                  color: AppColors.textSecondary,
                 ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                exerciseRef.techniqueDescription!,
+                style: NinjaText.body,
               ),
             ],
-          ),
+          ],
         ),
-      ),
+      ],
     );
   }
 
-  Widget? _buildExerciseMedia(dynamic exercise) {
-    // Приоритет: видео -> гиф -> картинка
-    String? videoUuid;
+  Widget _buildExerciseMedia(dynamic exercise) {
+    // Приоритет: гиф -> картинка (видео не показываем на списке)
     String? gifUuid;
     String? imageUuid;
 
-    if (exercise is search_models.ExerciseReference) {
-      videoUuid = exercise.video;
-      gifUuid = exercise.gif;
-      imageUuid = exercise.image;
-    } else if (exercise is Map<String, dynamic>) {
-      videoUuid = exercise['video_uuid'];
-      gifUuid = exercise['gif_uuid'];
-      imageUuid = exercise['image_uuid'];
+    // Извлекаем UUID гифки
+    final dynamic gif = exercise is search_models.ExerciseReference
+        ? exercise.gif
+        : exercise['gif_uuid'];
+    if (gif != null) {
+      if (gif is String && gif.isNotEmpty) {
+        gifUuid = gif;
+      } else if (gif is Map<String, dynamic>) {
+        gifUuid = gif['uuid'] as String?;
+      }
     }
 
-    if (gifUuid != null) {
-      return GifWidget(gifUuid: gifUuid, height: 60, width: 60);
-    } else if (imageUuid != null) {
-      return AuthImageWidget(imageUuid: imageUuid, height: 60, width: 60);
-    } else {
-      return Container(
-        height: 60,
+    // Извлекаем UUID картинки
+    final dynamic image = exercise is search_models.ExerciseReference
+        ? exercise.image
+        : exercise['image_uuid'];
+    if (image != null) {
+      if (image is String && image.isNotEmpty) {
+        imageUuid = image;
+      } else if (image is Map<String, dynamic>) {
+        imageUuid = image['uuid'] as String?;
+      }
+    }
+
+    // На списке видео не показываем — используем гифку, затем картинку
+    if (gifUuid != null && gifUuid.isNotEmpty) {
+      return SizedBox(
         width: 60,
-        decoration: BoxDecoration(
-          color: Colors.grey[300],
+        height: 60,
+        child: ClipRRect(
           borderRadius: BorderRadius.circular(8),
+          child: GifWidget(gifUuid: gifUuid, height: 60, width: 60),
         ),
-        child: const Icon(Icons.image, color: Colors.grey, size: 24),
       );
     }
+
+    if (imageUuid != null && imageUuid.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: AuthImageWidget(
+          imageUuid: imageUuid,
+          height: 60,
+          width: 60,
+          fit: BoxFit.cover,
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: 60,
+      height: 60,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.inputBorder.withOpacity(0.3)),
+        ),
+      ),
+    );
   }
 
   Widget? _buildExerciseMediaForModal(
@@ -518,33 +545,6 @@ class _UserExerciseSelectorScreenState
   }
 
   // Универсальные методы для получения данных упражнения
-  String _getExerciseCaption(dynamic exercise) {
-    if (exercise is search_models.ExerciseReference) {
-      return exercise.caption;
-    } else if (exercise is Map<String, dynamic>) {
-      return exercise['caption'] ?? '';
-    }
-    return '';
-  }
-
-  String _getExerciseDescription(dynamic exercise) {
-    if (exercise is search_models.ExerciseReference) {
-      return exercise.description;
-    } else if (exercise is Map<String, dynamic>) {
-      return exercise['description'] ?? '';
-    }
-    return '';
-  }
-
-  String _getExerciseMuscleGroup(dynamic exercise) {
-    if (exercise is search_models.ExerciseReference) {
-      return exercise.muscleGroup;
-    } else if (exercise is Map<String, dynamic>) {
-      return exercise['muscle_group'] ?? '';
-    }
-    return '';
-  }
-
   String _getExerciseUuid(dynamic exercise) {
     if (exercise is search_models.ExerciseReference) {
       return exercise.uuid;
@@ -568,397 +568,511 @@ class _UserExerciseSelectorScreenState
     return result;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Выбрать упражнение',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        backgroundColor: AppColors.surface,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
-      body: Column(
-        children: [
-          // Search Bar
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _searchController,
-              onChanged: _onSearchChanged,
-              decoration: InputDecoration(
-                hintText: 'Поиск упражнений...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: isSearching
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() {
-                            searchResults = [];
-                            isSearching = false;
-                            hasSearched = false;
-                            _selectedMuscleGroups.clear();
-                            _selectedEquipmentNames.clear();
-                          });
-                          currentPage = 1;
-                          _loadUserExercises();
-                        },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: AppColors.inputBorder.withOpacity(0.1),
-              ),
-            ),
-          ),
-          // Фильтры - Группы мышц
-          if (_availableMuscleGroups.isNotEmpty)
-            Container(
-              height: 50,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: _availableMuscleGroups.map((muscleGroup) {
-                  final isSelected = _selectedMuscleGroups.contains(
-                    muscleGroup,
-                  );
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip(
-                      label: Text(muscleGroup),
-                      selected: isSelected,
-                      onSelected: (selected) {
-                        _toggleMuscleGroupFilter(muscleGroup);
-                      },
-                      selectedColor: AppColors.buttonPrimary.withOpacity(0.3),
-                      checkmarkColor: AppColors.buttonPrimary,
-                      backgroundColor: AppColors.surface,
-                      side: BorderSide(
-                        color: isSelected
-                            ? const Color.fromARGB(255, 155, 155, 155)
-                            : AppColors.inputBorder,
-                        width: isSelected ? 2.0 : 1.0,
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-          // Фильтры - Оборудование
-          if (_availableEquipmentNames.isNotEmpty)
-            Container(
-              height: 50,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: _availableEquipmentNames.map((equipmentName) {
-                  final isSelected = _selectedEquipmentNames.contains(
-                    equipmentName,
-                  );
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip(
-                      label: Text(equipmentName),
-                      selected: isSelected,
-                      onSelected: (selected) {
-                        _toggleEquipmentFilter(equipmentName);
-                      },
-                      selectedColor: AppColors.buttonPrimary.withOpacity(0.3),
-                      checkmarkColor: AppColors.buttonPrimary,
-                      backgroundColor: AppColors.surface,
-                      side: BorderSide(
-                        color: isSelected
-                            ? const Color.fromARGB(255, 155, 155, 155)
-                            : AppColors.inputBorder,
-                        width: isSelected ? 2.0 : 1.0,
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-          // Content
-          Expanded(
-            child: isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.textPrimary,
-                    ),
-                  )
-                : _displayedExercises.isEmpty
-                ? const Center(
-                    child: Text(
-                      'Упражнения не найдены',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: _displayedExercises.length,
-                    separatorBuilder: (context, index) =>
-                        const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final exercise = _displayedExercises[index];
-                      final isSelected =
-                          _selectedExercise != null &&
-                          _selectedExercise!.uuid == _getExerciseUuid(exercise);
+  Widget _buildPaginationControls() {
+    // Показываем элементы пагинации всегда, когда есть элементы
+    if (_displayedExercises.isEmpty) return const SizedBox.shrink();
 
-                      return Card(
-                        margin: EdgeInsets.zero,
-                        color: isSelected ? Colors.blue.withOpacity(0.1) : null,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          side: BorderSide(
-                            color: isSelected
-                                ? Colors.blue
-                                : Colors.transparent,
-                            width: isSelected ? 2 : 0,
-                          ),
-                        ),
-                        child: Stack(
-                          children: [
-                            ListTile(
-                              leading: _buildExerciseMedia(exercise),
-                              title: Padding(
-                                padding: const EdgeInsets.only(right: 120),
-                                child: Text(
-                                  _getExerciseCaption(exercise),
-                                  style: TextStyle(
-                                    fontWeight: isSelected
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                ),
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _getExerciseDescription(exercise),
-                                    style: const TextStyle(
-                                      color: AppColors.textSecondary,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Группа мышц: ${_getExerciseMuscleGroup(exercise)}',
-                                    style: const TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              onTap: () => _selectExercise(exercise),
-                            ),
-                            // Кнопка информации
-                            Positioned(
-                              right: 40,
-                              top: 8,
-                              child: IconButton(
-                                icon: const Icon(Icons.info_outline),
-                                onPressed: () => _showExerciseDetail(exercise),
-                                tooltip: 'Детали упражнения',
-                              ),
-                            ),
-                            // Кнопка избранного (сердечко)
-                            Positioned(
-                              right: 8,
-                              top: 8,
-                              child: _FavoriteButton(
-                                isFavorite: _getExerciseIsFavorite(exercise),
-                                onPressed: () async {
-                                  await _toggleFavorite(exercise);
-                                },
-                              ),
-                            ),
-                            // Индикатор выбора
-                            if (isSelected)
-                              const Positioned(
-                                right: 8,
-                                bottom: 8,
-                                child: Icon(
-                                  Icons.check_circle,
-                                  color: Colors.blue,
-                                  size: 24,
-                                ),
-                              ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
-      // Пагинация и кнопка выбора
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Column(
         children: [
-          if (totalItems > 0)
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey[800],
-                border: Border(
-                  top: BorderSide(
-                    color: AppColors.inputBorder.withOpacity(0.3),
-                  ),
-                ),
+          // Первая строка: выбор размера страницы и навигация по страницам
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Выбор размера страницы (слева)
+              DropdownButton<int>(
+                value: pageSize,
+                items: availablePageSizes.map((size) {
+                  return DropdownMenuItem<int>(
+                    value: size,
+                    child: Text('$size'),
+                  );
+                }).toList(),
+                onChanged: (newSize) {
+                  if (newSize != null) {
+                    _changePageSize(newSize);
+                  }
+                },
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Размер страницы
-                  Row(
-                    children: [
-                      Text(
-                        'Показать:',
-                        style: TextStyle(color: Colors.grey[200]),
-                      ),
-                      const SizedBox(width: 8),
-                      DropdownButton<int>(
-                        value: pageSize,
-                        items: availablePageSizes.map((size) {
-                          return DropdownMenuItem(
-                            value: size,
-                            child: Text(
-                              size.toString(),
-                              style: TextStyle(color: Colors.grey[200]),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          if (value != null) {
-                            _changePageSize(value);
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                  // Навигация по страницам
-                  Row(
+              const SizedBox(width: 16),
+              // Навигация по страницам (справа, показываем только если есть несколько страниц)
+              if (totalPages > 1)
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
                         onPressed: currentPage > 1
                             ? () => _goToPage(currentPage - 1)
                             : null,
-                        icon: Icon(Icons.chevron_left, color: Colors.grey[200]),
+                        icon: const Icon(Icons.chevron_left),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
                       ),
-                      Text(
-                        '${currentPage} из ${totalPages}',
-                        style: TextStyle(color: Colors.grey[200]),
+                      Flexible(
+                        child: Text(
+                          'Страница $currentPage из $totalPages',
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                       IconButton(
                         onPressed: currentPage < totalPages
                             ? () => _goToPage(currentPage + 1)
                             : null,
-                        icon: Icon(
-                          Icons.chevron_right,
-                          color: Colors.grey[200],
-                        ),
+                        icon: const Icon(Icons.chevron_right),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-          // Кнопка выбора
-          if (_selectedExercise != null)
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey[800],
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.3),
-                    spreadRadius: 1,
-                    blurRadius: 5,
-                    offset: const Offset(0, -3),
-                  ),
-                ],
-              ),
-              child: SafeArea(
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          // Вторая строка: всего элементов
+          Text('Всего элементов: $totalItems'),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      extendBody: true,
+      body: TexturedBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Верхний раздел с кнопкой назад
+              Padding(
+                padding: const EdgeInsets.all(24),
                 child: Row(
                   children: [
+                    const MetalBackButton(),
+                    const SizedBox(width: NinjaSpacing.md),
                     Expanded(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Выбрано:',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[300],
+                      child: Text(
+                        'Выбрать упражнение',
+                        style: NinjaText.title,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    const SizedBox(width: NinjaSpacing.md),
+                    const SizedBox(width: 48), // Для симметрии
+                  ],
+                ),
+              ),
+              // Search Bar
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                child: MetalSearchBar(
+                  controller: _searchController,
+                  hint: 'Поиск упражнений...',
+                  onChanged: _onSearchChanged,
+                ),
+              ),
+              // Фильтры - Группы мышц
+              if (_availableMuscleGroups.isNotEmpty)
+                Container(
+                  height: 40,
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Builder(
+                    builder: (context) {
+                      return ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: _availableMuscleGroups.asMap().entries.map((
+                          entry,
+                        ) {
+                          final index = entry.key;
+                          final muscleGroup = entry.value;
+                          final isSelected = _selectedMuscleGroups.contains(
+                            muscleGroup,
+                          );
+                          final isFirst = index == 0;
+                          final isLast =
+                              index == _availableMuscleGroups.length - 1;
+
+                          return MetalButton(
+                            label: muscleGroup,
+                            onPressed: () {
+                              _toggleMuscleGroupFilter(muscleGroup);
+                            },
+                            height: 36,
+                            fontSize: 13,
+                            isSelected: isSelected,
+                            position: isFirst
+                                ? MetalButtonPosition.first
+                                : isLast
+                                ? MetalButtonPosition.last
+                                : MetalButtonPosition.middle,
+                          );
+                        }).toList(),
+                      );
+                    },
+                  ),
+                ),
+              // Фильтры - Оборудование
+              if (_availableEquipmentNames.isNotEmpty)
+                Container(
+                  height: 40,
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Builder(
+                    builder: (context) {
+                      return ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: _availableEquipmentNames.asMap().entries.map((
+                          entry,
+                        ) {
+                          final index = entry.key;
+                          final equipmentName = entry.value;
+                          final isSelected = _selectedEquipmentNames.contains(
+                            equipmentName,
+                          );
+                          final isFirst = index == 0;
+                          final isLast =
+                              index == _availableEquipmentNames.length - 1;
+
+                          return MetalButton(
+                            label: equipmentName,
+                            onPressed: () {
+                              _toggleEquipmentFilter(equipmentName);
+                            },
+                            height: 36,
+                            fontSize: 13,
+                            isSelected: isSelected,
+                            position: isFirst
+                                ? MetalButtonPosition.first
+                                : isLast
+                                ? MetalButtonPosition.last
+                                : MetalButtonPosition.middle,
+                          );
+                        }).toList(),
+                      );
+                    },
+                  ),
+                ),
+              const SizedBox(height: 16),
+              // Content
+              Expanded(
+                child: isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.textPrimary,
+                        ),
+                      )
+                    : _displayedExercises.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              hasSearched
+                                  ? Icons.search_off
+                                  : Icons.fitness_center,
+                              size: 64,
+                              color: AppColors.textSecondary,
                             ),
+                            const SizedBox(height: 16),
+                            Text(
+                              hasSearched
+                                  ? 'По вашему запросу ничего не найдено'
+                                  : 'Упражнения не найдены',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 16,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        itemCount: _displayedExercises.length + 1,
+                        itemBuilder: (context, index) {
+                          // Если это последний элемент, показываем пагинацию
+                          if (index == _displayedExercises.length) {
+                            return _buildPaginationControls();
+                          }
+
+                          final exercise = _displayedExercises[index];
+                          final isSelected =
+                              _selectedExercise != null &&
+                              _selectedExercise!.uuid ==
+                                  _getExerciseUuid(exercise);
+                          final isFirst = index == 0;
+                          final isLast = index == _displayedExercises.length - 1;
+
+                          // Преобразуем в ExerciseReference для получения данных
+                          search_models.ExerciseReference exerciseRef;
+                          if (exercise is search_models.ExerciseReference) {
+                            exerciseRef = exercise;
+                          } else if (exercise is Map<String, dynamic>) {
+                            exerciseRef =
+                                search_models.ExerciseReference.fromJson(
+                              exercise,
+                            );
+                          } else {
+                            return const SizedBox.shrink();
+                          }
+
+                          return Stack(
+                            children: [
+                              MetalListItem(
+                                leading: _buildExerciseMedia(exercise),
+                                title: Text(
+                                  exerciseRef.caption,
+                                  style: NinjaText.body.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: isSelected
+                                        ? AppColors.buttonPrimary
+                                        : null,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  exerciseRef.muscleGroup,
+                                  style: NinjaText.caption,
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.info_outline),
+                                      onPressed: () =>
+                                          _showExerciseDetail(exercise),
+                                      tooltip: 'Детали упражнения',
+                                      color: AppColors.textSecondary,
+                                      iconSize: 20,
+                                    ),
+                                    _FavoriteButton(
+                                      isFavorite: exerciseRef.isFavorite,
+                                      onPressed: () async {
+                                        await _toggleFavorite(exercise);
+                                      },
+                                    ),
+                                  ],
+                                ),
+                                onTap: () => _selectExercise(exercise),
+                                isFirst: isFirst,
+                                isLast: isLast,
+                                removeSpacing: true,
+                              ),
+                              // Индикатор выбора
+                              if (isSelected)
+                                Positioned(
+                                  right: 8,
+                                  bottom: 8,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.buttonPrimary,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.check,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      // Кнопка выбора
+      bottomNavigationBar: _selectedExercise != null
+          ? Container(
+              color: Colors.transparent,
+              child: Stack(
+                children: [
+                  // Градиент (нижний слой) - занимает всю область
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(24),
+                          topRight: Radius.circular(24),
+                        ),
+                        gradient: const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Color(0xFF2E2E2E), Color(0xFF1E1E1E)],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.65),
+                            offset: const Offset(0, 14),
+                            blurRadius: 34,
                           ),
-                          Text(
-                            _selectedExercise!.caption,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
+                          BoxShadow(
+                            color: Colors.white.withOpacity(0.07),
+                            offset: const Offset(0, -1),
+                            blurRadius: 2,
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Row(
-                      children: [
-                        IconButton(
-                          onPressed: () {
-                            setState(() {
-                              _selectedExercise = null;
-                            });
-                          },
-                          icon: const Icon(Icons.close, color: Colors.red),
-                          tooltip: 'Отменить выбор',
+                  ),
+                  // Текстура
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(24),
+                          topRight: Radius.circular(24),
                         ),
-                        ElevatedButton(
-                          onPressed: _confirmSelection,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.buttonPrimary,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 12,
+                        child: Image.asset(
+                          'assets/textures/graphite_noise.png',
+                          fit: BoxFit.cover,
+                          color: Colors.white.withOpacity(0.04),
+                          colorBlendMode: BlendMode.softLight,
+                          filterQuality: FilterQuality.low,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Внутренняя светотень по вертикали
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(24),
+                          topRight: Radius.circular(24),
+                        ),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.black.withOpacity(0.12),
+                                Colors.white.withOpacity(0.07),
+                                Colors.black.withOpacity(0.20),
+                              ],
+                              stops: const [0.0, 0.45, 1.0],
                             ),
                           ),
-                          child: const Text(
-                            'Выбрать',
-                            style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Градиентная обводка сверху
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(24),
+                          topRight: Radius.circular(24),
+                        ),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                const Color(0xFFD3D3C6).withOpacity(0.15),
+                                Colors.transparent,
+                              ],
+                              stops: const [0.0, 0.15],
+                            ),
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  ],
-                ),
+                  ),
+                  // Внутренняя светотень по горизонтали
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(24),
+                          topRight: Radius.circular(24),
+                        ),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [
+                                Colors.black.withOpacity(0.50),
+                                Colors.transparent,
+                                Colors.black.withOpacity(0.55),
+                              ],
+                              stops: const [0.0, 0.5, 1.0],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Контент
+                  SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Выбрано:',
+                                      style: NinjaText.caption.copyWith(
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _selectedExercise!.caption,
+                                      style: NinjaText.body.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _selectedExercise = null;
+                                  });
+                                },
+                                icon: const Icon(Icons.close),
+                                color: AppColors.textSecondary,
+                                tooltip: 'Отменить выбор',
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          MetalButton(
+                            label: 'Выбрать',
+                            onPressed: _confirmSelection,
+                            height: 56,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-        ],
-      ),
+            )
+          : null,
     );
   }
 }
@@ -1026,3 +1140,4 @@ class _FavoriteButtonState extends State<_FavoriteButton>
     );
   }
 }
+

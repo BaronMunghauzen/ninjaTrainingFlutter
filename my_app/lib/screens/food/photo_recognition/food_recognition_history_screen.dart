@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../../design/ninja_colors.dart';
 import '../../../design/ninja_radii.dart';
 import '../../../design/ninja_spacing.dart';
@@ -206,132 +207,171 @@ class _FoodRecognitionHistoryScreenState
         body: TexturedBackground(
           child: SafeArea(
             child: Column(
-            children: [
-              // Заголовок и кнопка назад
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: NinjaSpacing.lg,
-                  vertical: NinjaSpacing.md,
+              children: [
+                // Заголовок и кнопка назад
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: NinjaSpacing.lg,
+                    vertical: NinjaSpacing.md,
+                  ),
+                  child: Row(
+                    children: [
+                      const MetalBackButton(),
+                      const SizedBox(width: NinjaSpacing.md),
+                      Text('История сканирований', style: NinjaText.title),
+                    ],
+                  ),
                 ),
-                child: Row(
-                  children: [
-                    const MetalBackButton(),
-                    const SizedBox(width: NinjaSpacing.md),
-                    Text(
-                      'История сканирований',
-                      style: NinjaText.title,
-                    ),
-                  ],
+                // Поиск
+                Padding(
+                  padding: const EdgeInsets.all(NinjaSpacing.lg),
+                  child: MetalSearchBar(
+                    controller: _searchController,
+                    hint: 'Поиск по названию',
+                    onChanged: _onSearchChanged,
+                  ),
                 ),
-              ),
-              // Поиск
-              Padding(
-                padding: const EdgeInsets.all(NinjaSpacing.lg),
-                child: MetalSearchBar(
-                  controller: _searchController,
-                  hint: 'Поиск по названию',
-                  onChanged: _onSearchChanged,
-                ),
-              ),
 
-              // Список
-              Expanded(
-                child: _isLoading && _recognitions.isEmpty
-                    ? const Center(
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            NinjaColors.textPrimary,
+                // Список
+                Expanded(
+                  child: _isLoading && _recognitions.isEmpty
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              NinjaColors.textPrimary,
+                            ),
                           ),
-                        ),
-                      )
-                    : _recognitions.isEmpty
-                    ? Center(
-                        child: Text('Нет сканирований', style: NinjaText.body),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: () => _loadRecognitions(),
-                        color: NinjaColors.textPrimary,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: NinjaSpacing.lg,
+                        )
+                      : _recognitions.isEmpty
+                      ? Center(
+                          child: Text(
+                            'Нет сканирований',
+                            style: NinjaText.body,
                           ),
-                          itemCount: _recognitions.length + (_hasNext ? 1 : 0),
-                          itemBuilder: (context, index) {
-                            if (index == _recognitions.length) {
-                              return Padding(
-                                padding: const EdgeInsets.all(NinjaSpacing.lg),
-                                child: Center(
-                                  child: TextButton(
-                                    onPressed: () =>
-                                        _loadRecognitions(loadMore: true),
-                                    child: Text(
-                                      'Загрузить еще',
-                                      style: NinjaText.body.copyWith(
-                                        color: NinjaColors.textPrimary,
+                        )
+                      : RefreshIndicator(
+                          onRefresh: () => _loadRecognitions(),
+                          color: NinjaColors.textPrimary,
+                          child: ListView.builder(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: NinjaSpacing.lg,
+                            ),
+                            itemCount:
+                                _recognitions.length + (_hasNext ? 1 : 0),
+                            itemBuilder: (context, index) {
+                              if (index == _recognitions.length) {
+                                return Padding(
+                                  padding: const EdgeInsets.all(
+                                    NinjaSpacing.lg,
+                                  ),
+                                  child: Center(
+                                    child: TextButton(
+                                      onPressed: () =>
+                                          _loadRecognitions(loadMore: true),
+                                      child: Text(
+                                        'Загрузить еще',
+                                        style: NinjaText.body.copyWith(
+                                          color: NinjaColors.textPrimary,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              );
-                            }
+                                );
+                              }
 
-                            final recognition = _recognitions[index];
-                            return _buildRecognitionCard(recognition);
-                          },
+                              final recognition = _recognitions[index];
+                              final isFirst = index == 0;
+                              final isLast = index == _recognitions.length - 1;
+                              return _buildRecognitionCard(
+                                recognition,
+                                isFirst: isFirst,
+                                isLast: isLast,
+                              );
+                            },
+                          ),
                         ),
-                      ),
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
-        ),
         ),
       ),
     );
   }
 
-  Widget _buildRecognitionCard(FoodRecognition recognition) {
+  Widget _buildRecognitionCard(
+    FoodRecognition recognition, {
+    bool isFirst = false,
+    bool isLast = false,
+  }) {
+    final dateFormat = DateFormat('dd.MM.yyyy');
+    final dateStr = dateFormat.format(DateTime.parse(recognition.createdAt));
+
     return MetalListItem(
       leading: ClipOval(
         child: AuthImageWidget(
           imageUuid: recognition.imageUuid,
           width: 60,
-          height: 60,
+          height: 50,
           fit: BoxFit.cover,
         ),
       ),
-      title: Text(
-        recognition.name,
-        style: NinjaText.title.copyWith(fontSize: 18),
+      title: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Text(
+              recognition.name,
+              style: NinjaText.title.copyWith(fontSize: 16),
+            ),
+          ),
+          Transform.translate(
+            offset: const Offset(
+              50,
+              0,
+            ), // Смещаем правее, но не за пределы элемента
+            child: Text(
+              dateStr,
+              style: NinjaText.caption.copyWith(
+                color: NinjaColors.textSecondary.withOpacity(0.7),
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
       ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             'Вес: ${recognition.weightG.toStringAsFixed(0)} г',
             style: NinjaText.caption,
           ),
-          const SizedBox(height: 8),
-          Row(
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
             children: [
               MacroInfoChip(
                 label: 'К',
                 value: recognition.caloriesTotal.toStringAsFixed(0),
+                size: 32,
               ),
-              const SizedBox(width: 8),
               MacroInfoChip(
                 label: 'Б',
                 value: recognition.proteinsTotal.toStringAsFixed(1),
+                size: 32,
               ),
-              const SizedBox(width: 8),
               MacroInfoChip(
                 label: 'Ж',
                 value: recognition.fatsTotal.toStringAsFixed(1),
+                size: 32,
               ),
-              const SizedBox(width: 8),
               MacroInfoChip(
                 label: 'У',
                 value: recognition.carbsTotal.toStringAsFixed(1),
+                size: 32,
               ),
             ],
           ),
@@ -340,7 +380,11 @@ class _FoodRecognitionHistoryScreenState
       trailing: GestureDetector(
         onTap: () => _showDeleteConfirmation(recognition.uuid),
         child: IconButton(
-          icon: const Icon(Icons.close, color: NinjaColors.textSecondary),
+          icon: const Icon(
+            Icons.close,
+            color: NinjaColors.textSecondary,
+            size: 20,
+          ),
           onPressed: () => _showDeleteConfirmation(recognition.uuid),
         ),
       ),
@@ -353,7 +397,9 @@ class _FoodRecognitionHistoryScreenState
               _loadRecognitions();
             });
       },
+      isFirst: isFirst,
+      isLast: isLast,
+      removeSpacing: true,
     );
   }
-
 }

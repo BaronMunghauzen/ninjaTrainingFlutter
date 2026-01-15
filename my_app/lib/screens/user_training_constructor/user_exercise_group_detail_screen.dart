@@ -2,9 +2,17 @@ import 'package:flutter/material.dart';
 import '../../constants/app_colors.dart';
 import '../../services/user_training_service.dart';
 import '../../services/api_service.dart';
+import '../../widgets/textured_background.dart';
+import '../../widgets/metal_back_button.dart';
+import '../../widgets/metal_card.dart';
+import '../../widgets/metal_message.dart';
+import '../../widgets/metal_modal.dart';
+import '../../widgets/metal_button.dart';
 import '../../widgets/gif_widget.dart';
 import '../../widgets/auth_image_widget.dart';
 import '../../widgets/video_player_widget.dart';
+import '../../design/ninja_spacing.dart';
+import '../../design/ninja_typography.dart';
 import 'user_exercise_edit_screen.dart';
 
 class UserExerciseGroupDetailScreen extends StatefulWidget {
@@ -119,33 +127,6 @@ class _UserExerciseGroupDetailScreenState
     }
   }
 
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$label:',
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget? _buildMediaWidget() {
     // Приоритет: сначала видео, затем гифка, затем картинка
@@ -213,164 +194,212 @@ class _UserExerciseGroupDetailScreenState
     return null;
   }
 
+  Future<void> _deleteExercise() async {
+    final confirmed = await MetalModal.show<bool>(
+      context: context,
+      title: 'Удаление упражнения',
+      children: [
+        Text(
+          'Вы уверены, что хотите удалить это упражнение?',
+          style: NinjaText.body,
+        ),
+        const SizedBox(height: NinjaSpacing.xl),
+        Row(
+          children: [
+            Expanded(
+              child: MetalButton(
+                label: 'Отмена',
+                onPressed: () => Navigator.of(context).pop(false),
+                height: 56,
+                fontSize: 16,
+                position: MetalButtonPosition.first,
+              ),
+            ),
+            Expanded(
+              child: MetalButton(
+                label: 'Удалить',
+                onPressed: () => Navigator.of(context).pop(true),
+                height: 56,
+                fontSize: 16,
+                position: MetalButtonPosition.last,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    if (confirmed != true) return;
+
+    // Удаляем только группу упражнений
+    final groupSuccess = await UserTrainingService.deleteExerciseGroup(
+      widget.exerciseGroup.uuid,
+    );
+    if (groupSuccess) {
+      // Вызываем callback для обновления данных на родительской странице
+      widget.onDataChanged?.call();
+      if (mounted) {
+        Navigator.of(context).pop(true);
+        MetalMessage.show(
+          context: context,
+          message: 'Упражнение удалено',
+          type: MetalMessageType.success,
+        );
+      }
+    } else {
+      if (mounted) {
+        MetalMessage.show(
+          context: context,
+          message: 'Ошибка при удалении упражнения',
+          type: MetalMessageType.error,
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.exerciseGroup.caption,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        backgroundColor: AppColors.surface,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () async {
-              if (widget.exerciseGroup.exercises.isNotEmpty) {
-                final exerciseUuid = widget.exerciseGroup.exercises.first;
-                final result = await Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        UserExerciseEditScreen(exerciseUuid: exerciseUuid),
-                  ),
-                );
-                if (result == true) {
-                  // Обновляем данные после редактирования
-                  _loadExerciseData();
-                  // Вызываем callback для обновления родительской страницы
-                  widget.onDataChanged?.call();
-                }
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete),
-            onPressed: () async {
-              final confirmed = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Удаление упражнения'),
-                  content: const Text(
-                    'Вы уверены, что хотите удалить это упражнение?',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(false),
-                      child: const Text('Отмена'),
+      backgroundColor: Colors.transparent,
+      body: TexturedBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Верхний раздел с кнопками
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Row(
+                  children: [
+                    const MetalBackButton(),
+                    const Spacer(),
+                    MetalBackButton(
+                      icon: Icons.edit,
+                      onTap: () async {
+                        if (widget.exerciseGroup.exercises.isNotEmpty) {
+                          final exerciseUuid = widget.exerciseGroup.exercises.first;
+                          final result = await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  UserExerciseEditScreen(exerciseUuid: exerciseUuid),
+                            ),
+                          );
+                          if (result == true) {
+                            // Обновляем данные после редактирования
+                            _loadExerciseData();
+                            // Вызываем callback для обновления родительской страницы
+                            widget.onDataChanged?.call();
+                          }
+                        }
+                      },
                     ),
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(true),
-                      child: const Text('Удалить'),
+                    const SizedBox(width: NinjaSpacing.md),
+                    MetalBackButton(
+                      icon: Icons.delete,
+                      onTap: _deleteExercise,
                     ),
                   ],
                 ),
-              );
-
-              if (confirmed == true) {
-                // Удаляем только группу упражнений
-                final groupSuccess =
-                    await UserTrainingService.deleteExerciseGroup(
-                      widget.exerciseGroup.uuid,
-                    );
-                if (groupSuccess) {
-                  // Вызываем callback для обновления данных на родительской странице
-                  widget.onDataChanged?.call();
-                  Navigator.of(context).pop(true);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Упражнение удалено')),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Ошибка при удалении упражнения'),
-                    ),
-                  );
-                }
-              }
-            },
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Название упражнения
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 20),
-                    child: Text(
-                      exerciseName,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-
-                  // Упражнение из справочника
-                  if (exerciseReferenceName != null) ...[
-                    const SizedBox(height: 16),
-                    _buildInfoRow(
-                      'Упражнение из справочника',
-                      exerciseReferenceName!,
-                    ),
-                  ],
-
-                  // Медиа (гифка или картинка) из справочника
-                  Builder(
-                    builder: (context) {
-                      final mediaWidget = _buildMediaWidget();
-                      if (mediaWidget != null) {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+              ),
+              // Основной контент
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const SizedBox(height: 16),
+                            // Название упражнения по центру
                             Text(
-                              'Демонстрация:',
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
+                              exerciseName,
+                              style: NinjaText.title,
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: NinjaSpacing.xl),
+                            // Медиа (гифка или картинка) из справочника
+                            Builder(
+                              builder: (context) {
+                                final mediaWidget = _buildMediaWidget();
+                                if (mediaWidget != null) {
+                                  return Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      if (exerciseReferenceName != null)
+                                        const SizedBox(height: NinjaSpacing.lg),
+                                      MetalCard(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Демонстрация',
+                                              style: NinjaText.caption.copyWith(
+                                                color: AppColors.textSecondary,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 12),
+                                            mediaWidget,
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              },
+                            ),
+                            const SizedBox(height: NinjaSpacing.lg),
+                            // Информация о тренировке
+                            MetalCard(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildInfoRow('Подходы', setsCount?.toString() ?? '3'),
+                                  const SizedBox(height: 16),
+                                  _buildInfoRow('Повторения', repsCount?.toString() ?? '12'),
+                                  const SizedBox(height: 16),
+                                  _buildInfoRow('Время отдыха', '${restTime ?? 60}с'),
+                                  const SizedBox(height: 16),
+                                  _buildInfoRow(
+                                    'Группа мышц',
+                                    widget.exerciseGroup.muscleGroup,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  _buildInfoRow(
+                                    'Вес',
+                                    (withWeight ?? true) ? 'С весом' : 'Без веса',
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            mediaWidget,
                           ],
-                        );
-                      }
-                      return const SizedBox.shrink();
-                    },
-                  ),
-
-                  // Информация о тренировке
-                  const SizedBox(height: 16),
-                  _buildInfoRow('Подходы', setsCount?.toString() ?? '3'),
-                  const SizedBox(height: 16),
-                  _buildInfoRow('Повторения', repsCount?.toString() ?? '12'),
-                  const SizedBox(height: 16),
-                  _buildInfoRow(
-                    'Группа мышц',
-                    widget.exerciseGroup.muscleGroup,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildInfoRow('Время отдыха', '${restTime ?? 60}с'),
-                  const SizedBox(height: 16),
-                  _buildInfoRow(
-                    'Вес',
-                    (withWeight ?? true) ? 'С весом' : 'Без веса',
-                  ),
-                ],
+                        ),
+                      ),
               ),
-            ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: NinjaText.caption.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: NinjaText.body.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }

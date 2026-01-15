@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../services/api_service.dart';
-import '../../constants/app_colors.dart';
+import '../services/api_service.dart';
+import '../constants/app_colors.dart';
 import 'package:provider/provider.dart';
-import '../../providers/auth_provider.dart';
-import '../system_training/system_training_detail_screen.dart';
-import '../system_training/active_system_training_screen.dart';
+import '../providers/auth_provider.dart';
+import '../screens/system_training/system_training_detail_screen.dart';
+import '../screens/system_training/active_system_training_screen.dart';
 
 class SystemTrainingListWidget extends StatefulWidget {
   const SystemTrainingListWidget({Key? key}) : super(key: key);
@@ -130,90 +130,89 @@ class _SystemTrainingListWidgetState extends State<SystemTrainingListWidget> {
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.inputBorder),
+              border: Border.all(color: Color(0xE6B5BF94).withOpacity(0.3)),
             ),
-            child: FutureBuilder<ImageProvider?>(
-              future: _loadTrainingImage(training['image_uuid']),
-              builder: (context, snapshot) {
-                final image = snapshot.data;
-                return Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Картинка тренировки
-                    if (image != null)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: FutureBuilder<ImageProvider?>(
+                future: _loadTrainingImage(training['image_uuid']),
+                builder: (context, snapshot) {
+                  final image = snapshot.data;
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Картинка тренировки
+                      if (image != null)
+                        Image(
                           image: image,
                           width: 140,
                           height: 140,
                           fit: BoxFit.cover,
-                        ),
-                      )
-                    else if (snapshot.connectionState ==
-                        ConnectionState.waiting)
-                      Container(
-                        color: AppColors.surface,
-                        child: const Center(
-                          child: CircularProgressIndicator(
+                        )
+                      else if (snapshot.connectionState ==
+                          ConnectionState.waiting)
+                        Container(
+                          color: AppColors.surface,
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        )
+                      else
+                        Container(
+                          color: AppColors.surface,
+                          child: const Icon(
+                            Icons.fitness_center,
+                            size: 60,
                             color: AppColors.textSecondary,
                           ),
                         ),
-                      )
-                    else
+                      // Полупрозрачный оверлей для лучшей читаемости текста
                       Container(
-                        color: AppColors.surface,
-                        child: const Icon(
-                          Icons.fitness_center,
-                          size: 60,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    // Полупрозрачный оверлей для лучшей читаемости текста
-                    Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.transparent,
-                            Colors.black.withOpacity(0.7),
-                          ],
-                          stops: const [0.4, 1.0],
-                        ),
-                      ),
-                    ),
-                    // Текст поверх картинки
-                    Positioned(
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Text(
-                          training['caption'] ?? '',
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            shadows: [
-                              Shadow(
-                                offset: Offset(0, 1),
-                                blurRadius: 2,
-                                color: Colors.black54,
-                              ),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.7),
                             ],
+                            stops: const [0.4, 1.0],
                           ),
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ),
-                  ],
-                );
-              },
+                      // Текст поверх картинки
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Text(
+                            training['caption'] ?? '',
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              shadows: [
+                                Shadow(
+                                  offset: Offset(0, 1),
+                                  blurRadius: 2,
+                                  color: Colors.black54,
+                                ),
+                              ],
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
           ),
         );
@@ -221,3 +220,6 @@ class _SystemTrainingListWidgetState extends State<SystemTrainingListWidget> {
     );
   }
 }
+
+
+

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../../constants/app_colors.dart';
+import '../../../widgets/textured_background.dart';
+import '../../../widgets/metal_tab_switcher.dart';
+import '../../../design/ninja_spacing.dart';
 import 'achievements/achievements_screen.dart';
 import 'statistics/statistics_screen.dart';
 
@@ -12,84 +14,41 @@ class AchievementsAndStatisticsScreen extends StatefulWidget {
 }
 
 class _AchievementsAndStatisticsScreenState
-    extends State<AchievementsAndStatisticsScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this, initialIndex: 0);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
+    extends State<AchievementsAndStatisticsScreen> {
+  int _selectedTabIndex = 0;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1A1A1A),
-        iconTheme: const IconThemeData(color: Colors.white),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(50),
-          child: Container(
-            margin: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(25),
-            ),
-            child: TabBar(
-              controller: _tabController,
-              indicator: BoxDecoration(
-                color: AppColors.buttonPrimary,
-                borderRadius: BorderRadius.circular(25),
-              ),
-              indicatorSize: TabBarIndicatorSize.tab,
-              dividerColor: Colors.transparent,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white70,
-              labelStyle: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-              unselectedLabelStyle: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w400,
-              ),
-              tabs: const [
-                Tab(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.analytics, size: 18),
-                      SizedBox(width: 8),
-                      Text('Статистика'),
-                    ],
-                  ),
+      backgroundColor: Colors.transparent,
+      body: TexturedBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(NinjaSpacing.lg),
+                child: MetalTabSwitcher(
+                  tabs: const ['Статистика', 'Достижения'],
+                  initialIndex: _selectedTabIndex,
+                  onTabChanged: (index) {
+                    setState(() {
+                      _selectedTabIndex = index;
+                    });
+                  },
                 ),
-                Tab(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.emoji_events, size: 18),
-                      SizedBox(width: 8),
-                      Text('Достижения'),
-                    ],
-                  ),
+              ),
+              Expanded(
+                child: IndexedStack(
+                  index: _selectedTabIndex,
+                  children: const [
+                    StatisticsScreen(),
+                    AchievementsScreen(),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: const [StatisticsScreen(), AchievementsScreen()],
       ),
     );
   }

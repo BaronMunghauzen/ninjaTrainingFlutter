@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/training_service.dart';
 import '../../constants/app_colors.dart';
+import '../../widgets/metal_button.dart';
 
 class WeeksDaysNavigation extends StatefulWidget {
   final int weeksCount;
@@ -526,45 +527,29 @@ class WeeksDaysNavigationState extends State<WeeksDaysNavigation> {
           child: Row(
             children: List.generate(
               widget.weeksCount,
-              (i) => Container(
-                width: widget.weekTabWidth ?? screenWidth / widget.weeksCount,
-                child: GestureDetector(
-                  onTap: widget.isActiveProgram ? () => _onWeekTap(i) : null,
-                  child: Container(
-                    alignment: Alignment.center,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.transparent,
-                      borderRadius:
-                          (widget.isActiveProgram
-                                  ? currentWeek
-                                  : widget.selectedWeek) ==
-                              i
-                          ? null
-                          : BorderRadius.circular(8),
-                      border:
-                          (widget.isActiveProgram
-                                  ? currentWeek
-                                  : widget.selectedWeek) ==
-                              i
-                          ? Border(
-                              bottom: BorderSide(
-                                color: AppColors.buttonPrimary,
-                                width: 3,
-                              ),
-                            )
-                          : null,
-                    ),
-                    child: Text(
-                      weeks[i],
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+              (i) {
+                MetalButtonPosition position;
+                if (widget.weeksCount == 1) {
+                  position = MetalButtonPosition.single;
+                } else if (i == 0) {
+                  position = MetalButtonPosition.first;
+                } else if (i == widget.weeksCount - 1) {
+                  position = MetalButtonPosition.last;
+                } else {
+                  position = MetalButtonPosition.middle;
+                }
+                return Container(
+                  width: widget.weekTabWidth ?? screenWidth / widget.weeksCount,
+                  child: MetalButton(
+                    label: weeks[i],
+                    onPressed: widget.isActiveProgram ? () => _onWeekTap(i) : null,
+                    height: 48,
+                    fontSize: 14,
+                    position: position,
+                    isSelected: currentWeek == i,
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
         ),
@@ -575,56 +560,31 @@ class WeeksDaysNavigationState extends State<WeeksDaysNavigation> {
           controller: _dayScrollController,
           child: Row(
             children: List.generate(widget.daysCount, (i) {
+              MetalButtonPosition position;
+              if (widget.daysCount == 1) {
+                position = MetalButtonPosition.single;
+              } else if (i == 0) {
+                position = MetalButtonPosition.first;
+              } else if (i == widget.daysCount - 1) {
+                position = MetalButtonPosition.last;
+              } else {
+                position = MetalButtonPosition.middle;
+              }
               final globalDayIndex = currentWeek * widget.daysCount + i;
-              final style = _allDaysStylesCache[globalDayIndex] ?? {};
               return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 6),
-                child: GestureDetector(
-                  onTap: widget.isActiveProgram ? () => _onDayTap(i) : null,
-                  child: MouseRegion(
-                    cursor: widget.isActiveProgram && _isDayClickable(i)
-                        ? SystemMouseCursors.click
-                        : SystemMouseCursors.basic,
-                    child: Container(
-                      width: 96,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: style['background'] ?? Colors.transparent,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: style['border'] ?? Colors.grey[700]!,
-                          width: style['borderWidth'] ?? 1.0,
-                        ),
-                      ),
-                      child: Center(
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    days[i],
-                                    style: TextStyle(
-                                      color: style['text'] ?? Colors.grey[400]!,
-                                      fontWeight: _calculateTextWeight(i),
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  if (widget.isActiveProgram) ...[
-                                    const SizedBox(height: 2),
-                                    _buildDayStatusIcon(i),
-                                  ],
-                                ],
-                              ),
-                      ),
-                    ),
-                  ),
+                width: 96,
+                child: MetalButton(
+                  label: days[i],
+                  onPressed: widget.isActiveProgram
+                      ? (_isDayClickable(i) ? () => _onDayTap(i) : null)
+                      : null,
+                  height: 48,
+                  fontSize: 14,
+                  position: position,
+                  isSelected: globalDayIndex == currentDayIndex,
+                  isLoading: widget.isActiveProgram &&
+                      _isLoading &&
+                      globalDayIndex == currentDayIndex,
                 ),
               );
             }),

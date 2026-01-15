@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../constants/app_colors.dart';
+import '../../../design/ninja_colors.dart';
+import '../../../design/ninja_spacing.dart';
+import '../../../design/ninja_typography.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../services/statistics_service.dart';
 import '../../../models/user_training_model.dart';
@@ -8,13 +10,16 @@ import '../../../models/measurement_type_model.dart';
 import '../../../models/measurement_model.dart';
 import '../../../models/exercise_model.dart';
 import '../../../models/exercise_statistics_model.dart';
+import '../../../widgets/textured_background.dart';
+import '../../../widgets/metal_card.dart';
+import '../../../widgets/metal_list_item.dart';
+import '../../../widgets/metal_modal.dart';
+import '../../../widgets/metal_message.dart';
+import '../../../widgets/metal_dropdown.dart';
+import '../../../widgets/metal_text_field.dart';
 import '../../../widgets/measurement_chart.dart';
-import '../../../widgets/measurement_modal.dart';
-import '../../../widgets/measurement_type_modal.dart';
 import '../../../widgets/training_calendar.dart';
-import '../../../widgets/training_detail_modal.dart';
 import '../../../widgets/exercise_statistics_table.dart';
-import '../../../widgets/subscription_error_dialog.dart';
 
 class StatisticsScreen extends StatefulWidget {
   const StatisticsScreen({super.key});
@@ -36,8 +41,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   ExerciseModel? _selectedExercise;
   ExerciseStatisticsModel? _exerciseStatistics;
   bool _isLoadingExerciseStatistics = false;
-  bool _isExerciseDropdownOpen = false;
-  bool _isMeasurementTypeDropdownOpen = false;
 
   DateTime? _weightDateFrom;
   DateTime? _weightDateTo;
@@ -119,9 +122,13 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         await _loadWeightMeasurements();
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Ошибка загрузки данных: $e')));
+      if (mounted) {
+        MetalMessage.show(
+          context: context,
+          message: 'Ошибка загрузки данных: $e',
+          type: MetalMessageType.error,
+        );
+      }
     } finally {
       setState(() => _isLoading = false);
     }
@@ -176,755 +183,768 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   }
 
   void _onDateSelected(DateTime date, List<UserTrainingModel> trainings) {
-    showDialog(
+    MetalModal.show(
       context: context,
-      builder: (context) =>
-          TrainingDetailModal(selectedDate: date, trainings: trainings),
+      title: 'Тренировки ${_formatDate(date)}',
+      children: [
+        SizedBox(
+          width: double.maxFinite,
+          height: 400,
+          child: trainings.isEmpty
+              ? Center(
+                  child: Text(
+                    'Нет тренировок на эту дату',
+                    style: NinjaText.body.copyWith(
+                      color: NinjaColors.textSecondary,
+                    ),
+                  ),
+                )
+              : ListView.separated(
+                  itemCount: trainings.length,
+                  separatorBuilder: (context, index) => const SizedBox.shrink(),
+                  itemBuilder: (context, index) {
+                    final training = trainings[index];
+                    return MetalListItem(
+                      leading: const SizedBox.shrink(),
+                      title: Text(
+                        training.training.caption,
+                        style: NinjaText.body.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (training.training.muscleGroup.isNotEmpty) ...[
+                            const SizedBox(height: NinjaSpacing.xs),
+                            Text(
+                              'Группа мышц: ${training.training.muscleGroup}',
+                              style: NinjaText.caption,
+                            ),
+                          ],
+                          if (training.program.caption.isNotEmpty) ...[
+                            const SizedBox(height: NinjaSpacing.xs),
+                            Text(
+                              'Программа: ${training.program.caption}',
+                              style: NinjaText.caption,
+                            ),
+                          ],
+                        ],
+                      ),
+                      onTap: () {},
+                      isFirst: index == 0,
+                      isLast: index == trainings.length - 1,
+                      removeSpacing: true,
+                    );
+                  },
+                ),
+        ),
+      ],
     );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: const Color(0xFF1A1A1A),
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF1A1A1A),
-          iconTheme: const IconThemeData(color: Colors.white),
-          title: const Text(
-            'Статистика',
-            style: TextStyle(color: Colors.white),
+        backgroundColor: Colors.transparent,
+        body: TexturedBackground(
+          child: const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(
+                NinjaColors.textPrimary,
+              ),
+            ),
           ),
-        ),
-        body: const Center(
-          child: CircularProgressIndicator(color: Color(0xFF1F2121)),
         ),
       );
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1A1A1A),
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text('', style: TextStyle(color: Colors.white)),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Счетчик тренировок
-            _buildTrainingCountCard(),
-            const SizedBox(height: 24),
+      backgroundColor: Colors.transparent,
+      body: TexturedBackground(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(NinjaSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Счетчик тренировок
+                _buildTrainingCountCard(),
+                const SizedBox(height: NinjaSpacing.lg),
 
-            // Календарь тренировок
-            _buildTrainingCalendar(),
-            const SizedBox(height: 24),
+                // Календарь тренировок
+                _buildTrainingCalendar(),
+                const SizedBox(height: NinjaSpacing.lg),
 
-            // График веса
-            _buildWeightChart(),
-            const SizedBox(height: 24),
+                // График веса
+                _buildWeightChart(),
+                const SizedBox(height: NinjaSpacing.lg),
 
-            // График кастомных измерений
-            _buildCustomMeasurementsChart(),
-            const SizedBox(height: 24),
+                // График кастомных измерений
+                _buildCustomMeasurementsChart(),
+                const SizedBox(height: NinjaSpacing.lg),
 
-            // Статистика упражнений
-            _buildExerciseStatistics(),
-          ],
+                // Статистика упражнений
+                _buildExerciseStatistics(),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
   Widget _buildTrainingCountCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Text(
-            'Проведено тренировок',
-            style: const TextStyle(fontSize: 16, color: Colors.white),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '${_completedTrainingsCount ?? 0} шт',
-            style: const TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+    return MetalCard(
+      padding: EdgeInsets.zero,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(NinjaSpacing.lg),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Проведено тренировок',
+              style: NinjaText.body.copyWith(color: NinjaColors.textSecondary),
+              textAlign: TextAlign.center,
             ),
-          ),
-        ],
+            const SizedBox(height: NinjaSpacing.sm),
+            Text(
+              '${_completedTrainingsCount ?? 0} шт',
+              style: NinjaText.title.copyWith(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildTrainingCalendar() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Календарь проведенных тренировок',
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+    return MetalCard(
+      padding: const EdgeInsets.all(NinjaSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Календарь проведенных тренировок', style: NinjaText.title),
+          const SizedBox(height: NinjaSpacing.lg),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(
+              children: [
+                // Фон в стиле metal_list_item
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(color: const Color(0xFF202020)),
+                  ),
+                ),
+                // Текстура
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Image.asset(
+                      'assets/textures/graphite_noise.png',
+                      fit: BoxFit.cover,
+                      color: Colors.white.withOpacity(0.05),
+                      colorBlendMode: BlendMode.softLight,
+                      filterQuality: FilterQuality.low,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ),
+                ),
+                // Вертикальная светотень
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withOpacity(0.16),
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.32),
+                          ],
+                          stops: const [0.0, 0.45, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                // Горизонтальная светотень
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [
+                            Colors.black.withOpacity(0.55),
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.60),
+                          ],
+                          stops: const [0.0, 0.5, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                // Календарь поверх фона (с прозрачным фоном)
+                TrainingCalendar(
+                  trainings: _trainings,
+                  onDateSelected: _onDateSelected,
+                  transparentBackground: true,
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
-        TrainingCalendar(
-          trainings: _trainings,
-          onDateSelected: _onDateSelected,
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _buildWeightChart() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Отслеживание веса',
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Поля для выбора дат
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                decoration: InputDecoration(
-                  labelText: 'Дата от',
-                  suffixIcon: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_weightDateFrom != null)
-                        IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            setState(() {
-                              _weightDateFrom = null;
-                            });
-                            _loadWeightMeasurements();
-                          },
-                        ),
-                      IconButton(
-                        icon: const Icon(Icons.calendar_today),
-                        onPressed: () async {
-                          final date = await showDatePicker(
-                            context: context,
-                            initialDate: _weightDateFrom ?? DateTime.now(),
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime.now(),
-                          );
-                          if (date != null) {
-                            setState(() {
-                              _weightDateFrom = date;
-                            });
-                            await _loadWeightMeasurements();
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                readOnly: true,
-                controller: TextEditingController(
-                  text: _weightDateFrom != null
-                      ? '${_weightDateFrom!.day}/${_weightDateFrom!.month}/${_weightDateFrom!.year}'
-                      : '',
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: TextField(
-                decoration: InputDecoration(
-                  labelText: 'Дата до',
-                  suffixIcon: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_weightDateTo != null)
-                        IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            setState(() {
-                              _weightDateTo = null;
-                            });
-                            _loadWeightMeasurements();
-                          },
-                        ),
-                      IconButton(
-                        icon: const Icon(Icons.calendar_today),
-                        onPressed: () async {
-                          final date = await showDatePicker(
-                            context: context,
-                            initialDate: _weightDateTo ?? DateTime.now(),
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime.now(),
-                          );
-                          if (date != null) {
-                            setState(() {
-                              _weightDateTo = date;
-                            });
-                            await _loadWeightMeasurements();
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                readOnly: true,
-                controller: TextEditingController(
-                  text: _weightDateTo != null
-                      ? '${_weightDateTo!.day}/${_weightDateTo!.month}/${_weightDateTo!.year}'
-                      : '',
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        MeasurementChart(
-          measurements: _weightMeasurements,
-          measurementTypeCaption: 'Вес',
-          onAddMeasurement: () => _showAddMeasurementModal('weight'),
-          onViewList: () =>
-              _showMeasurementListModal(_weightMeasurements, 'Вес'),
-        ),
-      ],
+    final dateFromController = TextEditingController(
+      text: _weightDateFrom != null
+          ? '${_weightDateFrom!.day}/${_weightDateFrom!.month}/${_weightDateFrom!.year}'
+          : '',
     );
-  }
+    final dateToController = TextEditingController(
+      text: _weightDateTo != null
+          ? '${_weightDateTo!.day}/${_weightDateTo!.month}/${_weightDateTo!.year}'
+          : '',
+    );
 
-  Widget _buildCustomMeasurementsChart() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Другие замеры',
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Выпадающий список типов измерений
-        Row(
-          children: [
-            Expanded(child: _buildCustomMeasurementTypeDropdown()),
-            const SizedBox(width: 16),
-            IconButton(
-              onPressed: () => _showMeasurementTypeModal(),
-              icon: const Icon(Icons.settings),
-              tooltip: 'Управление типами измерений',
-            ),
-          ],
-        ),
-
-        if (_selectedCustomMeasurementType != null) ...[
-          const SizedBox(height: 16),
+    return MetalCard(
+      padding: const EdgeInsets.all(NinjaSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Отслеживание веса', style: NinjaText.title),
+          const SizedBox(height: NinjaSpacing.lg),
 
           // Поля для выбора дат
           Row(
             children: [
               Expanded(
-                child: TextField(
-                  decoration: InputDecoration(
-                    labelText: 'Дата от',
-                    suffixIcon: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_customDateFrom != null)
-                          IconButton(
-                            icon: const Icon(Icons.clear),
+                child: GestureDetector(
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: _weightDateFrom ?? DateTime.now(),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now(),
+                    );
+                    if (date != null) {
+                      setState(() {
+                        _weightDateFrom = date;
+                        dateFromController.text =
+                            '${date.day}/${date.month}/${date.year}';
+                      });
+                      await _loadWeightMeasurements();
+                    }
+                  },
+                  child: Stack(
+                    children: [
+                      MetalTextField(
+                        controller: dateFromController,
+                        hint: 'Дата от',
+                        enabled: false,
+                      ),
+                      if (_weightDateFrom != null)
+                        Positioned(
+                          right: 8,
+                          top: 0,
+                          bottom: 0,
+                          child: IconButton(
+                            icon: const Icon(Icons.close, size: 18),
                             onPressed: () {
                               setState(() {
-                                _customDateFrom = null;
+                                _weightDateFrom = null;
+                                dateFromController.clear();
                               });
-                              _loadCustomMeasurements();
+                              _loadWeightMeasurements();
                             },
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
                           ),
-                        IconButton(
-                          icon: const Icon(Icons.calendar_today),
-                          onPressed: () async {
-                            final date = await showDatePicker(
-                              context: context,
-                              initialDate: _customDateFrom ?? DateTime.now(),
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime.now(),
-                            );
-                            if (date != null) {
-                              setState(() {
-                                _customDateFrom = date;
-                              });
-                              await _loadCustomMeasurements();
-                            }
-                          },
                         ),
-                      ],
-                    ),
-                  ),
-                  readOnly: true,
-                  controller: TextEditingController(
-                    text: _customDateFrom != null
-                        ? '${_customDateFrom!.day}/${_customDateFrom!.month}/${_customDateFrom!.year}'
-                        : '',
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: NinjaSpacing.md),
               Expanded(
-                child: TextField(
-                  decoration: InputDecoration(
-                    labelText: 'Дата до',
-                    suffixIcon: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_customDateTo != null)
-                          IconButton(
-                            icon: const Icon(Icons.clear),
+                child: GestureDetector(
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: _weightDateTo ?? DateTime.now(),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now(),
+                    );
+                    if (date != null) {
+                      setState(() {
+                        _weightDateTo = date;
+                        dateToController.text =
+                            '${date.day}/${date.month}/${date.year}';
+                      });
+                      await _loadWeightMeasurements();
+                    }
+                  },
+                  child: Stack(
+                    children: [
+                      MetalTextField(
+                        controller: dateToController,
+                        hint: 'Дата до',
+                        enabled: false,
+                      ),
+                      if (_weightDateTo != null)
+                        Positioned(
+                          right: 8,
+                          top: 0,
+                          bottom: 0,
+                          child: IconButton(
+                            icon: const Icon(Icons.close, size: 18),
                             onPressed: () {
                               setState(() {
-                                _customDateTo = null;
+                                _weightDateTo = null;
+                                dateToController.clear();
                               });
-                              _loadCustomMeasurements();
+                              _loadWeightMeasurements();
                             },
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
                           ),
-                        IconButton(
-                          icon: const Icon(Icons.calendar_today),
-                          onPressed: () async {
-                            final date = await showDatePicker(
-                              context: context,
-                              initialDate: _customDateTo ?? DateTime.now(),
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime.now(),
-                            );
-                            if (date != null) {
-                              setState(() {
-                                _customDateTo = date;
-                              });
-                              await _loadCustomMeasurements();
-                            }
-                          },
                         ),
-                      ],
-                    ),
-                  ),
-                  readOnly: true,
-                  controller: TextEditingController(
-                    text: _customDateTo != null
-                        ? '${_customDateTo!.day}/${_customDateTo!.month}/${_customDateTo!.year}'
-                        : '',
+                    ],
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: NinjaSpacing.lg),
 
-          MeasurementChart(
-            measurements: _customMeasurements,
-            measurementTypeCaption: _selectedCustomMeasurementType!.caption,
-            onAddMeasurement: () => _showAddMeasurementModal('custom'),
-            onViewList: () => _showMeasurementListModal(
-              _customMeasurements,
-              _selectedCustomMeasurementType!.caption,
+          // График с фоном из metal_list_item
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(
+              children: [
+                // Фон в стиле metal_list_item
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(color: const Color(0xFF202020)),
+                  ),
+                ),
+                // Текстура
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Image.asset(
+                      'assets/textures/graphite_noise.png',
+                      fit: BoxFit.cover,
+                      color: Colors.white.withOpacity(0.05),
+                      colorBlendMode: BlendMode.softLight,
+                      filterQuality: FilterQuality.low,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ),
+                ),
+                // Вертикальная светотень
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withOpacity(0.16),
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.32),
+                          ],
+                          stops: const [0.0, 0.45, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                // Горизонтальная светотень
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [
+                            Colors.black.withOpacity(0.55),
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.60),
+                          ],
+                          stops: const [0.0, 0.5, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                // График поверх фона
+                MeasurementChart(
+                  measurements: _weightMeasurements,
+                  measurementTypeCaption: 'Вес',
+                  onAddMeasurement: () => _showAddMeasurementModal('weight'),
+                  onViewList: () =>
+                      _showMeasurementListModal(_weightMeasurements, 'Вес'),
+                  transparentBackground: true,
+                ),
+              ],
             ),
           ),
         ],
-      ],
+      ),
+    );
+  }
+
+  Widget _buildCustomMeasurementsChart() {
+    final customDateFromController = TextEditingController(
+      text: _customDateFrom != null
+          ? '${_customDateFrom!.day}/${_customDateFrom!.month}/${_customDateFrom!.year}'
+          : '',
+    );
+    final customDateToController = TextEditingController(
+      text: _customDateTo != null
+          ? '${_customDateTo!.day}/${_customDateTo!.month}/${_customDateTo!.year}'
+          : '',
+    );
+
+    return MetalCard(
+      padding: const EdgeInsets.all(NinjaSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Другие замеры', style: NinjaText.title),
+          const SizedBox(height: NinjaSpacing.lg),
+
+          // Выпадающий список типов измерений
+          Row(
+            children: [
+              Expanded(child: _buildCustomMeasurementTypeDropdown()),
+              const SizedBox(width: NinjaSpacing.md),
+              IconButton(
+                onPressed: () => _showMeasurementTypeModal(),
+                icon: const Icon(Icons.settings),
+                tooltip: 'Управление типами измерений',
+                color: NinjaColors.textPrimary,
+              ),
+            ],
+          ),
+
+          if (_selectedCustomMeasurementType != null) ...[
+            const SizedBox(height: NinjaSpacing.lg),
+
+            // Поля для выбора дат
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: _customDateFrom ?? DateTime.now(),
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime.now(),
+                      );
+                      if (date != null) {
+                        setState(() {
+                          _customDateFrom = date;
+                          customDateFromController.text =
+                              '${date.day}/${date.month}/${date.year}';
+                        });
+                        await _loadCustomMeasurements();
+                      }
+                    },
+                    child: Stack(
+                      children: [
+                        MetalTextField(
+                          controller: customDateFromController,
+                          hint: 'Дата от',
+                          enabled: false,
+                        ),
+                        if (_customDateFrom != null)
+                          Positioned(
+                            right: 8,
+                            top: 0,
+                            bottom: 0,
+                            child: IconButton(
+                              icon: const Icon(Icons.close, size: 18),
+                              onPressed: () {
+                                setState(() {
+                                  _customDateFrom = null;
+                                  customDateFromController.clear();
+                                });
+                                _loadCustomMeasurements();
+                              },
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: NinjaSpacing.md),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: _customDateTo ?? DateTime.now(),
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime.now(),
+                      );
+                      if (date != null) {
+                        setState(() {
+                          _customDateTo = date;
+                          customDateToController.text =
+                              '${date.day}/${date.month}/${date.year}';
+                        });
+                        await _loadCustomMeasurements();
+                      }
+                    },
+                    child: Stack(
+                      children: [
+                        MetalTextField(
+                          controller: customDateToController,
+                          hint: 'Дата до',
+                          enabled: false,
+                        ),
+                        if (_customDateTo != null)
+                          Positioned(
+                            right: 8,
+                            top: 0,
+                            bottom: 0,
+                            child: IconButton(
+                              icon: const Icon(Icons.close, size: 18),
+                              onPressed: () {
+                                setState(() {
+                                  _customDateTo = null;
+                                  customDateToController.clear();
+                                });
+                                _loadCustomMeasurements();
+                              },
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: NinjaSpacing.lg),
+
+            // График с фоном из metal_list_item
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Stack(
+                children: [
+                  // Фон в стиле metal_list_item
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(color: const Color(0xFF202020)),
+                    ),
+                  ),
+                  // Текстура
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Image.asset(
+                        'assets/textures/graphite_noise.png',
+                        fit: BoxFit.cover,
+                        color: Colors.white.withOpacity(0.05),
+                        colorBlendMode: BlendMode.softLight,
+                        filterQuality: FilterQuality.low,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                    ),
+                  ),
+                  // Вертикальная светотень
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.black.withOpacity(0.16),
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.32),
+                            ],
+                            stops: const [0.0, 0.45, 1.0],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Горизонтальная светотень
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                            colors: [
+                              Colors.black.withOpacity(0.55),
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.60),
+                            ],
+                            stops: const [0.0, 0.5, 1.0],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // График поверх фона
+                  MeasurementChart(
+                    measurements: _customMeasurements,
+                    measurementTypeCaption:
+                        _selectedCustomMeasurementType!.caption,
+                    onAddMeasurement: () => _showAddMeasurementModal('custom'),
+                    onViewList: () => _showMeasurementListModal(
+                      _customMeasurements,
+                      _selectedCustomMeasurementType!.caption,
+                    ),
+                    transparentBackground: true,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
   Widget _buildCustomMeasurementTypeDropdown() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () {
-              if (_userMeasurementTypes.isEmpty) return;
-              setState(() {
-                _isMeasurementTypeDropdownOpen =
-                    !_isMeasurementTypeDropdownOpen;
-              });
-            },
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: IgnorePointer(
-                child: TextFormField(
-                  readOnly: true,
-                  controller: TextEditingController(
-                    text: _selectedCustomMeasurementType?.caption ?? '',
-                  ),
-                  decoration: InputDecoration(
-                    labelText: 'Тип измерения',
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 16,
-                    ),
-                    suffixIcon: Icon(
-                      _isMeasurementTypeDropdownOpen
-                          ? Icons.arrow_drop_up
-                          : Icons.arrow_drop_down,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        if (_isMeasurementTypeDropdownOpen) ...[
-          const SizedBox(height: 4),
-          Container(
-            width: double.infinity,
-            height: _userMeasurementTypes.length > 5 ? 300 : null,
-            decoration: BoxDecoration(
-              color: const Color(0xFF1A1A1A),
-              border: Border.all(color: Colors.grey.shade700, width: 1),
-              borderRadius: BorderRadius.circular(4),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.5),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: _userMeasurementTypes.length > 5
-                ? ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 300),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      itemCount: _userMeasurementTypes.length,
-                      separatorBuilder: (context, index) =>
-                          Divider(height: 1, color: Colors.grey.shade700),
-                      itemBuilder: (context, index) {
-                        final type = _userMeasurementTypes[index];
-                        return InkWell(
-                          onTap: () {
-                            setState(() {
-                              _selectedCustomMeasurementType = type;
-                              _isMeasurementTypeDropdownOpen = false;
-                              _customMeasurements.clear();
-                            });
-                            _loadCustomMeasurements();
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            child: Text(
-                              type.caption,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  )
-                : Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: _userMeasurementTypes.map((type) {
-                      return InkWell(
-                        onTap: () {
-                          setState(() {
-                            _selectedCustomMeasurementType = type;
-                            _isMeasurementTypeDropdownOpen = false;
-                            _customMeasurements.clear();
-                          });
-                          _loadCustomMeasurements();
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          child: Text(
-                            type.caption,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
+    if (_userMeasurementTypes.isEmpty) {
+      return MetalDropdown<MeasurementTypeModel?>(
+        value: null,
+        items: [
+          MetalDropdownItem<MeasurementTypeModel?>(
+            value: null,
+            label: 'Нет типов измерений',
           ),
         ],
-      ],
+        onChanged: (_) {},
+      );
+    }
+
+    return MetalDropdown<MeasurementTypeModel>(
+      value: _selectedCustomMeasurementType ?? _userMeasurementTypes.first,
+      items: _userMeasurementTypes.map((type) {
+        return MetalDropdownItem<MeasurementTypeModel>(
+          value: type,
+          label: type.caption,
+        );
+      }).toList(),
+      onChanged: (type) {
+        setState(() {
+          _selectedCustomMeasurementType = type;
+          _customMeasurements.clear();
+        });
+        _loadCustomMeasurements();
+      },
     );
   }
 
   Widget _buildCustomDropdown() {
-    print('=== _buildCustomDropdown CALLED ===');
-    print('Dropdown state: $_isExerciseDropdownOpen');
-    print('Exercises count: ${_exercises.length}');
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () {
-              print('=== DROPDOWN TAPPED (InkWell) ===');
-              print('Exercises count: ${_exercises.length}');
-              print('Current dropdown state: $_isExerciseDropdownOpen');
-              print(
-                'Selected exercise: ${_selectedExercise?.caption ?? 'null'}',
-              );
-
-              if (_exercises.isEmpty) {
-                print('ERROR: Exercises list is empty!');
-                return;
-              }
-
-              print('Toggling dropdown state...');
-              setState(() {
-                _isExerciseDropdownOpen = !_isExerciseDropdownOpen;
-              });
-              print('New dropdown state: $_isExerciseDropdownOpen');
-              print(
-                'Will ${_isExerciseDropdownOpen ? 'SHOW' : 'HIDE'} dropdown list',
-              );
-              print('==================================');
-            },
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: IgnorePointer(
-                child: TextFormField(
-                  readOnly: true,
-                  controller: TextEditingController(
-                    text: _selectedExercise?.caption ?? '',
-                  ),
-                  decoration: InputDecoration(
-                    labelText: 'Выберите упражнение',
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 16,
-                    ),
-                    suffixIcon: Icon(
-                      _isExerciseDropdownOpen
-                          ? Icons.arrow_drop_up
-                          : Icons.arrow_drop_down,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        if (_isExerciseDropdownOpen) ...[
-          Builder(
-            builder: (context) {
-              print('=== RENDERING DROPDOWN LIST ===');
-              print('Dropdown is open: $_isExerciseDropdownOpen');
-              print('Exercises count: ${_exercises.length}');
-              print(
-                'Container will have height: ${_exercises.length > 5 ? 300 : 'auto'}',
-              );
-              print('===============================');
-              return const SizedBox(height: 4);
-            },
-          ),
-          Container(
-            width: double.infinity,
-            height: _exercises.length > 5 ? 300 : null,
-            decoration: BoxDecoration(
-              color: const Color(0xFF1A1A1A),
-              border: Border.all(color: Colors.grey.shade700, width: 1),
-              borderRadius: BorderRadius.circular(4),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.5),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: _exercises.length > 5
-                ? ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 300),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      itemCount: _exercises.length,
-                      separatorBuilder: (context, index) =>
-                          Divider(height: 1, color: Colors.grey.shade700),
-                      itemBuilder: (context, index) {
-                        final exercise = _exercises[index];
-                        return InkWell(
-                          onTap: () {
-                            print('=== EXERCISE SELECTED ===');
-                            print('Selected exercise: ${exercise.caption}');
-                            print('Exercise UUID: ${exercise.uuid}');
-                            setState(() {
-                              _selectedExercise = exercise;
-                              _isExerciseDropdownOpen = false;
-                              _exerciseStatistics = null;
-                              _isLoadingExerciseStatistics = false;
-                            });
-                            print('Dropdown closed, loading statistics...');
-                            _loadExerciseStatistics(exercise);
-                            print('==========================');
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            child: Text(
-                              exercise.caption,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  )
-                : Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: _exercises.map((exercise) {
-                      return InkWell(
-                        onTap: () {
-                          setState(() {
-                            _selectedExercise = exercise;
-                            _isExerciseDropdownOpen = false;
-                            _exerciseStatistics = null;
-                            _isLoadingExerciseStatistics = false;
-                          });
-                          _loadExerciseStatistics(exercise);
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          child: Text(
-                            exercise.caption,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
+    if (_exercises.isEmpty) {
+      return MetalDropdown<ExerciseModel?>(
+        value: null,
+        items: [
+          MetalDropdownItem<ExerciseModel?>(
+            value: null,
+            label: 'Нет упражнений',
           ),
         ],
-      ],
+        onChanged: (_) {},
+      );
+    }
+
+    return MetalDropdown<ExerciseModel>(
+      value: _selectedExercise ?? _exercises.first,
+      items: _exercises.map((exercise) {
+        return MetalDropdownItem<ExerciseModel>(
+          value: exercise,
+          label: exercise.caption,
+        );
+      }).toList(),
+      onChanged: (exercise) {
+        setState(() {
+          _selectedExercise = exercise;
+          _exerciseStatistics = null;
+          _isLoadingExerciseStatistics = false;
+        });
+        _loadExerciseStatistics(exercise);
+      },
     );
   }
 
   Widget _buildExerciseStatistics() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Статистика упражнений',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 16),
+    return MetalCard(
+      padding: const EdgeInsets.all(NinjaSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Статистика упражнений', style: NinjaText.title),
+          const SizedBox(height: NinjaSpacing.lg),
 
-        _buildCustomDropdown(),
+          _buildCustomDropdown(),
 
-        if (_selectedExercise != null) ...[
-          const SizedBox(height: 16),
-          Builder(
-            builder: (context) {
-              print(
-                'StatisticsScreen 🔍 Проверяем состояние: isLoading=$_isLoadingExerciseStatistics, hasData=${_exerciseStatistics != null}',
-              );
-              return _isLoadingExerciseStatistics
-                  ? const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(32.0),
-                        child: CircularProgressIndicator(),
-                      ),
-                    )
-                  : _exerciseStatistics != null
-                  ? (() {
-                      print(
-                        'StatisticsScreen 🔍 Отображаем ExerciseStatisticsTable',
-                      );
-                      return ExerciseStatisticsTable(
-                        statistics: _exerciseStatistics!,
-                      );
-                    })()
-                  : (() {
-                      print(
-                        'StatisticsScreen 🔍 Отображаем сообщение "Выберите упражнение"',
-                      );
-                      return const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(32.0),
-                          child: Text(
-                            'Выберите упражнение для просмотра статистики',
-                          ),
+          if (_selectedExercise != null) ...[
+            const SizedBox(height: NinjaSpacing.lg),
+            _isLoadingExerciseStatistics
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32.0),
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          NinjaColors.textPrimary,
                         ),
-                      );
-                    })();
-            },
-          ),
+                      ),
+                    ),
+                  )
+                : _exerciseStatistics != null
+                ? ExerciseStatisticsTable(statistics: _exerciseStatistics!)
+                : Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: Text(
+                        'Выберите упражнение для просмотра статистики',
+                        style: NinjaText.body.copyWith(
+                          color: NinjaColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+          ],
         ],
-      ],
+      ),
     );
   }
 
@@ -960,9 +980,13 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       setState(() {
         _isLoadingExerciseStatistics = false;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Ошибка загрузки статистики: $e')));
+      if (mounted) {
+        MetalMessage.show(
+          context: context,
+          message: 'Ошибка загрузки статистики: $e',
+          type: MetalMessageType.error,
+        );
+      }
     }
   }
 
@@ -974,11 +998,15 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     // Проверяем подписку перед добавлением измерения
     final userProfile = authProvider.userProfile;
     if (userProfile != null && userProfile.subscriptionStatus != 'active') {
-      showDialog(
+      MetalModal.show(
         context: context,
-        builder: (context) => SubscriptionErrorDialog(
-          message: 'Для добавления измерений необходимо продлить подписку',
-        ),
+        title: 'Ошибка',
+        children: [
+          Text(
+            'Для добавления измерений необходимо продлить подписку',
+            style: NinjaText.body,
+          ),
+        ],
       );
       return;
     }
@@ -995,34 +1023,129 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           'Добавить измерение ${_selectedCustomMeasurementType?.caption ?? ''}';
     }
 
-    showDialog(
-      context: context,
-      builder: (context) => MeasurementModal(
-        title: title,
-        onSave: (date, value) async {
-          final success = await StatisticsService.addMeasurement(
-            userUuid: userUuid,
-            measurementTypeUuid: measurementTypeUuid,
-            measurementDate: date,
-            value: value,
-          );
+    final dateController = TextEditingController();
+    final valueController = TextEditingController();
+    DateTime? selectedDate;
 
-          if (success) {
-            if (type == 'weight') {
-              await _loadWeightMeasurements();
-            } else {
-              await _loadCustomMeasurements();
-            }
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Измерение добавлено')),
+    MetalModal.show(
+      context: context,
+      title: title,
+      children: [
+        StatefulBuilder(
+          builder: (context, setModalState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                GestureDetector(
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: selectedDate ?? DateTime.now(),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now(),
+                    );
+                    if (date != null) {
+                      setModalState(() {
+                        selectedDate = date;
+                        dateController.text = date.toIso8601String().split(
+                          'T',
+                        )[0];
+                      });
+                    }
+                  },
+                  child: MetalTextField(
+                    controller: dateController,
+                    hint: 'Дата',
+                    enabled: false,
+                  ),
+                ),
+                const SizedBox(height: NinjaSpacing.lg),
+                MetalTextField(
+                  controller: valueController,
+                  hint: 'Значение',
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                ),
+                const SizedBox(height: NinjaSpacing.lg),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: Text('Отмена', style: NinjaText.body),
+                    ),
+                    const SizedBox(width: NinjaSpacing.md),
+                    TextButton(
+                      onPressed: () async {
+                        final date = dateController.text.trim();
+                        final valueText = valueController.text.trim();
+
+                        if (date.isEmpty || valueText.isEmpty) {
+                          MetalMessage.show(
+                            context: context,
+                            message: 'Заполните все поля',
+                            type: MetalMessageType.error,
+                          );
+                          return;
+                        }
+
+                        final normalizedValueText = valueText.replaceAll(
+                          ',',
+                          '.',
+                        );
+                        final value = double.tryParse(normalizedValueText);
+                        if (value == null) {
+                          MetalMessage.show(
+                            context: context,
+                            message: 'Введите корректное значение',
+                            type: MetalMessageType.error,
+                          );
+                          return;
+                        }
+
+                        Navigator.of(context).pop();
+
+                        final success = await StatisticsService.addMeasurement(
+                          userUuid: userUuid,
+                          measurementTypeUuid: measurementTypeUuid,
+                          measurementDate: date,
+                          value: value,
+                        );
+
+                        if (success) {
+                          if (type == 'weight') {
+                            await _loadWeightMeasurements();
+                          } else {
+                            await _loadCustomMeasurements();
+                          }
+                          if (mounted) {
+                            MetalMessage.show(
+                              context: context,
+                              message: 'Измерение добавлено',
+                              type: MetalMessageType.success,
+                            );
+                          }
+                        } else {
+                          if (mounted) {
+                            MetalMessage.show(
+                              context: context,
+                              message: 'Ошибка добавления измерения',
+                              type: MetalMessageType.error,
+                            );
+                          }
+                        }
+                      },
+                      child: Text('Сохранить', style: NinjaText.body),
+                    ),
+                  ],
+                ),
+              ],
             );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Ошибка добавления измерения')),
-            );
-          }
-        },
-      ),
+          },
+        ),
+      ],
     );
   }
 
@@ -1030,171 +1153,673 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     List<MeasurementModel> measurements,
     String caption,
   ) {
-    showDialog(
+    final currentMeasurements = measurements == _weightMeasurements
+        ? _weightMeasurements
+        : _customMeasurements;
+
+    MetalModal.show(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => MeasurementListModal(
-          measurements: measurements == _weightMeasurements
-              ? _weightMeasurements
-              : _customMeasurements,
-          measurementTypeCaption: caption,
-          onEdit: (measurement) {
-            Navigator.of(context).pop();
-            _showEditMeasurementModal(
-              measurement,
-              measurements == _weightMeasurements ? 'weight' : 'custom',
+      title: 'Список измерений - $caption',
+      children: [
+        StatefulBuilder(
+          builder: (context, setModalState) {
+            return SizedBox(
+              width: double.maxFinite,
+              height: 400,
+              child: currentMeasurements.isEmpty
+                  ? Center(
+                      child: Text(
+                        'Нет данных для отображения',
+                        style: NinjaText.body.copyWith(
+                          color: NinjaColors.textSecondary,
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      itemCount: currentMeasurements.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox.shrink(),
+                      itemBuilder: (context, index) {
+                        final measurement = currentMeasurements[index];
+                        final date = DateTime.parse(
+                          measurement.measurementDate,
+                        );
+
+                        return MetalListItem(
+                          leading: const SizedBox.shrink(),
+                          title: Text(
+                            '${measurement.value.toStringAsFixed(1)}',
+                            style: NinjaText.body.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          subtitle: Text(
+                            '${date.day}/${date.month}/${date.year}',
+                            style: NinjaText.caption,
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.edit, size: 20),
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                  _showEditMeasurementModal(
+                                    measurement,
+                                    measurements == _weightMeasurements
+                                        ? 'weight'
+                                        : 'custom',
+                                  );
+                                },
+                                color: NinjaColors.textSecondary,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                              const SizedBox(width: NinjaSpacing.xs),
+                              IconButton(
+                                icon: const Icon(Icons.delete, size: 20),
+                                onPressed: () async {
+                                  final success =
+                                      await StatisticsService.deleteMeasurement(
+                                        measurement.uuid,
+                                      );
+                                  if (success) {
+                                    if (measurements == _weightMeasurements) {
+                                      await _loadWeightMeasurements();
+                                    } else {
+                                      await _loadCustomMeasurements();
+                                    }
+                                    // Обновляем модальное окно
+                                    setModalState(() {});
+                                    if (mounted) {
+                                      MetalMessage.show(
+                                        context: context,
+                                        message: 'Измерение удалено',
+                                        type: MetalMessageType.success,
+                                      );
+                                    }
+                                  } else {
+                                    if (mounted) {
+                                      MetalMessage.show(
+                                        context: context,
+                                        message: 'Ошибка удаления измерения',
+                                        type: MetalMessageType.error,
+                                      );
+                                    }
+                                  }
+                                },
+                                color: Colors.red,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                            ],
+                          ),
+                          onTap: () {},
+                          isFirst: index == 0,
+                          isLast: index == currentMeasurements.length - 1,
+                          removeSpacing: true,
+                        );
+                      },
+                    ),
             );
-          },
-          onDelete: (measurementUuid) async {
-            final success = await StatisticsService.deleteMeasurement(
-              measurementUuid,
-            );
-            if (success) {
-              if (measurements == _weightMeasurements) {
-                await _loadWeightMeasurements();
-              } else {
-                await _loadCustomMeasurements();
-              }
-              // Обновляем модальное окно
-              setModalState(() {});
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Измерение удалено')),
-              );
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Ошибка удаления измерения')),
-              );
-            }
           },
         ),
-      ),
+      ],
     );
   }
 
   void _showEditMeasurementModal(MeasurementModel measurement, String type) {
-    showDialog(
-      context: context,
-      builder: (context) => MeasurementModal(
-        title: 'Редактировать измерение',
-        initialDate: measurement.measurementDate,
-        initialValue: measurement.value,
-        onSave: (date, value) async {
-          final success = await StatisticsService.updateMeasurement(
-            measurementUuid: measurement.uuid,
-            measurementDate: date,
-            value: value,
-          );
+    final dateController = TextEditingController(
+      text: measurement.measurementDate,
+    );
+    final valueController = TextEditingController(
+      text: measurement.value.toString(),
+    );
+    DateTime? selectedDate = DateTime.parse(measurement.measurementDate);
 
-          if (success) {
-            if (type == 'weight') {
-              await _loadWeightMeasurements();
-            } else {
-              await _loadCustomMeasurements();
-            }
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Измерение обновлено')),
+    MetalModal.show(
+      context: context,
+      title: 'Редактировать измерение',
+      children: [
+        StatefulBuilder(
+          builder: (context, setModalState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                GestureDetector(
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: selectedDate ?? DateTime.now(),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now(),
+                    );
+                    if (date != null) {
+                      setModalState(() {
+                        selectedDate = date;
+                        dateController.text = date.toIso8601String().split(
+                          'T',
+                        )[0];
+                      });
+                    }
+                  },
+                  child: MetalTextField(
+                    controller: dateController,
+                    hint: 'Дата',
+                    enabled: false,
+                  ),
+                ),
+                const SizedBox(height: NinjaSpacing.lg),
+                MetalTextField(
+                  controller: valueController,
+                  hint: 'Значение',
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                ),
+                const SizedBox(height: NinjaSpacing.lg),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: Text('Отмена', style: NinjaText.body),
+                    ),
+                    const SizedBox(width: NinjaSpacing.md),
+                    TextButton(
+                      onPressed: () async {
+                        final date = dateController.text.trim();
+                        final valueText = valueController.text.trim();
+
+                        if (date.isEmpty || valueText.isEmpty) {
+                          MetalMessage.show(
+                            context: context,
+                            message: 'Заполните все поля',
+                            type: MetalMessageType.error,
+                          );
+                          return;
+                        }
+
+                        final normalizedValueText = valueText.replaceAll(
+                          ',',
+                          '.',
+                        );
+                        final value = double.tryParse(normalizedValueText);
+                        if (value == null) {
+                          MetalMessage.show(
+                            context: context,
+                            message: 'Введите корректное значение',
+                            type: MetalMessageType.error,
+                          );
+                          return;
+                        }
+
+                        Navigator.of(context).pop();
+
+                        final success =
+                            await StatisticsService.updateMeasurement(
+                              measurementUuid: measurement.uuid,
+                              measurementDate: date,
+                              value: value,
+                            );
+
+                        if (success) {
+                          if (type == 'weight') {
+                            await _loadWeightMeasurements();
+                          } else {
+                            await _loadCustomMeasurements();
+                          }
+                          if (mounted) {
+                            MetalMessage.show(
+                              context: context,
+                              message: 'Измерение обновлено',
+                              type: MetalMessageType.success,
+                            );
+                          }
+                        } else {
+                          if (mounted) {
+                            MetalMessage.show(
+                              context: context,
+                              message: 'Ошибка обновления измерения',
+                              type: MetalMessageType.error,
+                            );
+                          }
+                        }
+                      },
+                      child: Text('Сохранить', style: NinjaText.body),
+                    ),
+                  ],
+                ),
+              ],
             );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Ошибка обновления измерения')),
-            );
-          }
-        },
-      ),
+          },
+        ),
+      ],
     );
   }
 
   void _showMeasurementTypeModal() {
-    showDialog(
+    MetalModal.show(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => MeasurementTypeModal(
-          measurementTypes: [
-            ..._systemMeasurementTypes,
-            ..._userMeasurementTypes,
-          ],
-          onAdd: (caption) async {
-            final authProvider = Provider.of<AuthProvider>(
-              context,
-              listen: false,
+      title: 'Типы измерений',
+      children: [
+        StatefulBuilder(
+          builder: (context, setModalState) {
+            // Пересоздаем список типов при каждом обновлении модалки
+            // Исключаем тип "Вес" из списка
+            final allTypes = [
+              ..._systemMeasurementTypes,
+              ..._userMeasurementTypes,
+            ].where((type) => type.caption != 'Вес').toList();
+            
+            return SizedBox(
+              width: double.maxFinite,
+              height: 400,
+              child: Column(
+                children: [
+                  // Кнопка добавления
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton.icon(
+                      onPressed: () {
+                        final captionController = TextEditingController();
+                        MetalModal.show(
+                          context: context,
+                          title: 'Добавить тип измерения',
+                          children: [
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                MetalTextField(
+                                  controller: captionController,
+                                  hint: 'Название типа измерения',
+                                ),
+                                const SizedBox(height: NinjaSpacing.lg),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(),
+                                      child: Text(
+                                        'Отмена',
+                                        style: NinjaText.body,
+                                      ),
+                                    ),
+                                    const SizedBox(width: NinjaSpacing.md),
+                                    TextButton(
+                                      onPressed: () async {
+                                        final caption = captionController.text
+                                            .trim();
+                                        if (caption.isEmpty) {
+                                          MetalMessage.show(
+                                            context: context,
+                                            message: 'Введите название',
+                                            type: MetalMessageType.error,
+                                          );
+                                          return;
+                                        }
+
+                                        Navigator.of(context).pop();
+
+                                        final authProvider =
+                                            Provider.of<AuthProvider>(
+                                              context,
+                                              listen: false,
+                                            );
+                                        final userUuid = authProvider.userUuid;
+                                        if (userUuid == null) return;
+
+                                        final success =
+                                            await StatisticsService.addMeasurementType(
+                                              userUuid: userUuid,
+                                              caption: caption,
+                                            );
+
+                                        if (success) {
+                                          await _loadInitialData();
+                                          _selectedCustomMeasurementType = null;
+                                          // Обновляем модалку после загрузки данных
+                                          setModalState(() {});
+                                          if (mounted) {
+                                            MetalMessage.show(
+                                              context: context,
+                                              message: 'Тип измерения добавлен',
+                                              type: MetalMessageType.success,
+                                            );
+                                          }
+                                        } else {
+                                          if (mounted) {
+                                            MetalMessage.show(
+                                              context: context,
+                                              message:
+                                                  'Ошибка добавления типа измерения',
+                                              type: MetalMessageType.error,
+                                            );
+                                          }
+                                        }
+                                      },
+                                      child: Text(
+                                        'Добавить',
+                                        style: NinjaText.body,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
+                        );
+                      },
+                      icon: const Icon(Icons.add),
+                      label: Text(
+                        'Добавить тип измерения',
+                        style: NinjaText.body,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: NinjaSpacing.lg),
+                  // Список типов измерений
+                  Expanded(
+                    child: allTypes.isEmpty
+                        ? Center(
+                            child: Text(
+                              'Нет типов измерений',
+                              style: NinjaText.body.copyWith(
+                                color: NinjaColors.textSecondary,
+                              ),
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: allTypes.length,
+                            separatorBuilder: (context, index) =>
+                                const SizedBox.shrink(),
+                            itemBuilder: (context, index) {
+                              final measurementType = allTypes[index];
+                              final isCustom =
+                                  measurementType.dataType == 'custom';
+
+                              return MetalListItem(
+                                leading: const SizedBox.shrink(),
+                                title: Text(
+                                  measurementType.caption,
+                                  style: NinjaText.body.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                trailing: isCustom
+                                    ? Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.edit,
+                                              size: 20,
+                                            ),
+                                            onPressed: () {
+                                              final captionController =
+                                                  TextEditingController(
+                                                    text:
+                                                        measurementType.caption,
+                                                  );
+                                              // Сохраняем setModalState из родительской модалки
+                                              final parentSetModalState = setModalState;
+                                              MetalModal.show(
+                                                context: context,
+                                                title:
+                                                    'Редактировать тип измерения',
+                                                children: [
+                                                  Column(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .stretch,
+                                                    children: [
+                                                      MetalTextField(
+                                                        controller:
+                                                            captionController,
+                                                        hint:
+                                                            'Название типа измерения',
+                                                      ),
+                                                      const SizedBox(
+                                                        height: NinjaSpacing.lg,
+                                                      ),
+                                                      Row(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .end,
+                                                        children: [
+                                                          TextButton(
+                                                            onPressed: () =>
+                                                                Navigator.of(
+                                                                  context,
+                                                                ).pop(),
+                                                            child: Text(
+                                                              'Отмена',
+                                                              style: NinjaText
+                                                                  .body,
+                                                            ),
+                                                          ),
+                                                          const SizedBox(
+                                                            width:
+                                                                NinjaSpacing.md,
+                                                          ),
+                                                          TextButton(
+                                                            onPressed: () async {
+                                                              final caption =
+                                                                  captionController
+                                                                      .text
+                                                                      .trim();
+                                                              if (caption
+                                                                  .isEmpty) {
+                                                                MetalMessage.show(
+                                                                  context:
+                                                                      context,
+                                                                  message:
+                                                                      'Введите название',
+                                                                  type:
+                                                                      MetalMessageType
+                                                                          .error,
+                                                                );
+                                                                return;
+                                                              }
+
+                                                              Navigator.of(
+                                                                context,
+                                                              ).pop();
+
+                                                              final success =
+                                                                  await StatisticsService.updateMeasurementType(
+                                                                    measurementTypeUuid:
+                                                                        measurementType
+                                                                            .uuid,
+                                                                    caption:
+                                                                        caption,
+                                                                  );
+
+                                                              if (success) {
+                                                                await _loadInitialData();
+                                                                if (_selectedCustomMeasurementType
+                                                                        ?.uuid ==
+                                                                    measurementType
+                                                                        .uuid) {
+                                                                  _selectedCustomMeasurementType = _userMeasurementTypes.firstWhere(
+                                                                    (type) =>
+                                                                        type.uuid ==
+                                                                        measurementType
+                                                                            .uuid,
+                                                                    orElse: () =>
+                                                                        _selectedCustomMeasurementType!,
+                                                                  );
+                                                                }
+                                                                // Обновляем родительскую модалку после загрузки данных
+                                                                parentSetModalState(() {});
+                                                                if (mounted) {
+                                                                  MetalMessage.show(
+                                                                    context:
+                                                                        context,
+                                                                    message:
+                                                                        'Тип измерения обновлен',
+                                                                    type: MetalMessageType
+                                                                        .success,
+                                                                  );
+                                                                }
+                                                              } else {
+                                                                if (mounted) {
+                                                                  MetalMessage.show(
+                                                                    context:
+                                                                        context,
+                                                                    message:
+                                                                        'Ошибка обновления типа измерения',
+                                                                    type: MetalMessageType
+                                                                        .error,
+                                                                  );
+                                                                }
+                                                              }
+                                                            },
+                                                            child: Text(
+                                                              'Сохранить',
+                                                              style: NinjaText
+                                                                  .body,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                            color: NinjaColors.textSecondary,
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(),
+                                          ),
+                                          const SizedBox(
+                                            width: NinjaSpacing.xs,
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.delete,
+                                              size: 20,
+                                            ),
+                                            onPressed: () {
+                                              MetalModal.show(
+                                                context: context,
+                                                title: 'Подтверждение удаления',
+                                                children: [
+                                                  Text(
+                                                    'Вы уверены, что хотите удалить "${measurementType.caption}"?',
+                                                    style: NinjaText.body,
+                                                  ),
+                                                  const SizedBox(
+                                                    height: NinjaSpacing.lg,
+                                                  ),
+                                                  Row(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment.end,
+                                                    children: [
+                                                      TextButton(
+                                                        onPressed: () =>
+                                                            Navigator.of(
+                                                              context,
+                                                            ).pop(),
+                                                        child: Text(
+                                                          'Отмена',
+                                                          style: NinjaText.body,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(
+                                                        width: NinjaSpacing.md,
+                                                      ),
+                                                      TextButton(
+                                                        onPressed: () async {
+                                                          Navigator.of(
+                                                            context,
+                                                          ).pop();
+
+                                                          final success =
+                                                              await StatisticsService.deleteMeasurementType(
+                                                                measurementType
+                                                                    .uuid,
+                                                              );
+
+                                                          if (success) {
+                                                            await _loadInitialData();
+                                                            if (_selectedCustomMeasurementType
+                                                                    ?.uuid ==
+                                                                measurementType
+                                                                    .uuid) {
+                                                              _selectedCustomMeasurementType =
+                                                                  null;
+                                                              _customMeasurements
+                                                                  .clear();
+                                                            }
+                                                            setModalState(
+                                                              () {},
+                                                            );
+                                                            if (mounted) {
+                                                              MetalMessage.show(
+                                                                context:
+                                                                    context,
+                                                                message:
+                                                                    'Тип измерения удален',
+                                                                type:
+                                                                    MetalMessageType
+                                                                        .success,
+                                                              );
+                                                            }
+                                                          } else {
+                                                            if (mounted) {
+                                                              MetalMessage.show(
+                                                                context:
+                                                                    context,
+                                                                message:
+                                                                    'Ошибка удаления типа измерения',
+                                                                type:
+                                                                    MetalMessageType
+                                                                        .error,
+                                                              );
+                                                            }
+                                                          }
+                                                        },
+                                                        child: Text(
+                                                          'Удалить',
+                                                          style: NinjaText.body
+                                                              .copyWith(
+                                                                color:
+                                                                    Colors.red,
+                                                              ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                            color: Colors.red,
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(),
+                                          ),
+                                        ],
+                                      )
+                                    : null,
+                                onTap: () {},
+                                isFirst: index == 0,
+                                isLast: index == allTypes.length - 1,
+                                removeSpacing: true,
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
             );
-            final userUuid = authProvider.userUuid;
-            if (userUuid == null) return;
-
-            final success = await StatisticsService.addMeasurementType(
-              userUuid: userUuid,
-              caption: caption,
-            );
-
-            if (success) {
-              await _loadInitialData();
-              // Очищаем выбранный тип, чтобы пользователь выбрал новый
-              _selectedCustomMeasurementType = null;
-              // Обновляем модальное окно
-              setModalState(() {});
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Тип измерения добавлен')),
-              );
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Ошибка добавления типа измерения'),
-                ),
-              );
-            }
-          },
-          onEdit: (uuid, caption) async {
-            final success = await StatisticsService.updateMeasurementType(
-              measurementTypeUuid: uuid,
-              caption: caption,
-            );
-
-            if (success) {
-              await _loadInitialData();
-              // Если редактировался выбранный тип, обновляем ссылку
-              if (_selectedCustomMeasurementType?.uuid == uuid) {
-                _selectedCustomMeasurementType = _userMeasurementTypes
-                    .firstWhere(
-                      (type) => type.uuid == uuid,
-                      orElse: () => _selectedCustomMeasurementType!,
-                    );
-              }
-              // Обновляем модальное окно
-              setModalState(() {});
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Тип измерения обновлен')),
-              );
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Ошибка обновления типа измерения'),
-                ),
-              );
-            }
-          },
-          onDelete: (uuid) async {
-            final success = await StatisticsService.deleteMeasurementType(uuid);
-
-            if (success) {
-              await _loadInitialData();
-              // Если удалялся выбранный тип, очищаем выбор
-              if (_selectedCustomMeasurementType?.uuid == uuid) {
-                _selectedCustomMeasurementType = null;
-                _customMeasurements.clear();
-              }
-              // Обновляем модальное окно
-              setModalState(() {});
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Тип измерения удален')),
-              );
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Ошибка удаления типа измерения')),
-              );
-            }
           },
         ),
-      ),
+      ],
     );
   }
 }

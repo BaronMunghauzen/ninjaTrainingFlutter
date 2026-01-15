@@ -28,6 +28,10 @@ class _MetalSearchBarState extends State<MetalSearchBar> {
     _focusNode.addListener(() {
       setState(() => _focused = _focusNode.hasFocus);
     });
+    // Слушаем изменения текста для обновления кнопки очистки
+    widget.controller.addListener(() {
+      setState(() {});
+    });
   }
 
   @override
@@ -85,8 +89,7 @@ class _MetalSearchBarState extends State<MetalSearchBar> {
                 borderRadius: BorderRadius.circular(14),
                 child: Image.asset(
                   'assets/textures/graphite_noise.png',
-                  repeat: ImageRepeat.repeat,
-                  fit: BoxFit.none,
+                  fit: BoxFit.cover,
                   color: Colors.white.withOpacity(0.015),
                   colorBlendMode: BlendMode.softLight,
                   filterQuality: FilterQuality.low,
@@ -115,6 +118,10 @@ class _MetalSearchBarState extends State<MetalSearchBar> {
                       controller: widget.controller,
                       focusNode: _focusNode,
                       onChanged: _onTextChanged,
+                      onTapOutside: (event) {
+                        // Скрываем клавиатуру при нажатии вне поля
+                        _focusNode.unfocus();
+                      },
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.9),
                         fontSize: 14,
@@ -132,6 +139,24 @@ class _MetalSearchBarState extends State<MetalSearchBar> {
                           color: Colors.white.withOpacity(0.4),
                           fontSize: 14,
                         ),
+                      ),
+                    ),
+                  ),
+                  // Кнопка очистки
+                  if (widget.controller.text.isNotEmpty)
+                    GestureDetector(
+                      onTap: () {
+                        widget.controller.clear();
+                        _onTextChanged('');
+                        _focusNode.unfocus();
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Icon(
+                          Icons.close,
+                          size: 18,
+                          color: Colors.white.withOpacity(0.5),
                       ),
                     ),
                   ),

@@ -1,11 +1,15 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../constants/app_colors.dart';
 import '../../../models/user_achievement_type_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../services/user_achievement_service.dart';
 import '../../../services/api_service.dart';
+import '../../../widgets/metal_card.dart';
+import '../../../widgets/metal_message.dart';
+import '../../../widgets/textured_background.dart';
+import '../../../design/ninja_typography.dart';
+import '../../../design/ninja_colors.dart';
 
 class AchievementsScreen extends StatefulWidget {
   const AchievementsScreen({super.key});
@@ -32,7 +36,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
 
   Future<void> _loadData() async {
     if (!mounted) return;
-    
+
     setState(() {
       _isLoading = true;
       _error = null;
@@ -41,7 +45,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
     try {
       // Получаем score из профиля пользователя (используем уже загруженный профиль)
       final authProvider = context.read<AuthProvider>();
-      
+
       // Используем уже загруженный профиль, не вызываем fetchUserProfile() чтобы избежать перестройки
       _userScore = authProvider.userProfile?.score;
 
@@ -53,20 +57,27 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
           _error = 'Пользователь не найден';
           _isLoading = false;
         });
+        MetalMessage.show(
+          context: context,
+          message: 'Пользователь не найден',
+          type: MetalMessageType.error,
+        );
         return;
       }
 
-      final achievements = await UserAchievementService.getUserAchievements(userUuid);
-      
+      final achievements = await UserAchievementService.getUserAchievements(
+        userUuid,
+      );
+
       if (!mounted) return;
-      
+
       // Фильтруем только активные достижения
       final activeAchievements = achievements.where((a) => a.isActive).toList();
-      
+
       // Предзагружаем картинки для полученных достижений
       for (final achievement in activeAchievements) {
-        if (achievement.isEarned && 
-            achievement.imageUuid != null && 
+        if (achievement.isEarned &&
+            achievement.imageUuid != null &&
             achievement.imageUuid!.isNotEmpty) {
           _loadImage(achievement.imageUuid!);
         }
@@ -84,6 +95,11 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
         _error = 'Ошибка загрузки данных: $e';
         _isLoading = false;
       });
+      MetalMessage.show(
+        context: context,
+        message: 'Ошибка загрузки данных: $e',
+        type: MetalMessageType.error,
+      );
     }
   }
 
@@ -104,7 +120,9 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
     }
   }
 
-  Map<String, List<UserAchievementType>> _groupByCategory(List<UserAchievementType> achievements) {
+  Map<String, List<UserAchievementType>> _groupByCategory(
+    List<UserAchievementType> achievements,
+  ) {
     final Map<String, List<UserAchievementType>> grouped = {};
     for (final achievement in achievements) {
       final category = achievement.category;
@@ -116,58 +134,53 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
     return grouped;
   }
 
-  String _getCategoryDisplayName(String category) {
-    // Преобразуем технические названия категорий в читаемые
-    final categoryNames = {
-      'training_count': 'Количество тренировок',
-      'training_count_in_week': 'Тренировки за неделю',
-      'special_day': 'Особые дни',
-      'time_less_than': 'Ранние тренировки',
-      'time_more_than': 'Поздние тренировки',
-    };
-    return categoryNames[category] ?? category;
-  }
-
   void _showAchievementDetail(UserAchievementType achievement) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => _buildAchievementDetailModal(achievement),
+      isScrollControlled: false,
+      builder: (context) => Align(
+        alignment: Alignment.bottomCenter,
+        child: SizedBox(
+          width: double.infinity,
+          child: _buildAchievementDetailModal(achievement),
+        ),
+      ),
     );
   }
 
   Widget _buildAchievementDetailModal(UserAchievementType achievement) {
     final isEarned = achievement.isEarned;
     final imageUuid = achievement.imageUuid;
-    final hasImage = isEarned && 
-                     imageUuid != null && 
-                     imageUuid.isNotEmpty &&
-                     _imageCache.containsKey(imageUuid) &&
-                     _imageCache[imageUuid] != null;
+    final hasImage =
+        isEarned &&
+        imageUuid != null &&
+        imageUuid.isNotEmpty &&
+        _imageCache.containsKey(imageUuid) &&
+        _imageCache[imageUuid] != null;
 
     // Загружаем картинку если еще не загружена
-    if (isEarned && imageUuid != null && imageUuid.isNotEmpty && !_imageCache.containsKey(imageUuid)) {
+    if (isEarned &&
+        imageUuid != null &&
+        imageUuid.isNotEmpty &&
+        !_imageCache.containsKey(imageUuid)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _loadImage(imageUuid);
       });
     }
 
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      padding: const EdgeInsets.all(24),
+    return MetalCard(
+      padding: const EdgeInsets.fromLTRB(10, 20, 10, 40),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Картинка или знак вопроса
           if (hasImage)
             Container(
-              width: 150,
-              height: 150,
+              width: 100,
+              height: 100,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -177,63 +190,57 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
                   image: _imageCache[imageUuid]!,
                   fit: BoxFit.contain,
                   errorBuilder: (context, error, stackTrace) {
-                    return _buildQuestionMark(size: 100);
+                    return _buildQuestionMark(size: 70);
                   },
                 ),
               ),
             )
           else
-            _buildQuestionMark(size: 100),
-          const SizedBox(height: 24),
+            _buildQuestionMark(size: 70),
+          const SizedBox(height: 12),
           // Название
-          Text(
-            achievement.name,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
+          Center(
+            child: Text(
+              achievement.name,
+              style: NinjaText.title.copyWith(fontSize: 20),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           // Описание
-          Text(
-            achievement.description,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 16,
+          Center(
+            child: Text(
+              achievement.description,
+              style: NinjaText.body.copyWith(fontSize: 13),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           // Очки
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.buttonPrimary.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.stars,
-                  color: Colors.white,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '+ ${achievement.points}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: NinjaColors.accent.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.stars, color: NinjaColors.accent, size: 18),
+                  const SizedBox(width: 6),
+                  Text(
+                    '+ ${achievement.points}',
+                    style: NinjaText.section.copyWith(
+                      color: NinjaColors.accent,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 24),
         ],
       ),
     );
@@ -247,85 +254,83 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
         color: Colors.grey.withOpacity(0.2),
         borderRadius: BorderRadius.circular(size / 2),
       ),
-      child: Icon(
-        Icons.help_outline,
-        size: size * 0.6,
-        color: Colors.grey,
-      ),
+      child: Icon(Icons.help_outline, size: size * 0.6, color: Colors.grey),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF1F2121)),
-            )
-          : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        _error!,
-                        style: const TextStyle(color: Colors.red, fontSize: 16),
-                        textAlign: TextAlign.center,
+      backgroundColor: Colors.transparent,
+      body: TexturedBackground(
+        child: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(NinjaColors.accent),
+                ),
+              )
+            : _error != null
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _error!,
+                      style: NinjaText.body.copyWith(color: NinjaColors.error),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _loadData,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: NinjaColors.metalMid,
+                        foregroundColor: NinjaColors.textPrimary,
                       ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadData,
-                        child: const Text('Повторить'),
-                      ),
-                    ],
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _loadData,
-                  color: AppColors.buttonPrimary,
-                  child: CustomScrollView(
-                    slivers: [
-                      // Заголовок с очками
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              children: [
-                                const Icon(
-                                  Icons.stars,
-                                  color: AppColors.buttonPrimary,
-                                  size: 24,
+                      child: Text('Повторить', style: NinjaText.body),
+                    ),
+                  ],
+                ),
+              )
+            : RefreshIndicator(
+                onRefresh: _loadData,
+                color: NinjaColors.accent,
+                child: CustomScrollView(
+                  slivers: [
+                    // Заголовок с очками
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                        child: MetalCard(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            children: [
+                              const Icon(
+                                Icons.stars,
+                                color: NinjaColors.accent,
+                                size: 24,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Заработано очков: ${_userScore ?? 0}',
+                                style: NinjaText.section.copyWith(
+                                  color: NinjaColors.textPrimary,
                                 ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Заработано очков: ${_userScore ?? 0}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                      // Список достижений по категориям
-                      ..._buildAchievementGroups(),
-                    ],
-                  ),
+                    ),
+                    // Список достижений по категориям
+                    ..._buildAchievementGroups(),
+                  ],
                 ),
+              ),
+      ),
     );
   }
 
@@ -383,14 +388,18 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
   Widget _buildAchievementItem(UserAchievementType achievement) {
     final isEarned = achievement.isEarned;
     final imageUuid = achievement.imageUuid;
-    final hasImage = isEarned && 
-                     imageUuid != null && 
-                     imageUuid.isNotEmpty &&
-                     _imageCache.containsKey(imageUuid) &&
-                     _imageCache[imageUuid] != null;
+    final hasImage =
+        isEarned &&
+        imageUuid != null &&
+        imageUuid.isNotEmpty &&
+        _imageCache.containsKey(imageUuid) &&
+        _imageCache[imageUuid] != null;
 
     // Загружаем картинку если еще не загружена
-    if (isEarned && imageUuid != null && imageUuid.isNotEmpty && !_imageCache.containsKey(imageUuid)) {
+    if (isEarned &&
+        imageUuid != null &&
+        imageUuid.isNotEmpty &&
+        !_imageCache.containsKey(imageUuid)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _loadImage(imageUuid);
       });
@@ -431,9 +440,10 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
             child: Text(
               achievement.name,
-              style: TextStyle(
-                color: isEarned ? Colors.white : Colors.white70,
-                fontSize: 13,
+              style: NinjaText.caption.copyWith(
+                color: isEarned
+                    ? NinjaColors.textPrimary
+                    : NinjaColors.textMuted,
                 fontWeight: FontWeight.w600,
               ),
               textAlign: TextAlign.center,

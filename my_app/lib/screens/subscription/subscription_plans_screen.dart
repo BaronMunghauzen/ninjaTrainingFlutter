@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../constants/app_colors.dart';
 import '../../models/subscription_plan_model.dart';
 import '../../models/subscription_status_model.dart';
 import '../../services/subscription_service.dart';
-import '../../widgets/custom_button.dart';
-import '../../widgets/refund_info_dialog.dart';
-import 'payment_check_screen.dart';
+import '../../widgets/textured_background.dart';
+import '../../widgets/metal_card.dart';
+import '../../widgets/metal_button.dart';
+import '../../widgets/metal_back_button.dart';
+import '../../widgets/metal_modal.dart';
+import '../../widgets/metal_message.dart';
+import '../../design/ninja_typography.dart';
+import '../../design/ninja_colors.dart';
 
 class SubscriptionPlansScreen extends StatefulWidget {
   const SubscriptionPlansScreen({super.key});
@@ -85,14 +89,11 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
 
         // Показываем подсказку пользователю
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'После оплаты вернитесь в приложение для проверки статуса',
-              ),
-              backgroundColor: AppColors.primary,
-              duration: Duration(seconds: 5),
-            ),
+          MetalMessage.show(
+            context: context,
+            message: 'После оплаты вернитесь в приложение для проверки статуса',
+            type: MetalMessageType.info,
+            duration: const Duration(seconds: 5),
           );
         }
       } else {
@@ -100,11 +101,10 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Ошибка создания платежа: $e'),
-            backgroundColor: AppColors.error,
-          ),
+        MetalMessage.show(
+          context: context,
+          message: 'Ошибка создания платежа: $e',
+          type: MetalMessageType.error,
         );
       }
     } finally {
@@ -116,104 +116,120 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
     }
   }
 
-  // Проверка ожидающего платежа при возврате на экран
-  Future<void> _checkPendingPayment() async {
-    final prefs = await SharedPreferences.getInstance();
-    final paymentUuid = prefs.getString('current_payment_uuid');
-
-    if (paymentUuid != null && mounted) {
-      // Переходим на экран проверки платежа
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PaymentCheckScreen(paymentUuid: paymentUuid),
-        ),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1A1A1A),
-        title: const Text(
-          'Выбор подписки',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+    return TexturedBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          title: Text(
+            'Выбор подписки',
+            style: NinjaText.title.copyWith(fontSize: 20),
           ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        elevation: 0,
-        actions: [
-          // Кнопка с информацией о возврате
-          IconButton(
-            icon: const Icon(Icons.help_outline, color: Colors.white),
-            iconSize: 26,
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (context) => const RefundInfoDialog(),
-              );
-            },
-            tooltip: 'Правила возврата',
-            splashRadius: 24,
-          ),
-          // Кнопка проверки ожидающего платежа
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: IconButton(
-              icon: const Icon(Icons.receipt_long, color: Colors.white),
-              iconSize: 28,
-              onPressed: _checkPendingPayment,
-              tooltip: 'Проверить платеж',
+          leading: const MetalBackButton(),
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          actions: [
+            // Кнопка с информацией о возврате
+            IconButton(
+              icon: const Icon(Icons.help_outline, color: NinjaColors.textPrimary),
+              iconSize: 26,
+              onPressed: () {
+                MetalModal.show(
+                  context: context,
+                  title: 'Правила возврата',
+                  children: [
+                    Text(
+                      'По закону «О защите прав потребителей» вы можете расторгнуть договор об оказании услуги в любое время. При этом часть услуг, которые уже были оказаны, нужно оплатить.',
+                      style: NinjaText.body.copyWith(
+                        color: NinjaColors.textSecondary,
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Если вам не нравится качество обслуживания, мы бесплатно устраним недостатки или уменьшим цену услуги.',
+                      style: NinjaText.body.copyWith(
+                        color: NinjaColors.textSecondary,
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'О недостатках оказанной услуги можно сообщить в течение срока гарантии, а если он не установлен, то в течение двух лет.',
+                      style: NinjaText.body.copyWith(
+                        color: NinjaColors.textSecondary,
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'При оплате банковской картой деньги вернутся на ту карту, с которой был сделан платёж. Срок возврата — от 1 до 30 рабочих дней.',
+                      style: NinjaText.body.copyWith(
+                        color: NinjaColors.textSecondary,
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    MetalButton(
+                      label: 'Понятно',
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                );
+              },
+              tooltip: 'Правила возврата',
               splashRadius: 24,
             ),
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            )
-          : _error != null
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.error_outline,
-                    color: AppColors.error,
-                    size: 64,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Ошибка загрузки',
-                    style: TextStyle(color: Colors.grey[400], fontSize: 18),
-                  ),
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    child: Text(
-                      _error!,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey[600], fontSize: 14),
+          ],
+        ),
+        body: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(NinjaColors.accent),
+                ),
+              )
+            : _error != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          color: NinjaColors.error,
+                          size: 64,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Ошибка загрузки',
+                          style: NinjaText.title.copyWith(
+                            color: NinjaColors.error,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 32),
+                          child: Text(
+                            _error!,
+                            textAlign: TextAlign.center,
+                            style: NinjaText.body.copyWith(
+                              color: NinjaColors.textMuted,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        MetalButton(
+                          label: 'Попробовать снова',
+                          onPressed: _loadData,
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  CustomButton(text: 'Попробовать снова', onPressed: _loadData),
-                ],
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: _loadData,
-              color: AppColors.primary,
+                  )
+                : RefreshIndicator(
+                    onRefresh: _loadData,
+                    color: NinjaColors.accent,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(20),
@@ -222,21 +238,13 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                   children: [
                     // Текущий статус подписки
                     if (_status != null && _status!.isActive) ...[
-                      Container(
+                      MetalCard(
                         padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF4CAF50).withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: const Color(0xFF4CAF50),
-                            width: 1.5,
-                          ),
-                        ),
                         child: Row(
                           children: [
                             const Icon(
                               Icons.info_outline,
-                              color: Color(0xFF4CAF50),
+                              color: NinjaColors.success,
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -244,9 +252,8 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                                 _status!.isTrial
                                     ? 'У вас активна триальная подписка до ${_status!.formattedExpiryDate}'
                                     : 'Текущая подписка до: ${_status!.formattedExpiryDate}\nПри покупке новой подписки срок продлится без разрыва',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
+                                style: NinjaText.body.copyWith(
+                                  color: NinjaColors.success,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -258,29 +265,24 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                     ],
 
                     // Способы оплаты
-                    Container(
+                    MetalCard(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[800]?.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
                             Icons.payment,
-                            color: Colors.grey[500],
+                            color: NinjaColors.textMuted,
                             size: 16,
                           ),
                           const SizedBox(width: 8),
                           Text(
                             'Оплата: банковская карта или СБП',
-                            style: TextStyle(
-                              color: Colors.grey[500],
-                              fontSize: 12,
+                            style: NinjaText.caption.copyWith(
+                              color: NinjaColors.textMuted,
                             ),
                           ),
                         ],
@@ -289,11 +291,15 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                     const SizedBox(height: 24),
 
                     // Список тарифных планов
-                    ..._plans.map((plan) => _buildPlanCard(plan)),
+                    ..._plans.map((plan) => Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: _buildPlanCard(plan),
+                        )),
                   ],
                 ),
               ),
             ),
+      ),
     );
   }
 
@@ -301,16 +307,8 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
     final discount = plan.calculateDiscount();
     final isPopular = plan.isPopular;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+    return MetalCard(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF2A2A2A),
-        borderRadius: BorderRadius.circular(16),
-        border: isPopular
-            ? Border.all(color: AppColors.primary, width: 2)
-            : null,
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -320,11 +318,7 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
             children: [
               Text(
                 plan.name,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: NinjaText.title.copyWith(fontSize: 20),
               ),
               if (discount > 0) ...[
                 Container(
@@ -333,15 +327,14 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.success.withOpacity(0.2),
+                    color: NinjaColors.success.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppColors.success),
+                    border: Border.all(color: NinjaColors.success),
                   ),
                   child: Text(
                     'Выгода $discount%',
-                    style: const TextStyle(
-                      color: AppColors.success,
-                      fontSize: 12,
+                    style: NinjaText.caption.copyWith(
+                      color: NinjaColors.success,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -354,15 +347,14 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.2),
+                    color: NinjaColors.accent.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppColors.primary),
+                    border: Border.all(color: NinjaColors.accent),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Популярный',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 12,
+                    style: NinjaText.caption.copyWith(
+                      color: NinjaColors.accent,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -378,8 +370,7 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
             children: [
               Text(
                 SubscriptionService.formatPrice(plan.price),
-                style: const TextStyle(
-                  color: Colors.white,
+                style: NinjaText.title.copyWith(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
                 ),
@@ -389,7 +380,9 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Text(
                   '${SubscriptionService.formatPrice(plan.pricePerMonth)}/мес',
-                  style: TextStyle(color: Colors.grey[400], fontSize: 16),
+                  style: NinjaText.body.copyWith(
+                    color: NinjaColors.textSecondary,
+                  ),
                 ),
               ),
             ],
@@ -399,7 +392,9 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
             const SizedBox(height: 12),
             Text(
               plan.description!,
-              style: TextStyle(color: Colors.grey[400], fontSize: 14),
+              style: NinjaText.body.copyWith(
+                color: NinjaColors.textSecondary,
+              ),
             ),
           ],
 
@@ -414,11 +409,10 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
           const SizedBox(height: 20),
 
           // Кнопка покупки
-          CustomButton(
-            text: 'Купить за ${SubscriptionService.formatPrice(plan.price)}',
+          MetalButton(
+            label: 'Купить за ${SubscriptionService.formatPrice(plan.price)}',
             onPressed: _isPurchasing ? null : () => _handlePurchase(plan),
             isLoading: _isPurchasing,
-            height: 56,
           ),
         ],
       ),
@@ -430,9 +424,16 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          const Icon(Icons.check_circle, color: AppColors.success, size: 20),
+          const Icon(
+            Icons.check_circle,
+            color: NinjaColors.success,
+            size: 20,
+          ),
           const SizedBox(width: 8),
-          Text(text, style: const TextStyle(color: Colors.white, fontSize: 14)),
+          Text(
+            text,
+            style: NinjaText.body,
+          ),
         ],
       ),
     );

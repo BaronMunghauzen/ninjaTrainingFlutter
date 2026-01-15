@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
-import '../../widgets/custom_text_field.dart';
-import '../../widgets/custom_button.dart';
+import '../../widgets/textured_background.dart';
+import '../../widgets/metal_text_field.dart';
+import '../../widgets/metal_back_button.dart';
+import '../../widgets/metal_dropdown.dart';
+import '../../widgets/metal_message.dart';
+import '../../design/ninja_typography.dart';
+import '../../design/ninja_colors.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -13,7 +17,6 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-  final _formKey = GlobalKey<FormState>();
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
   late TextEditingController _loginController;
@@ -24,6 +27,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String? _selectedGender;
   bool _hasChanges = false;
   bool _isSaving = false;
+  String? _emailError;
+  String? _loginError;
 
   @override
   void initState() {
@@ -94,7 +99,36 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _saveProfile() async {
-    if (!_formKey.currentState!.validate()) return;
+    // Валидация
+    setState(() {
+      _emailError = null;
+      _loginError = null;
+    });
+
+    if (_emailController.text.isEmpty) {
+      setState(() {
+        _emailError = 'Email обязателен';
+      });
+    } else if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+        .hasMatch(_emailController.text)) {
+      setState(() {
+        _emailError = 'Введите корректный email';
+      });
+    }
+
+    if (_loginController.text.isEmpty) {
+      setState(() {
+        _loginError = 'Логин обязателен';
+      });
+    } else if (_loginController.text.length < 3) {
+      setState(() {
+        _loginError = 'Логин должен содержать минимум 3 символа';
+      });
+    }
+
+    if (_emailError != null || _loginError != null) {
+      return;
+    }
 
     if (mounted) {
       setState(() {
@@ -132,19 +166,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     if (mounted) {
       if (error == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Профиль успешно обновлен',
-              style: TextStyle(color: AppColors.textPrimary),
-            ),
-            backgroundColor: const Color(0xFF1F2121),
-          ),
+        MetalMessage.show(
+          context: context,
+          message: 'Профиль успешно обновлен',
+          type: MetalMessageType.success,
         );
         Navigator.pop(context);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error), backgroundColor: Colors.red),
+        MetalMessage.show(
+          context: context,
+          message: error,
+          type: MetalMessageType.error,
         );
       }
     }
@@ -164,185 +196,150 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1A1A1A),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Редактировать профиль',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+    return TexturedBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          leading: const MetalBackButton(),
+          title: Text(
+            'Редактировать профиль',
+            style: NinjaText.title.copyWith(fontSize: 20),
           ),
-        ),
-        centerTitle: true,
-        elevation: 0,
-        actions: [
-          if (_hasChanges && !_isSaving)
-            Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: ElevatedButton(
-                onPressed: _saveProfile,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 10,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  elevation: 3,
-                ),
-                child: const Text(
-                  'Сохранить',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          centerTitle: true,
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          actions: [
+            if (_hasChanges && !_isSaving)
+              Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: MetalBackButton(
+                  icon: Icons.check,
+                  onTap: _saveProfile,
                 ),
               ),
-            ),
-          if (_isSaving)
-            const Padding(
-              padding: EdgeInsets.only(right: 16.0),
-              child: Center(
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      AppColors.primary,
+            if (_isSaving)
+              const Padding(
+                padding: EdgeInsets.only(right: 16.0),
+                child: Center(
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        NinjaColors.accent,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-        ],
-      ),
-      body: Consumer<AuthProvider>(
-        builder: (context, authProvider, child) {
-          final userProfile = authProvider.userProfile;
-          if (userProfile == null) {
-            return const Center(
-              child: Text(
-                'Профиль не загружен',
-                style: TextStyle(color: Colors.white),
-              ),
-            );
-          }
+          ],
+        ),
+        body: Consumer<AuthProvider>(
+          builder: (context, authProvider, child) {
+            final userProfile = authProvider.userProfile;
+            if (userProfile == null) {
+              return Center(
+                child: Text(
+                  'Профиль не загружен',
+                  style: NinjaText.body.copyWith(color: NinjaColors.error),
+                ),
+              );
+            }
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(20.0),
-            child: Form(
-              key: _formKey,
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(20.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CustomTextField(
-                    label: 'Email',
-                    hint: 'Введите email',
+                  // Email
+                  Text('Email', style: NinjaText.section),
+                  const SizedBox(height: 8),
+                  MetalTextField(
                     controller: _emailController,
+                    hint: 'Введите email',
                     keyboardType: TextInputType.emailAddress,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Email обязателен';
-                      }
-                      if (!RegExp(
-                        r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                      ).hasMatch(value)) {
-                        return 'Введите корректный email';
-                      }
-                      return null;
-                    },
                   ),
+                  if (_emailError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        _emailError!,
+                        style: NinjaText.caption.copyWith(
+                          color: NinjaColors.error,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 20),
 
-                  CustomTextField(
-                    label: 'Логин',
-                    hint: 'Введите логин',
+                  // Логин
+                  Text('Логин', style: NinjaText.section),
+                  const SizedBox(height: 8),
+                  MetalTextField(
                     controller: _loginController,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Логин обязателен';
-                      }
-                      if (value.length < 3) {
-                        return 'Логин должен содержать минимум 3 символа';
-                      }
-                      return null;
-                    },
+                    hint: 'Введите логин',
                   ),
+                  if (_loginError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        _loginError!,
+                        style: NinjaText.caption.copyWith(
+                          color: NinjaColors.error,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 20),
 
-                  CustomTextField(
-                    label: 'Телефон',
-                    hint: 'Введите номер телефона',
+                  // Телефон
+                  Text('Телефон', style: NinjaText.section),
+                  const SizedBox(height: 8),
+                  MetalTextField(
                     controller: _phoneController,
+                    hint: 'Введите номер телефона',
                     keyboardType: TextInputType.phone,
                   ),
                   const SizedBox(height: 20),
 
-                  CustomTextField(
-                    label: 'Имя',
-                    hint: 'Введите имя',
+                  // Имя
+                  Text('Имя', style: NinjaText.section),
+                  const SizedBox(height: 8),
+                  MetalTextField(
                     controller: _firstNameController,
+                    hint: 'Введите имя',
                   ),
                   const SizedBox(height: 20),
 
-                  CustomTextField(
-                    label: 'Фамилия',
-                    hint: 'Введите фамилию',
+                  // Фамилия
+                  Text('Фамилия', style: NinjaText.section),
+                  const SizedBox(height: 8),
+                  MetalTextField(
                     controller: _lastNameController,
+                    hint: 'Введите фамилию',
                   ),
                   const SizedBox(height: 20),
 
-                  CustomTextField(
-                    label: 'Отчество',
-                    hint: 'Введите отчество',
+                  // Отчество
+                  Text('Отчество', style: NinjaText.section),
+                  const SizedBox(height: 8),
+                  MetalTextField(
                     controller: _middleNameController,
+                    hint: 'Введите отчество',
                   ),
                   const SizedBox(height: 20),
 
                   // Пол
-                  const Text(
-                    'Пол',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  Text('Пол', style: NinjaText.section),
                   const SizedBox(height: 8),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2A2A2A),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: DropdownButtonFormField<String>(
-                      value: _selectedGender,
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
-                      ),
-                      dropdownColor: const Color(0xFF2A2A2A),
-                      style: const TextStyle(color: Colors.white),
-                      hint: const Text(
-                        'Выберите пол',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'male', child: Text('Мужской')),
-                        DropdownMenuItem(
-                          value: 'female',
-                          child: Text('Женский'),
-                        ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: MetalDropdown<String>(
+                      value: _selectedGender ?? 'male',
+                      items: [
+                        MetalDropdownItem(value: 'male', label: 'Мужской'),
+                        MetalDropdownItem(value: 'female', label: 'Женский'),
                       ],
                       onChanged: (value) {
                         setState(() {
@@ -354,28 +351,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  CustomTextField(
-                    label: 'О себе',
-                    hint: 'Расскажите о себе',
+                  // О себе
+                  Text('О себе', style: NinjaText.section),
+                  const SizedBox(height: 8),
+                  MetalTextField(
                     controller: _descriptionController,
+                    hint: 'Расскажите о себе',
                     maxLines: 3,
                   ),
                   const SizedBox(height: 32),
-
-                  // Кнопка сохранения
-                  if (_hasChanges)
-                    SizedBox(
-                      width: double.infinity,
-                      child: CustomButton(
-                        text: _isSaving ? 'Сохранение...' : 'Сохранить',
-                        onPressed: _isSaving ? null : _saveProfile,
-                      ),
-                    ),
                 ],
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }

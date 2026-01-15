@@ -1,46 +1,142 @@
 import 'package:flutter/material.dart';
 import '../../../design/ninja_colors.dart';
-import '../../../design/ninja_gradients.dart';
-import '../../../design/ninja_radii.dart';
-import '../../../design/ninja_shadows.dart';
 import '../../../design/ninja_spacing.dart';
 import '../../../design/ninja_typography.dart';
 import '../../../widgets/textured_background.dart';
 import '../../../widgets/metal_button.dart';
+import '../../../widgets/metal_card.dart';
+import '../../../widgets/metal_back_button.dart';
+import '../../../widgets/metal_list_item.dart';
+import '../../../widgets/metal_modal.dart';
+import '../../../widgets/macro_info_chip.dart';
 import '../../../models/food_recognition_model.dart';
+import '../../food/food_progress/services/food_progress_service.dart';
 
-class FoodRecognitionResultScreen extends StatelessWidget {
+class FoodRecognitionResultScreen extends StatefulWidget {
   final FoodRecognition recognition;
 
   const FoodRecognitionResultScreen({Key? key, required this.recognition})
     : super(key: key);
 
   @override
+  State<FoodRecognitionResultScreen> createState() =>
+      _FoodRecognitionResultScreenState();
+}
+
+class _FoodRecognitionResultScreenState
+    extends State<FoodRecognitionResultScreen> {
+  bool _isAdding = false;
+
+  void _showAddToMealsConfirmation() {
+    MetalModal.show(
+      context: context,
+      title: 'Добавить в приемы пищи?',
+      children: [
+        Text(
+          'Добавить "${widget.recognition.name}" в приемы пищи?',
+          style: NinjaText.body,
+        ),
+        const SizedBox(height: NinjaSpacing.lg),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Отмена', style: NinjaText.body),
+            ),
+            const SizedBox(width: NinjaSpacing.md),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _addToMeals();
+              },
+              child: Text('Добавить', style: NinjaText.body),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _addToMeals() async {
+    setState(() {
+      _isAdding = true;
+    });
+
+    try {
+      // Используем текущие дату и время
+      final mealDatetime = DateTime.now();
+
+      await FoodProgressService.addMeal(
+        mealDatetime: mealDatetime,
+        name: widget.recognition.name,
+        calories: widget.recognition.caloriesTotal,
+        proteins: widget.recognition.proteinsTotal,
+        fats: widget.recognition.fatsTotal,
+        carbs: widget.recognition.carbsTotal,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isAdding = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isAdding = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка добавления приема пищи: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.close, color: NinjaColors.textPrimary),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text('Результаты анализа', style: NinjaText.title),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
       body: TexturedBackground(
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(NinjaSpacing.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+          child: Column(
+            children: [
+              // Кастомный заголовок с фоном как у экрана
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: NinjaSpacing.lg,
+                  vertical: NinjaSpacing.md,
+                ),
+                child: Row(
+                  children: [
+                    MetalBackButton(
+                      icon: Icons.close,
+                      onTap: () => Navigator.of(context).pop(),
+                    ),
+                    const SizedBox(width: NinjaSpacing.md),
+                    Text('Результаты анализа', style: NinjaText.title),
+                  ],
+                ),
+              ),
+              // Контент
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(NinjaSpacing.lg),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                 // Комментарий пользователя
-                if (recognition.comment != null &&
-                    recognition.comment!.isNotEmpty) ...[
+                      if (widget.recognition.comment != null &&
+                          widget.recognition.comment!.isNotEmpty) ...[
                   _buildSection(
                     title: 'Комментарий пользователя',
-                    child: Text(recognition.comment!, style: NinjaText.body),
+                          child: Text(
+                            widget.recognition.comment!,
+                            style: NinjaText.body,
+                          ),
                   ),
                   const SizedBox(height: NinjaSpacing.lg),
                 ],
@@ -49,7 +145,7 @@ class FoodRecognitionResultScreen extends StatelessWidget {
                 _buildSection(
                   title: 'Название',
                   child: Text(
-                    recognition.name,
+                          widget.recognition.name,
                     style: NinjaText.title.copyWith(fontSize: 18),
                   ),
                 ),
@@ -60,13 +156,22 @@ class FoodRecognitionResultScreen extends StatelessWidget {
                   title: 'КБЖУ в порции',
                   child: Column(
                     children: [
-                      _buildNutritionRow('Калории', recognition.caloriesTotal),
+                            _buildNutritionRow(
+                              'Калории',
+                              widget.recognition.caloriesTotal,
+                            ),
                       const SizedBox(height: NinjaSpacing.sm),
-                      _buildNutritionRow('Белки', recognition.proteinsTotal),
+                            _buildNutritionRow(
+                              'Белки',
+                              widget.recognition.proteinsTotal,
+                            ),
                       const SizedBox(height: NinjaSpacing.sm),
-                      _buildNutritionRow('Жиры', recognition.fatsTotal),
+                            _buildNutritionRow('Жиры', widget.recognition.fatsTotal),
                       const SizedBox(height: NinjaSpacing.sm),
-                      _buildNutritionRow('Углеводы', recognition.carbsTotal),
+                            _buildNutritionRow(
+                              'Углеводы',
+                              widget.recognition.carbsTotal,
+                            ),
                     ],
                   ),
                 ),
@@ -76,7 +181,7 @@ class FoodRecognitionResultScreen extends StatelessWidget {
                 _buildSection(
                   title: 'Вес порции',
                   child: Text(
-                    '${recognition.weightG.toStringAsFixed(0)} г',
+                          '${widget.recognition.weightG.toStringAsFixed(0)} г',
                     style: NinjaText.body,
                   ),
                 ),
@@ -89,25 +194,31 @@ class FoodRecognitionResultScreen extends StatelessWidget {
                     children: [
                       _buildNutritionRow(
                         'Калории',
-                        recognition.caloriesPer100g,
+                              widget.recognition.caloriesPer100g,
                       ),
                       const SizedBox(height: NinjaSpacing.sm),
-                      _buildNutritionRow('Белки', recognition.proteinsPer100g),
+                            _buildNutritionRow(
+                              'Белки',
+                              widget.recognition.proteinsPer100g,
+                            ),
                       const SizedBox(height: NinjaSpacing.sm),
-                      _buildNutritionRow('Жиры', recognition.fatsPer100g),
+                            _buildNutritionRow('Жиры', widget.recognition.fatsPer100g),
                       const SizedBox(height: NinjaSpacing.sm),
-                      _buildNutritionRow('Углеводы', recognition.carbsPer100g),
+                            _buildNutritionRow(
+                              'Углеводы',
+                              widget.recognition.carbsPer100g,
+                            ),
                     ],
                   ),
                 ),
                 const SizedBox(height: NinjaSpacing.lg),
 
                 // Микронутриенты
-                if (recognition.micronutrients.isNotEmpty) ...[
+                      if (widget.recognition.micronutrients.isNotEmpty) ...[
                   _buildSection(
                     title: 'Микронутриенты',
                     child: Column(
-                      children: recognition.micronutrients
+                            children: widget.recognition.micronutrients
                           .map(
                             (micronutrient) =>
                                 _buildMicronutrientItem(micronutrient),
@@ -119,12 +230,15 @@ class FoodRecognitionResultScreen extends StatelessWidget {
                 ],
 
                 // Ингредиенты
-                if (recognition.ingredients.isNotEmpty) ...[
+                      if (widget.recognition.ingredients.isNotEmpty) ...[
                   _buildSection(
                     title: 'Ингредиенты',
                     child: Column(
-                      children: recognition.ingredients
-                          .map((ingredient) => _buildIngredientItem(ingredient))
+                            children: widget.recognition.ingredients
+                                .map(
+                                  (ingredient) =>
+                                      _buildIngredientItem(ingredient),
+                                )
                           .toList(),
                     ),
                   ),
@@ -132,22 +246,24 @@ class FoodRecognitionResultScreen extends StatelessWidget {
                 ],
 
                 // Советы/рекомендации/альтернативы
-                if ((recognition.recommendationsTip != null &&
-                        recognition.recommendationsTip!.isNotEmpty) ||
-                    (recognition.recommendationsAlternative != null &&
-                        recognition
+                      if ((widget.recognition.recommendationsTip != null &&
+                              widget.recognition.recommendationsTip!.isNotEmpty) ||
+                          (widget.recognition.recommendationsAlternative !=
+                              null &&
+                              widget.recognition
                             .recommendationsAlternative!
                             .isNotEmpty)) ...[
                   _buildSection(
                     title: 'Советы/рекомендации/альтернативы',
                     child: Column(
                       children: [
-                        if (recognition.recommendationsTip != null)
-                          ...recognition.recommendationsTip!.map(
+                              if (widget.recognition.recommendationsTip != null)
+                                ...widget.recognition.recommendationsTip!.map(
                             (rec) => _buildRecommendationItem(rec),
                           ),
-                        if (recognition.recommendationsAlternative != null)
-                          ...recognition.recommendationsAlternative!.map(
+                              if (widget.recognition.recommendationsAlternative !=
+                                  null)
+                                ...widget.recognition.recommendationsAlternative!.map(
                             (rec) => _buildRecommendationItem(rec),
                           ),
                       ],
@@ -156,14 +272,65 @@ class FoodRecognitionResultScreen extends StatelessWidget {
                   const SizedBox(height: NinjaSpacing.lg),
                 ],
 
-                // Кнопка закрыть
-                MetalButton(
-                  label: 'Закрыть',
-                  onPressed: () => Navigator.of(context).pop(),
-                  height: 56,
+                      // Кнопки
+                      Row(
+                        children: [
+                          Expanded(
+                            child: MetalButton(
+                              label: 'Добавить в приемы пищи',
+                              onPressed: _isAdding ? null : _showAddToMealsConfirmation,
+                              isLoading: _isAdding,
+                              height: 56,
+                            ),
+                          ),
+                          const SizedBox(width: NinjaSpacing.md),
+                          Expanded(
+                            child: MetalButton(
+                        label: 'Закрыть',
+                        onPressed: () => Navigator.of(context).pop(),
+                        height: 56,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: NinjaSpacing.xl),
+                      // Предупреждение об ИИ
+                      Container(
+                        padding: const EdgeInsets.all(NinjaSpacing.md),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.orange.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              color: Colors.orange.withOpacity(0.8),
+                              size: 20,
+                            ),
+                            const SizedBox(width: NinjaSpacing.sm),
+                            Expanded(
+                              child: Text(
+                                'Результат сканирования фото - это анализ искусственного интеллекта и может быть неверным. Пожалуйста, проверьте данные перед добавлением в приемы пищи.',
+                                style: NinjaText.caption.copyWith(
+                                  color: Colors.orange.withOpacity(0.9),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: NinjaSpacing.lg),
+                    ],
+                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -171,14 +338,8 @@ class FoodRecognitionResultScreen extends StatelessWidget {
   }
 
   Widget _buildSection({required String title, required Widget child}) {
-    return Container(
+    return MetalCard(
       padding: const EdgeInsets.all(NinjaSpacing.lg),
-      decoration: BoxDecoration(
-        gradient: NinjaGradients.metalSoft,
-        borderRadius: BorderRadius.circular(NinjaRadii.sm),
-        boxShadow: NinjaShadows.card,
-        border: Border.all(color: NinjaColors.metalEdgeSoft, width: 0.6),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -253,21 +414,16 @@ class FoodRecognitionResultScreen extends StatelessWidget {
   }
 
   Widget _buildIngredientItem(Ingredient ingredient) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: NinjaSpacing.md),
-      padding: const EdgeInsets.all(NinjaSpacing.md),
-      decoration: BoxDecoration(
-        gradient: NinjaGradients.metalSoft,
-        borderRadius: BorderRadius.circular(NinjaRadii.xs),
-        border: Border.all(color: NinjaColors.metalEdgeSoft, width: 0.5),
+    return MetalListItem(
+      leading: const SizedBox.shrink(),
+      title: Text(
+        ingredient.name,
+        style: NinjaText.body.copyWith(fontWeight: FontWeight.bold),
       ),
-      child: Column(
+      subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            ingredient.name,
-            style: NinjaText.body.copyWith(fontWeight: FontWeight.bold),
-          ),
+          const SizedBox(height: NinjaSpacing.md),
           if (ingredient.description != null) ...[
             const SizedBox(height: NinjaSpacing.xs),
             Text(ingredient.description!, style: NinjaText.caption),
@@ -278,71 +434,55 @@ class FoodRecognitionResultScreen extends StatelessWidget {
             style: NinjaText.caption,
           ),
           const SizedBox(height: NinjaSpacing.sm),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            spacing: NinjaSpacing.sm,
+            runSpacing: NinjaSpacing.xs,
             children: [
-              _buildNutritionBadge('К', ingredient.caloriesInPortion),
-              _buildNutritionBadge('Б', ingredient.proteinsInPortion),
-              _buildNutritionBadge('Ж', ingredient.fatsInPortion),
-              _buildNutritionBadge('У', ingredient.carbsInPortion),
+              MacroInfoChip(
+                label: 'К',
+                value: ingredient.caloriesInPortion.toStringAsFixed(1),
+                size: 32,
+              ),
+              MacroInfoChip(
+                label: 'Б',
+                value: ingredient.proteinsInPortion.toStringAsFixed(1),
+                size: 32,
+              ),
+              MacroInfoChip(
+                label: 'Ж',
+                value: ingredient.fatsInPortion.toStringAsFixed(1),
+                size: 32,
+              ),
+              MacroInfoChip(
+                label: 'У',
+                value: ingredient.carbsInPortion.toStringAsFixed(1),
+                size: 32,
+              ),
             ],
           ),
+          const SizedBox(height: NinjaSpacing.md),
         ],
       ),
+      onTap: () {}, // Пустой callback, так как элемент не кликабельный
     );
   }
 
   Widget _buildRecommendationItem(Recommendation recommendation) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: NinjaSpacing.md),
-      padding: const EdgeInsets.all(NinjaSpacing.md),
-      decoration: BoxDecoration(
-        gradient: NinjaGradients.metalSoft,
-        borderRadius: BorderRadius.circular(NinjaRadii.xs),
-        border: Border.all(color: NinjaColors.metalEdgeSoft, width: 0.5),
+    return MetalListItem(
+      leading: const SizedBox.shrink(),
+      title: Text(
+        recommendation.title,
+        style: NinjaText.body.copyWith(fontWeight: FontWeight.bold),
       ),
-      child: Column(
+      subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            recommendation.title,
-            style: NinjaText.body.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: NinjaSpacing.xs),
+          const SizedBox(height: NinjaSpacing.md),
           Text(recommendation.description, style: NinjaText.caption),
+          const SizedBox(height: NinjaSpacing.md),
         ],
       ),
-    );
-  }
-
-  Widget _buildNutritionBadge(String label, double value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: NinjaSpacing.sm,
-        vertical: NinjaSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        gradient: NinjaGradients.metalVertical,
-        borderRadius: BorderRadius.circular(NinjaRadii.xs),
-        boxShadow: NinjaShadows.button,
-        border: Border.all(color: NinjaColors.metalEdgeSoft, width: 0.5),
-      ),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(NinjaRadii.xs),
-                gradient: NinjaGradients.highlightTop,
-              ),
-            ),
-          ),
-          Text(
-            '$label ${value.toStringAsFixed(1)}',
-            style: NinjaText.chip.copyWith(color: NinjaColors.textPrimary),
-          ),
-        ],
-      ),
+      onTap: () {}, // Пустой callback, так как элемент не кликабельный
     );
   }
 }

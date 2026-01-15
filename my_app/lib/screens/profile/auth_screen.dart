@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
-import '../../constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
-import '../../widgets/custom_text_field.dart';
-import '../../widgets/custom_button.dart';
+import '../../widgets/textured_background.dart';
+import '../../widgets/metal_text_field.dart';
+import '../../widgets/metal_button.dart';
+import '../../widgets/metal_message.dart';
+import '../../design/ninja_typography.dart';
+import '../../design/ninja_colors.dart';
 import 'forgot_password_screen.dart';
 import '../main_screen_wrapper.dart';
 import '../../services/api_service.dart';
@@ -17,7 +20,6 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
-  final _formKey = GlobalKey<FormState>();
   final _loginOrEmailController = TextEditingController();
   final _emailController = TextEditingController();
   final _loginController = TextEditingController();
@@ -26,6 +28,11 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
 
   bool _isLogin = true;
   bool _isLoading = false;
+  String? _loginOrEmailError;
+  String? _emailError;
+  String? _loginError;
+  String? _passwordError;
+  String? _confirmPasswordError;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -70,14 +77,86 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _submitForm() async {
-    if (!_formKey.currentState!.validate()) return;
+    // Валидация
+    setState(() {
+      _loginOrEmailError = null;
+      _emailError = null;
+      _loginError = null;
+      _passwordError = null;
+      _confirmPasswordError = null;
+    });
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    bool hasError = false;
+
+    if (_isLogin) {
+      if (_loginOrEmailController.text.trim().isEmpty) {
+        setState(() {
+          _loginOrEmailError = 'Введите логин или email';
+          hasError = true;
+        });
+      }
+      if (_passwordController.text.isEmpty) {
+        setState(() {
+          _passwordError = 'Введите пароль';
+          hasError = true;
+        });
+      }
+    } else {
+      if (_emailController.text.trim().isEmpty) {
+        setState(() {
+          _emailError = 'Введите email';
+          hasError = true;
+        });
+      } else if (!authProvider.isValidEmail(_emailController.text.trim())) {
+        setState(() {
+          _emailError = 'Введите корректный email';
+          hasError = true;
+        });
+      }
+      if (_loginController.text.trim().isEmpty) {
+        setState(() {
+          _loginError = 'Введите логин';
+          hasError = true;
+        });
+      } else if (!authProvider.isValidLogin(_loginController.text.trim())) {
+        setState(() {
+          _loginError = 'Логин должен содержать минимум 3 символа';
+          hasError = true;
+        });
+      }
+      if (_passwordController.text.isEmpty) {
+        setState(() {
+          _passwordError = 'Введите пароль';
+          hasError = true;
+        });
+      } else if (!authProvider.isValidPassword(_passwordController.text)) {
+        setState(() {
+          _passwordError = 'Пароль должен содержать минимум 6 символов';
+          hasError = true;
+        });
+      }
+      if (_confirmPasswordController.text.isEmpty) {
+        setState(() {
+          _confirmPasswordError = 'Подтвердите пароль';
+          hasError = true;
+        });
+      } else if (_confirmPasswordController.text != _passwordController.text) {
+        setState(() {
+          _confirmPasswordError = 'Пароли не совпадают';
+          hasError = true;
+        });
+      }
+    }
+
+    if (hasError) return;
+
     if (mounted) {
       setState(() {
         _isLoading = true;
       });
     }
     try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
       String? error;
       if (_isLogin) {
         error = await authProvider.signIn(
@@ -93,8 +172,10 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
         );
       }
       if (error != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error), backgroundColor: AppColors.error),
+        MetalMessage.show(
+          context: context,
+          message: error,
+          type: MetalMessageType.error,
         );
       } else if (error == null && mounted) {
         // Если нет ошибки, значит авторизация/регистрация прошла успешно
@@ -126,18 +207,11 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
       }
     } on NetworkException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.wifi_off, color: Colors.white),
-                const SizedBox(width: 8),
-                Expanded(child: Text(e.message)),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
+        MetalMessage.show(
+          context: context,
+          message: e.message,
+          type: MetalMessageType.error,
+          duration: const Duration(seconds: 5),
         );
       }
     } finally {
@@ -151,26 +225,19 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          // Фоновый градиент
-          Container(
-            decoration: const BoxDecoration(
-              gradient: AppColors.primaryGradient,
-            ),
-          ),
-
-          // Основной контент
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: Form(
-                    key: _formKey,
+    return TexturedBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Stack(
+          children: [
+            // Основной контент
+            SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: SlideTransition(
+                    position: _slideAnimation,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -191,9 +258,8 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                           _isLogin
                               ? 'Войдите в свой аккаунт'
                               : 'Заполните форму для регистрации',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: AppColors.textSecondary,
+                          style: NinjaText.body.copyWith(
+                            color: NinjaColors.textSecondary,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -202,125 +268,115 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
 
                         // Поле логина/email (для входа) или email (для регистрации)
                         if (_isLogin) ...[
-                          CustomTextField(
-                            label: 'Логин или Email',
-                            hint: 'Введите логин или email',
+                          Text('Логин или Email', style: NinjaText.section),
+                          const SizedBox(height: 8),
+                          MetalTextField(
                             controller: _loginOrEmailController,
+                            hint: 'Введите логин или email',
                             keyboardType: TextInputType.text,
-                            prefixIcon: const Icon(
-                              Icons.person_outline,
-                              color: AppColors.textSecondary,
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Введите логин или email';
-                              }
-                              return null;
-                            },
                           ),
+                          if (_loginOrEmailError != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                _loginOrEmailError!,
+                                style: NinjaText.caption.copyWith(
+                                  color: NinjaColors.error,
+                                ),
+                              ),
+                            ),
                         ] else ...[
-                          CustomTextField(
-                            label: 'Email',
-                            hint: 'Введите ваш email',
+                          Text('Email', style: NinjaText.section),
+                          const SizedBox(height: 8),
+                          MetalTextField(
                             controller: _emailController,
+                            hint: 'Введите ваш email',
                             keyboardType: TextInputType.emailAddress,
-                            prefixIcon: const Icon(
-                              Icons.email_outlined,
-                              color: AppColors.textSecondary,
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Введите email';
-                              }
-                              if (!Provider.of<AuthProvider>(
-                                context,
-                                listen: false,
-                              ).isValidEmail(value)) {
-                                return 'Введите корректный email';
-                              }
-                              return null;
-                            },
                           ),
+                          if (_emailError != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                _emailError!,
+                                style: NinjaText.caption.copyWith(
+                                  color: NinjaColors.error,
+                                ),
+                              ),
+                            ),
 
                           const SizedBox(height: 20),
 
                           // Поле логина (только для регистрации)
-                          CustomTextField(
-                            label: 'Логин',
-                            hint: 'Введите логин',
+                          Text('Логин', style: NinjaText.section),
+                          const SizedBox(height: 8),
+                          MetalTextField(
                             controller: _loginController,
+                            hint: 'Введите логин',
                             keyboardType: TextInputType.text,
-                            prefixIcon: const Icon(
-                              Icons.person_outline,
-                              color: AppColors.textSecondary,
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Введите логин';
-                              }
-                              if (!Provider.of<AuthProvider>(
-                                context,
-                                listen: false,
-                              ).isValidLogin(value)) {
-                                return 'Логин должен содержать минимум 3 символа';
-                              }
-                              return null;
-                            },
                           ),
+                          if (_loginError != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                _loginError!,
+                                style: NinjaText.caption.copyWith(
+                                  color: NinjaColors.error,
+                                ),
+                              ),
+                            ),
                         ],
 
                         const SizedBox(height: 20),
 
                         // Поле пароля
-                        CustomTextField(
-                          label: 'Пароль',
-                          hint: 'Введите пароль',
+                        Text('Пароль', style: NinjaText.section),
+                        const SizedBox(height: 8),
+                        MetalTextField(
                           controller: _passwordController,
+                          hint: 'Введите пароль',
                           isPassword: true,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Введите пароль';
-                            }
-                            if (!_isLogin &&
-                                !Provider.of<AuthProvider>(
-                                  context,
-                                  listen: false,
-                                ).isValidPassword(value)) {
-                              return 'Пароль должен содержать минимум 6 символов';
-                            }
-                            return null;
-                          },
                         ),
+                        if (_passwordError != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              _passwordError!,
+                              style: NinjaText.caption.copyWith(
+                                color: NinjaColors.error,
+                              ),
+                            ),
+                          ),
 
                         // Поле подтверждения пароля (только для регистрации)
                         if (!_isLogin) ...[
                           const SizedBox(height: 20),
-                          CustomTextField(
-                            label: 'Подтвердите пароль',
-                            hint: 'Повторите пароль',
+                          Text('Подтвердите пароль', style: NinjaText.section),
+                          const SizedBox(height: 8),
+                          MetalTextField(
                             controller: _confirmPasswordController,
+                            hint: 'Повторите пароль',
                             isPassword: true,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Подтвердите пароль';
-                              }
-                              if (value != _passwordController.text) {
-                                return 'Пароли не совпадают';
-                              }
-                              return null;
-                            },
                           ),
+                          if (_confirmPasswordError != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                _confirmPasswordError!,
+                                style: NinjaText.caption.copyWith(
+                                  color: NinjaColors.error,
+                                ),
+                              ),
+                            ),
                         ],
 
                         const SizedBox(height: 32),
 
                         // Кнопка входа/регистрации
-                        CustomButton(
-                          text: _isLogin ? 'Войти' : 'Зарегистрироваться',
+                        MetalButton(
+                          label: _isLogin ? 'Войти' : 'Зарегистрироваться',
+                          icon: _isLogin ? Icons.login : Icons.person_add,
                           onPressed: _submitForm,
                           isLoading: _isLoading,
-                          icon: _isLogin ? Icons.login : Icons.person_add,
-                          height: 64,
                         ),
 
                         const SizedBox(height: 24),
@@ -337,11 +393,10 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                                   ),
                                 );
                               },
-                              child: const Text(
+                              child: Text(
                                 'Забыли пароль?',
-                                style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 14,
+                                style: NinjaText.body.copyWith(
+                                  color: NinjaColors.textSecondary,
                                   decoration: TextDecoration.underline,
                                 ),
                               ),
@@ -358,18 +413,16 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                               _isLogin
                                   ? 'Нет аккаунта? '
                                   : 'Уже есть аккаунт? ',
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 16,
+                              style: NinjaText.body.copyWith(
+                                color: NinjaColors.textSecondary,
                               ),
                             ),
                             TextButton(
                               onPressed: _toggleMode,
                               child: Text(
                                 _isLogin ? 'Зарегистрироваться' : 'Войти',
-                                style: const TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontSize: 16,
+                                style: NinjaText.body.copyWith(
+                                  color: NinjaColors.textPrimary,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -384,8 +437,8 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

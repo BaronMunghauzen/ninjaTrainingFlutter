@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../constants/app_colors.dart';
+import 'package:flutter/services.dart';
+import '../../widgets/metal_message.dart';
+import '../../widgets/metal_text_field.dart';
+import '../../widgets/metal_button.dart';
+import '../../design/ninja_spacing.dart';
 
 class FreeTrainingNameModal extends StatefulWidget {
   const FreeTrainingNameModal({super.key});
@@ -9,8 +13,13 @@ class FreeTrainingNameModal extends StatefulWidget {
 }
 
 class _FreeTrainingNameModalState extends State<FreeTrainingNameModal> {
-  final TextEditingController _nameController = TextEditingController();
-  bool _isLoading = false;
+  late final TextEditingController _nameController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController();
+  }
 
   @override
   void dispose() {
@@ -18,62 +27,68 @@ class _FreeTrainingNameModalState extends State<FreeTrainingNameModal> {
     super.dispose();
   }
 
-  void _onCreate() {
-    final name = _nameController.text.trim();
-    if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Введите название тренировки')),
-      );
-      return;
-    }
-    Navigator.of(context).pop(name);
-  }
-
-  void _onCancel() {
-    Navigator.of(context).pop();
-  }
-
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text(
-        'Новая тренировка',
-        style: TextStyle(color: AppColors.textPrimary),
-      ),
-      content: TextField(
-        controller: _nameController,
-        decoration: const InputDecoration(
-          labelText: 'Название тренировки',
-          hintText: 'Например: Тренировка ног',
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        MetalTextField(
+          controller: _nameController,
+          hint: 'Например: Тренировка ног',
+          inputFormatters: [LengthLimitingTextInputFormatter(50)],
         ),
-        style: const TextStyle(color: AppColors.textPrimary),
-        maxLength: 50,
-      ),
-      actions: [
-        TextButton(
-          onPressed: _isLoading ? null : _onCancel,
-          child: const Text(
-            'Отмена',
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
-        ),
-        ElevatedButton(
-          onPressed: _isLoading ? null : _onCreate,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.buttonPrimary,
-            foregroundColor: Colors.white,
-          ),
-          child: _isLoading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Создать'),
+        const SizedBox(height: NinjaSpacing.lg),
+        Row(
+          children: [
+            Expanded(
+              child: MetalButton(
+                label: 'Отмена',
+                onPressed: () {
+                  if (!mounted) return;
+                  FocusScope.of(context).unfocus();
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      Navigator.of(context).pop();
+                    }
+                  });
+                },
+                height: 56,
+                fontSize: 16,
+                position: MetalButtonPosition.first,
+              ),
+            ),
+            Expanded(
+              child: MetalButton(
+                label: 'Создать',
+                onPressed: () {
+                  if (!mounted) return;
+                  FocusScope.of(context).unfocus();
+                  final name = _nameController.text.trim();
+                  if (name.isEmpty) {
+                    if (mounted) {
+                      MetalMessage.show(
+                        context: context,
+                        message: 'Введите название тренировки',
+                        type: MetalMessageType.error,
+                      );
+                    }
+                    return;
+                  }
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      Navigator.of(context).pop(name);
+                    }
+                  });
+                },
+                height: 56,
+                fontSize: 16,
+                position: MetalButtonPosition.last,
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
 }
-
-

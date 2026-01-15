@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:ui' as ui;
-import '../../constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/notification_service.dart';
 import '../../services/api_service.dart';
@@ -10,6 +9,7 @@ import 'achievements_and_statistics/achievements_and_statistics_screen.dart';
 import 'profile/profile_screen.dart';
 import 'food/food_screen.dart';
 import '../widgets/network_status_banner.dart';
+import '../widgets/metal_bottom_nav_bar.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
@@ -53,78 +53,20 @@ class _MainScreenState extends State<MainScreen> {
     return NetworkStatusBanner(
       child: Scaffold(
         body: _buildCurrentScreen(),
-        bottomNavigationBar: Container(
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 10,
-                offset: const Offset(0, -2),
-              ),
-            ],
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildNavItem(0, 'assets/images/training.png', ''),
-                  _buildNavItem(1, 'assets/images/food.png', ''),
-                  _buildNavItem(2, 'assets/images/achivandstat.png', ''),
-                  _buildNavItem(3, 'assets/images/profile.png', ''),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem(int index, String iconPath, String label) {
-    final isSelected = _currentIndex == index;
-
-    return GestureDetector(
-      onTap: () => _onTabSelected(index),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.textPrimary.withOpacity(0.1)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(
-              iconPath,
-              width: 28,
-              height: 28,
-              color: isSelected
-                  ? AppColors.textPrimary
-                  : AppColors.textSecondary,
-            ),
-            if (label.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSelected
-                      ? AppColors.textPrimary
-                      : AppColors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                ),
-              ),
-            ],
+        bottomNavigationBar: MetalBottomNavBar(
+          currentIndex: _currentIndex,
+          onTap: _onTabSelected,
+          items: [
+            MetalNavItem(iconPath: 'assets/images/training.png'),
+            MetalNavItem(iconPath: 'assets/images/food.png'),
+            MetalNavItem(iconPath: 'assets/images/achivandstat.png'),
+            MetalNavItem(iconPath: 'assets/images/profile.png'),
           ],
         ),
       ),
     );
   }
+
 
   Widget _buildCurrentScreen() {
     switch (_currentIndex) {

@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../constants/app_colors.dart';
 import 'user_training_list_screen.dart';
 import 'user_exercise_reference_list_screen.dart';
+import '../../widgets/textured_background.dart';
+import '../../widgets/metal_back_button.dart';
+import '../../widgets/metal_tab_switcher.dart';
+import '../../design/ninja_spacing.dart';
+import '../../design/ninja_typography.dart';
 
 class UserTrainingConstructorScreen extends StatefulWidget {
   final VoidCallback? onDataChanged;
@@ -15,53 +19,64 @@ class UserTrainingConstructorScreen extends StatefulWidget {
 }
 
 class _UserTrainingConstructorScreenState
-    extends State<UserTrainingConstructorScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
+    extends State<UserTrainingConstructorScreen> {
+  int _selectedTabIndex = 0;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Конструктор тренировок',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w600,
+      backgroundColor: Colors.transparent,
+      body: TexturedBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Верхний раздел с кнопкой назад и названием
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Row(
+                  children: [
+                    const MetalBackButton(),
+                    const SizedBox(width: NinjaSpacing.md),
+                    Expanded(
+                      child: Text(
+                        'Конструктор тренировок',
+                        style: NinjaText.title,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    const SizedBox(width: NinjaSpacing.md),
+                    // Пустое место для симметрии
+                    const SizedBox(width: 48),
+                  ],
+                ),
+              ),
+              // Переключатель вкладок
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: MetalTabSwitcher(
+                  tabs: const ['Мои тренировки', 'Справочник упражнений'],
+                  initialIndex: _selectedTabIndex,
+                  onTabChanged: (index) {
+                    setState(() {
+                      _selectedTabIndex = index;
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Контент вкладок
+              Expanded(
+                child: IndexedStack(
+                  index: _selectedTabIndex,
+                  children: [
+                    UserTrainingListScreen(onDataChanged: widget.onDataChanged),
+                    const UserExerciseReferenceListScreen(),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-        backgroundColor: AppColors.surface,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: AppColors.textPrimary,
-          unselectedLabelColor: AppColors.textSecondary,
-          indicatorColor: AppColors.buttonPrimary,
-          tabs: const [
-            Tab(text: 'Мои тренировки'),
-            Tab(text: 'Справочник упражнений'),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          UserTrainingListScreen(onDataChanged: widget.onDataChanged),
-          const UserExerciseReferenceListScreen(),
-        ],
       ),
     );
   }

@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http_parser/http_parser.dart';
 import '../../constants/app_colors.dart';
 import '../../models/training_model.dart';
 import '../../services/user_training_service.dart';
 import '../../services/api_service.dart';
+import '../../widgets/textured_background.dart';
+import '../../widgets/metal_back_button.dart';
+import '../../widgets/metal_button.dart';
+import '../../widgets/metal_list_item.dart';
+import '../../widgets/metal_message.dart';
+import '../../widgets/metal_modal.dart';
 import '../../widgets/auth_image_widget.dart';
+import '../../widgets/gif_widget.dart';
+import '../../design/ninja_typography.dart';
+import '../../design/ninja_spacing.dart';
 import 'user_exercise_group_create_screen.dart';
 import 'user_exercise_group_detail_screen.dart';
 import 'user_training_edit_screen.dart';
@@ -33,8 +38,11 @@ class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
   List<ExerciseGroup> exerciseGroups = [];
   Map<String, Map<String, dynamic>> exerciseData =
       {}; // UUID группы -> данные упражнения
+  Map<String, Map<String, dynamic>> exerciseReferenceData =
+      {}; // UUID группы -> данные exercise_reference
   bool isLoading = true;
   String? _imageUuid; // UUID изображения тренировки
+  bool _isUploadingImage = false;
 
   @override
   void initState() {
@@ -52,6 +60,7 @@ class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
 
       // Загружаем данные для каждого упражнения в группах
       Map<String, Map<String, dynamic>> exerciseDataMap = {};
+      Map<String, Map<String, dynamic>> exerciseReferenceDataMap = {};
       for (final group in groups) {
         if (group.exercises.isNotEmpty) {
           try {
@@ -61,6 +70,22 @@ class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
             if (response.statusCode == 200) {
               final data = ApiService.decodeJson(response.body);
               exerciseDataMap[group.uuid] = data;
+
+              // Загружаем данные exercise_reference
+              final exerciseReferenceUuid = data['exercise_reference_uuid'];
+              if (exerciseReferenceUuid != null) {
+                try {
+                  final refResponse = await ApiService.get(
+                    '/exercise_reference/$exerciseReferenceUuid',
+                  );
+                  if (refResponse.statusCode == 200) {
+                    final refData = ApiService.decodeJson(refResponse.body);
+                    exerciseReferenceDataMap[group.uuid] = refData;
+                  }
+                } catch (e) {
+                  print('Error loading exercise reference for group ${group.uuid}: $e');
+                }
+              }
             }
           } catch (e) {
             print('Error loading exercise data for group ${group.uuid}: $e');
@@ -78,6 +103,7 @@ class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
       setState(() {
         exerciseGroups = groups;
         exerciseData = exerciseDataMap;
+        exerciseReferenceData = exerciseReferenceDataMap;
         isLoading = false;
       });
     } catch (e) {
@@ -99,6 +125,7 @@ class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
         setState(() {
           // Обновляем локальную переменную состояния
           _training = updatedTraining;
+          _imageUuid = _training.imageUuid;
         });
       }
     } catch (e) {
@@ -111,167 +138,332 @@ class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
       final ImagePicker picker = ImagePicker();
       final XFile? image = await picker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 80,
-        requestFullMetadata:
-            false, // Отключаем метаданные для лучшей производительности
+        maxWidth: 1920,
+        maxHeight: 1920,
+        imageQuality: 85,
       );
 
-      if (image != null) {
-        print('Загружаем изображение: ${image.path}');
-        // Создаем multipart request для загрузки файла
-        final uri = Uri.parse(
-          '${ApiService.baseUrl}/trainings/${_training.uuid}/upload-image',
-        );
-        final request = http.MultipartRequest('POST', uri);
+      if (image == null) return;
 
-        // Добавляем заголовки авторизации
-        final prefs = await SharedPreferences.getInstance();
-        final token = prefs.getString('user_token');
-        if (token != null) {
-          request.headers['Cookie'] = 'users_access_token=$token';
-        }
+      if (!mounted) return;
+      setState(() {
+        _isUploadingImage = true;
+      });
 
-        // Добавляем файл с правильным Content-Type
-        final fileExtension = image.path.split('.').last.toLowerCase();
-        String contentType;
+      // Определяем MIME тип
+      final fileExtension = image.path.split('.').last.toLowerCase();
+      String? mimeType;
+      switch (fileExtension) {
+        case 'jpg':
+        case 'jpeg':
+          mimeType = 'image/jpeg';
+          break;
+        case 'png':
+          mimeType = 'image/png';
+          break;
+        case 'webp':
+          mimeType = 'image/webp';
+          break;
+        case 'gif':
+          mimeType = 'image/gif';
+          break;
+        default:
+          mimeType = 'image/jpeg';
+      }
 
-        switch (fileExtension) {
-          case 'jpg':
-          case 'jpeg':
-            contentType = 'image/jpeg';
-            break;
-          case 'png':
-            contentType = 'image/png';
-            break;
-          case 'webp':
-            contentType = 'image/webp';
-            break;
-          case 'gif':
-            contentType = 'image/gif';
-            break;
-          default:
-            contentType = 'image/jpeg'; // По умолчанию
-        }
+      final response = await ApiService.multipart(
+        '/trainings/${_training.uuid}/upload-image',
+        fileField: 'file',
+        filePath: image.path,
+        mimeType: mimeType,
+      );
 
-        request.files.add(
-          await http.MultipartFile.fromPath(
-            'file',
-            image.path,
-            contentType: MediaType.parse(contentType),
-          ),
-        );
+      if (!mounted) return;
 
-        // Отправляем запрос
-        print('Отправляем запрос на: $uri');
-        print('Заголовки: ${request.headers}');
-        print('Файлы: ${request.files.map((f) => f.field).toList()}');
-        print('Content-Type файла: $contentType');
-        final streamedResponse = await request.send();
-        final response = await http.Response.fromStream(streamedResponse);
-        print('Ответ сервера: ${response.statusCode}');
-        print('Тело ответа: ${response.body}');
+      setState(() {
+        _isUploadingImage = false;
+      });
 
-        if (response.statusCode == 200) {
-          final responseData = json.decode(response.body);
-          if (responseData['image_uuid'] != null) {
-            setState(() {
-              _imageUuid = responseData['image_uuid'];
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Изображение успешно загружено')),
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Ошибка: не получен UUID изображения'),
-              ),
-            );
-          }
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final responseData = ApiService.decodeJson(response.body);
+        if (responseData['image_uuid'] != null) {
+          setState(() {
+            _imageUuid = responseData['image_uuid'];
+          });
+          MetalMessage.show(
+            context: context,
+            message: 'Изображение успешно загружено',
+            type: MetalMessageType.success,
+            title: 'Успешно',
+          );
         } else {
-          final errorBody = response.body;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Ошибка загрузки (${response.statusCode}): ${errorBody.isNotEmpty ? errorBody : 'Неизвестная ошибка'}',
-              ),
-            ),
+          MetalMessage.show(
+            context: context,
+            message: 'Ошибка: не получен UUID изображения',
+            type: MetalMessageType.error,
+            title: 'Ошибка',
           );
         }
+      } else {
+        MetalMessage.show(
+          context: context,
+          message: 'Ошибка загрузки изображения: ${response.statusCode}',
+          type: MetalMessageType.error,
+          title: 'Ошибка',
+        );
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      if (!mounted) return;
+      setState(() {
+        _isUploadingImage = false;
+      });
+      MetalMessage.show(
+        context: context,
+        message: 'Ошибка: $e',
+        type: MetalMessageType.error,
+        title: 'Ошибка',
+      );
     }
   }
 
   Future<void> _deleteImage() async {
-    try {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Удаление изображения'),
-          content: const Text(
-            'Вы уверены, что хотите удалить изображение тренировки?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Отмена'),
+    final confirm = await MetalModal.show<bool>(
+      context: context,
+      title: 'Удалить изображение?',
+      children: [
+        Text(
+          'Вы уверены, что хотите удалить это изображение?',
+          style: NinjaText.body,
+        ),
+        const SizedBox(height: NinjaSpacing.xl),
+        Row(
+          children: [
+            Expanded(
+              child: MetalButton(
+                label: 'Отмена',
+                onPressed: () => Navigator.of(context).pop(false),
+                height: 56,
+                fontSize: 16,
+                position: MetalButtonPosition.first,
+              ),
             ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Удалить'),
+            Expanded(
+              child: MetalButton(
+                label: 'Удалить',
+                onPressed: () => Navigator.of(context).pop(true),
+                height: 56,
+                fontSize: 16,
+                position: MetalButtonPosition.last,
+                topColor: Colors.red,
+              ),
             ),
           ],
         ),
+      ],
+    );
+
+    if (confirm != true) return;
+
+    try {
+      final response = await ApiService.delete(
+        '/trainings/${_training.uuid}/delete-image',
       );
 
-      if (confirmed == true) {
-        final response = await ApiService.delete(
-          '/trainings/${_training.uuid}/delete-image',
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        setState(() {
+          _imageUuid = null;
+        });
+        MetalMessage.show(
+          context: context,
+          message: 'Изображение успешно удалено',
+          type: MetalMessageType.success,
+          title: 'Успешно',
         );
-
-        if (response.statusCode == 200) {
-          setState(() {
-            _imageUuid = null;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Изображение успешно удалено')),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Ошибка удаления: ${response.statusCode}')),
-          );
-        }
+      } else {
+        MetalMessage.show(
+          context: context,
+          message: 'Ошибка удаления: ${response.statusCode}',
+          type: MetalMessageType.error,
+          title: 'Ошибка',
+        );
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      MetalMessage.show(
+        context: context,
+        message: 'Ошибка: $e',
+        type: MetalMessageType.error,
+        title: 'Ошибка',
+      );
     }
   }
 
-  Widget _buildInfoChip(String label, String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.textSecondary.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.textSecondary.withOpacity(0.3),
-          width: 1,
+  Future<void> _handleImageTap() async {
+    if (_imageUuid != null) {
+      // Если есть изображение, показываем модалку для удаления
+      await _deleteImage();
+    } else {
+      // Если нет изображения, загружаем
+      await _uploadImage();
+    }
+  }
+
+  Future<void> _archiveTraining() async {
+    final confirmed = await MetalModal.show<bool>(
+      context: context,
+      title: 'Архивирование тренировки',
+      children: [
+        Text(
+          'Вы уверены, что хотите архивировать эту тренировку?',
+          style: NinjaText.body,
         ),
-      ),
-      child: Text(
-        '$label: $value',
-        style: const TextStyle(
-          color: AppColors.textSecondary,
-          fontSize: 11,
-          fontWeight: FontWeight.w500,
+        const SizedBox(height: 8),
+        Text(
+          'После архивирования тренировка не будет отображаться на главной странице.',
+          style: NinjaText.caption.copyWith(
+            color: AppColors.textSecondary,
+          ),
         ),
+        const SizedBox(height: NinjaSpacing.xl),
+        Row(
+          children: [
+            Expanded(
+              child: MetalButton(
+                label: 'Отмена',
+                onPressed: () => Navigator.of(context).pop(false),
+                height: 56,
+                fontSize: 16,
+                position: MetalButtonPosition.first,
+              ),
+            ),
+            Expanded(
+              child: MetalButton(
+                label: 'Архивировать',
+                onPressed: () => Navigator.of(context).pop(true),
+                height: 56,
+                fontSize: 16,
+                position: MetalButtonPosition.last,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    if (confirmed != true) return;
+
+    final success = await UserTrainingService.archiveTraining(
+      _training.uuid,
+    );
+    if (success) {
+      widget.onDataChanged?.call();
+      Navigator.of(context).pop();
+    } else {
+      if (mounted) {
+        MetalMessage.show(
+          context: context,
+          message: 'Ошибка при архивировании тренировки',
+          type: MetalMessageType.error,
+          title: 'Ошибка',
+        );
+      }
+    }
+  }
+
+  Future<void> _restoreTraining() async {
+    final confirmed = await MetalModal.show<bool>(
+      context: context,
+      title: 'Восстановление тренировки',
+      children: [
+        Text(
+          'Вы уверены, что хотите восстановить эту тренировку из архива?',
+          style: NinjaText.body,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'После восстановления тренировка станет видна на главной странице.',
+          style: NinjaText.caption.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: NinjaSpacing.xl),
+        Row(
+          children: [
+            Expanded(
+              child: MetalButton(
+                label: 'Отмена',
+                onPressed: () => Navigator.of(context).pop(false),
+                height: 56,
+                fontSize: 16,
+                position: MetalButtonPosition.first,
+              ),
+            ),
+            Expanded(
+              child: MetalButton(
+                label: 'Восстановить',
+                onPressed: () => Navigator.of(context).pop(true),
+                height: 56,
+                fontSize: 16,
+                position: MetalButtonPosition.last,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    if (confirmed != true) return;
+
+    final success = await UserTrainingService.restoreTraining(
+      _training.uuid,
+    );
+    if (success) {
+      widget.onDataChanged?.call();
+      Navigator.of(context).pop();
+    } else {
+      if (mounted) {
+        MetalMessage.show(
+          context: context,
+          message: 'Ошибка при восстановлении тренировки',
+          type: MetalMessageType.error,
+          title: 'Ошибка',
+        );
+      }
+    }
+  }
+
+  Widget _buildExerciseMedia(String? gifUuid, String? imageUuid) {
+    // Приоритет: гифка -> картинка
+    if (gifUuid != null && gifUuid.isNotEmpty) {
+      return SizedBox(
+        width: 60,
+        height: 60,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: GifWidget(gifUuid: gifUuid, height: 60, width: 60),
+        ),
+      );
+    }
+
+    if (imageUuid != null && imageUuid.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: AuthImageWidget(
+          imageUuid: imageUuid,
+          height: 60,
+          width: 60,
+          fit: BoxFit.cover,
+        ),
+      );
+    }
+
+    // Если нет медиа, показываем иконку
+    return const SizedBox(
+      width: 60,
+      height: 60,
+      child: Icon(
+        Icons.fitness_center,
+        color: AppColors.textSecondary,
+        size: 24,
       ),
     );
   }
@@ -279,384 +471,285 @@ class _UserTrainingDetailScreenState extends State<UserTrainingDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _training.caption,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        backgroundColor: AppColors.surface,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () async {
-              final result = await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) =>
-                      UserTrainingEditScreen(training: _training),
-                ),
-              );
-              if (result == true) {
-                // Обновляем данные тренировки
-                await _refreshTrainingData();
-                // Обновляем список групп упражнений
-                _loadExerciseGroups();
-              }
-            },
-          ),
-          if (_training.actual)
-            IconButton(
-              icon: const Icon(Icons.archive),
-              onPressed: () async {
-                final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Архивирование тренировки'),
-                    content: const Text(
-                      'Вы уверены, что хотите архивировать эту тренировку?',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(false),
-                        child: const Text('Отмена'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(true),
-                        child: const Text('Архивировать'),
-                      ),
-                    ],
-                  ),
-                );
-
-                if (confirmed == true) {
-                  final success = await UserTrainingService.archiveTraining(
-                    _training.uuid,
-                  );
-                  if (success) {
-                    // Вызываем callback для обновления данных на родительской странице
-                    print(
-                      'UserTrainingDetailScreen: Вызываем callback после архивации',
-                    );
-                    widget.onDataChanged?.call();
-                    Navigator.of(context).pop();
-                  }
-                }
-              },
-            )
-          else
-            IconButton(
-              icon: const Icon(Icons.unarchive),
-              onPressed: () async {
-                final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Восстановление тренировки'),
-                    content: const Text(
-                      'Вы уверены, что хотите восстановить эту тренировку из архива?',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(false),
-                        child: const Text('Отмена'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(true),
-                        child: const Text('Восстановить'),
-                      ),
-                    ],
-                  ),
-                );
-
-                if (confirmed == true) {
-                  final success = await UserTrainingService.restoreTraining(
-                    _training.uuid,
-                  );
-                  if (success) {
-                    // Вызываем callback для обновления данных на родительской странице
-                    print(
-                      'UserTrainingDetailScreen: Вызываем callback после восстановления',
-                    );
-                    widget.onDataChanged?.call();
-                    Navigator.of(context).pop();
-                  }
-                }
-              },
-            ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Информация о тренировке
-          Padding(
-            padding: const EdgeInsets.fromLTRB(30, 8, 16, 16),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+      backgroundColor: Colors.transparent,
+      body: TexturedBackground(
+        child: SafeArea(
+          child: Stack(
+            children: [
+              Column(
                 children: [
-                  // Изображение тренировки
-                  Row(
-                    children: [
-                      Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: AppColors.inputBorder,
-                            width: 1,
+                  // Верхняя панель с кнопкой назад, названием и кнопками действий
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Row(
+                      children: [
+                        const MetalBackButton(),
+                        const SizedBox(width: NinjaSpacing.md),
+                        Expanded(
+                          child: Text(
+                            _training.caption,
+                            style: NinjaText.title,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        child: _imageUuid != null
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(7),
-                                child: Builder(
-                                  builder: (context) {
-                                    try {
-                                      return AuthImageWidget(
-                                        imageUuid: _imageUuid!,
-                                        width: 80,
-                                        height: 80,
-                                      );
-                                    } catch (e) {
-                                      // Если ошибка декодирования, показываем заглушку
-                                      return Container(
-                                        width: 80,
-                                        height: 80,
-                                        decoration: BoxDecoration(
-                                          color: AppColors.surface,
-                                          borderRadius: BorderRadius.circular(
-                                            7,
-                                          ),
-                                        ),
-                                        child: const Icon(
-                                          Icons.broken_image,
-                                          color: AppColors.textSecondary,
-                                          size: 32,
-                                        ),
-                                      );
-                                    }
-                                  },
-                                ),
-                              )
-                            : Container(
-                                decoration: BoxDecoration(
-                                  color: AppColors.surface,
-                                  borderRadius: BorderRadius.circular(7),
-                                ),
-                                child: const Icon(
-                                  Icons.image,
-                                  color: AppColors.textSecondary,
-                                  size: 32,
-                                ),
-                              ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _training.caption,
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              _training.description,
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Кнопки управления изображением
-                      Column(
-                        children: [
-                          IconButton(
-                            onPressed: _uploadImage,
-                            icon: const Icon(Icons.add_photo_alternate),
-                            tooltip: 'Загрузить изображение',
-                          ),
-                          if (_imageUuid != null)
-                            IconButton(
-                              onPressed: _deleteImage,
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              tooltip: 'Удалить изображение',
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Группа мышц: ${_training.muscleGroup}',
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Уровень сложности: ${_training.difficultyLevel}',
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const Divider(),
-          // Заголовок списка упражнений
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Упражнения',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ),
-          ),
-          // Список групп упражнений
-          Expanded(
-            child: isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.textPrimary,
-                    ),
-                  )
-                : exerciseGroups.isEmpty
-                ? const Center(
-                    child: Text(
-                      'В этой тренировке пока нет упражнений',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 16,
-                      ),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: exerciseGroups.length,
-                    itemBuilder: (context, index) {
-                      final group = exerciseGroups[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        child: ListTile(
-                          title: Text(
-                            group.caption,
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                group.description,
-                                style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 8),
-                              // Информация о подходах, повторениях, времени отдыха и весе
-                              Row(
-                                children: [
-                                  _buildInfoChip(
-                                    'Подходы',
-                                    exerciseData[group.uuid]?['sets_count']
-                                            ?.toString() ??
-                                        '3',
-                                  ),
-                                  const SizedBox(width: 8),
-                                  _buildInfoChip(
-                                    'Повторения',
-                                    exerciseData[group.uuid]?['reps_count']
-                                            ?.toString() ??
-                                        '12',
-                                  ),
-                                  const SizedBox(width: 8),
-                                  _buildInfoChip(
-                                    'Отдых',
-                                    '${exerciseData[group.uuid]?['rest_time'] ?? 60}с',
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  _buildInfoChip(
-                                    'Вес',
-                                    (exerciseData[group.uuid]?['with_weight'] ??
-                                            true)
-                                        ? 'С весом'
-                                        : 'Без веса',
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
+                        const SizedBox(width: NinjaSpacing.md),
+                        // Кнопка редактирования
+                        MetalBackButton(
+                          icon: Icons.edit,
                           onTap: () async {
                             final result = await Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (context) =>
-                                    UserExerciseGroupDetailScreen(
-                                      exerciseGroup: group,
-                                      onDataChanged: () {
-                                        // Обновляем данные на этой странице
-                                        _loadExerciseGroups();
-                                        // Вызываем callback родительской страницы
-                                        widget.onDataChanged?.call();
-                                      },
-                                    ),
+                                    UserTrainingEditScreen(training: _training),
                               ),
                             );
-                            // Обновляем данные после возврата (на случай если не было удаления)
                             if (result == true) {
+                              // Обновляем данные тренировки
+                              await _refreshTrainingData();
+                              // Обновляем список групп упражнений
                               _loadExerciseGroups();
                             }
                           },
                         ),
-                      );
-                    },
+                        const SizedBox(width: 8),
+                        // Кнопка архивирования/восстановления
+                        if (_training.actual)
+                          MetalBackButton(
+                            icon: Icons.archive,
+                            onTap: _archiveTraining,
+                          )
+                        else
+                          MetalBackButton(
+                            icon: Icons.unarchive,
+                            onTap: _restoreTraining,
+                          ),
+                      ],
+                    ),
                   ),
+                  // Контент
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 16,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      // Изображение тренировки
+                      GestureDetector(
+                        onTap: _handleImageTap,
+                        child: Container(
+                          width: double.infinity,
+                          height: 200,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppColors.inputBorder.withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: _isUploadingImage
+                              ? const Center(
+                                  child: CircularProgressIndicator(
+                                    color: AppColors.textPrimary,
+                                  ),
+                                )
+                              : _imageUuid != null
+                                  ? Stack(
+                                      children: [
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(12),
+                                          child: AuthImageWidget(
+                                            imageUuid: _imageUuid!,
+                                            width: double.infinity,
+                                            height: 200,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        ),
+                                        Positioned(
+                                          top: 8,
+                                          right: 8,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: Colors.black.withOpacity(0.6),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.delete,
+                                              color: Colors.white,
+                                              size: 20,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  : Container(
+                                      decoration: BoxDecoration(
+                                        color: AppColors.surface.withOpacity(0.3),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(
+                                            Icons.add_photo_alternate,
+                                            size: 48,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'Добавить изображение',
+                                            style: NinjaText.body.copyWith(
+                                              color: AppColors.textSecondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Описание
+                      if (_training.description.isNotEmpty) ...[
+                        Text(
+                          _training.description,
+                          style: NinjaText.body,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      // Группа мышц
+                      if (_training.muscleGroup.isNotEmpty) ...[
+                        Text(
+                          'Группа мышц: ${_training.muscleGroup}',
+                          style: NinjaText.caption,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      // Список групп упражнений
+                      if (isLoading)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(24),
+                            child: CircularProgressIndicator(
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        )
+                      else if (exerciseGroups.isEmpty)
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Text(
+                              'В этой тренировке пока нет упражнений',
+                              style: NinjaText.body.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        )
+                      else
+                        ...exerciseGroups.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final group = entry.value;
+                          final isFirst = index == 0;
+                          final isLast = index == exerciseGroups.length - 1;
+
+                          // Получаем медиа из exercise_reference
+                          final refData = exerciseReferenceData[group.uuid];
+                          String? gifUuid;
+                          String? imageUuid;
+                          
+                          if (refData != null) {
+                            final gif = refData['gif_uuid'] ?? refData['gif'];
+                            final image = refData['image_uuid'] ?? refData['image'];
+                            if (gif != null && gif.toString().isNotEmpty) {
+                              gifUuid = gif.toString();
+                            }
+                            if (image != null && image.toString().isNotEmpty) {
+                              imageUuid = image.toString();
+                            }
+                          }
+
+                          return MetalListItem(
+                            leading: _buildExerciseMedia(gifUuid, imageUuid),
+                            title: Text(
+                              group.caption,
+                              style: NinjaText.body.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Подходы: ${exerciseData[group.uuid]?['sets_count']?.toString() ?? '3'}, '
+                              'Повторения: ${exerciseData[group.uuid]?['reps_count']?.toString() ?? '12'}, '
+                              'Отдых: ${exerciseData[group.uuid]?['rest_time'] ?? 60}с',
+                              style: NinjaText.caption,
+                            ),
+                            onTap: () async {
+                              final result = await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      UserExerciseGroupDetailScreen(
+                                    exerciseGroup: group,
+                                    onDataChanged: () {
+                                      // Обновляем данные на этой странице
+                                      _loadExerciseGroups();
+                                      // Вызываем callback родительской страницы
+                                      widget.onDataChanged?.call();
+                                    },
+                                  ),
+                                ),
+                              );
+                              // Обновляем данные после возврата
+                              if (result == true) {
+                                _loadExerciseGroups();
+                              }
+                            },
+                            isFirst: isFirst,
+                            isLast: isLast,
+                            removeSpacing: true,
+                          );
+                        }),
+                          const SizedBox(height: 80), // Отступ для кнопки внизу
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              // Кнопка добавления в правом нижнем углу
+              Positioned(
+                right: 24,
+                bottom: 24,
+                child: SizedBox(
+                  width: 56,
+                  height: 56,
+                  child: MetalButton(
+                    label: '',
+                    icon: Icons.add,
+                    onPressed: () async {
+                      final result = await Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => UserExerciseGroupCreateScreen(
+                            trainingUuid: _training.uuid,
+                          ),
+                        ),
+                      );
+                      if (result == true) {
+                        _loadExerciseGroups();
+                      }
+                    },
+                    height: 56,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) =>
-                  UserExerciseGroupCreateScreen(trainingUuid: _training.uuid),
-            ),
-          );
-          if (result == true) {
-            _loadExerciseGroups();
-          }
-        },
-        backgroundColor: AppColors.buttonPrimary,
-        child: const Icon(Icons.add),
+        ),
       ),
     );
   }
