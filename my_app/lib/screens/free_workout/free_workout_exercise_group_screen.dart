@@ -55,11 +55,10 @@ class _FreeWorkoutExerciseGroupScreenState
     final exerciseName = exerciseData?['caption'] ?? 'Упражнение';
 
     if (exerciseReferenceUuid == null || userUuid == null || userUuid.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Не удалось загрузить информацию об упражнении'),
-          backgroundColor: Colors.red,
-        ),
+      MetalMessage.show(
+        context: context,
+        message: 'Не удалось загрузить информацию об упражнении',
+        type: MetalMessageType.error,
       );
       return;
     }

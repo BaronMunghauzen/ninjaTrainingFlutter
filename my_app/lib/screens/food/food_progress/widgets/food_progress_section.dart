@@ -37,16 +37,16 @@ class FoodProgressSection extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.add_circle_outline),
-                    onPressed: onAddMeal,
-                    color: NinjaColors.textPrimary,
-                    tooltip: 'Добавить прием пищи',
-                  ),
-                  IconButton(
                     icon: const Icon(Icons.track_changes),
                     onPressed: onAddTarget,
                     color: NinjaColors.textPrimary,
                     tooltip: 'Добавить цель',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline),
+                    onPressed: onAddMeal,
+                    color: NinjaColors.textPrimary,
+                    tooltip: 'Добавить прием пищи',
                   ),
                 ],
               ),

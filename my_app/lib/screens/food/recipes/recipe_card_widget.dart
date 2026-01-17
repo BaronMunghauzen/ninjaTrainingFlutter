@@ -6,6 +6,7 @@ import '../../../widgets/metal_card.dart';
 import '../../../widgets/auth_image_widget.dart';
 import '../../../widgets/macro_info_chip.dart';
 import '../../../widgets/metal_modal.dart';
+import '../../../widgets/metal_message.dart';
 import '../../../design/ninja_spacing.dart';
 import '../../../design/ninja_typography.dart';
 import '../../../design/ninja_colors.dart';
@@ -440,6 +441,21 @@ class _RecipeCardWidgetState extends State<RecipeCardWidget> {
       final fats = widget.recipe.fatsPerPortion * _selectedPortions;
       final carbs = widget.recipe.carbsPerPortion * _selectedPortions;
 
+      // Проверяем, что хотя бы одно из значений БЖУ не равно 0
+      if (proteins == 0 && fats == 0 && carbs == 0) {
+        if (mounted) {
+          setState(() {
+            _isAddingToMeal = false;
+          });
+          MetalMessage.show(
+            context: context,
+            message: 'Невозможно добавить рецепт: все значения БЖУ равны 0',
+            type: MetalMessageType.error,
+          );
+        }
+        return;
+      }
+
       // Используем текущее время
       final mealDatetime = DateTime.now();
 
@@ -456,17 +472,21 @@ class _RecipeCardWidgetState extends State<RecipeCardWidget> {
         setState(() {
           _isAddingToMeal = false;
         });
+        MetalMessage.show(
+          context: context,
+          message: 'Рецепт успешно добавлен в прием пищи',
+          type: MetalMessageType.success,
+        );
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isAddingToMeal = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Ошибка добавления: $e'),
-            backgroundColor: Colors.red,
-          ),
+        MetalMessage.show(
+          context: context,
+          message: 'Ошибка добавления: $e',
+          type: MetalMessageType.error,
         );
       }
     }

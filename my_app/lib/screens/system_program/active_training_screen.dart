@@ -54,14 +54,12 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
     final userProfile = authProvider.userProfile;
 
     if (userProfile != null && userProfile.subscriptionStatus != 'active') {
-      showDialog(
+      SubscriptionErrorDialog.show(
         context: context,
         barrierDismissible: false,
-        builder: (context) => SubscriptionErrorDialog(
-          onClose: () {
-            Navigator.of(context).pop();
-          },
-        ),
+        onClose: () {
+          Navigator.of(context).pop();
+        },
       );
     }
   }
@@ -173,7 +171,8 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
                               message: e.toString(),
                               type: MetalMessageType.error,
                               title: 'Ошибка',
-                              description: 'Произошла ошибка при завершении программы',
+                              description:
+                                  'Произошла ошибка при завершении программы',
                             );
                           }
                         }
@@ -222,32 +221,18 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
             const Spacer(),
             Icon(Icons.emoji_events, size: 80, color: AppColors.buttonPrimary),
             const SizedBox(height: 20),
-            const Text(
-              'Поздравляем! Вы проделали большую работу. Переходите к следующему этапу.',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+            Text(
+              'Поздравляем! Вы проделали большую работу. Продолжайте в том же духе',
+              style: NinjaText.title.copyWith(fontSize: 20),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
             SizedBox(
               width: 220,
-              child: ElevatedButton(
+              child: MetalButton(
+                label: 'Продолжить',
                 onPressed: _continueToNextStage,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.buttonPrimary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  'Продолжить',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                ),
+                fontSize: 18,
               ),
             ),
             const SizedBox(height: 20),
@@ -291,35 +276,18 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
                   color: AppColors.buttonPrimary,
                 ),
                 const SizedBox(height: 20),
-                const Text(
-                  'Поздравляем! Вы проделали большую работу. Переходите к следующему этапу.',
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                Text(
+                  'Поздравляем! Вы проделали большую работу. Продолжайте в том же духе',
+                  style: NinjaText.title.copyWith(fontSize: 20),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
                 SizedBox(
                   width: 220,
-                  child: ElevatedButton(
+                  child: MetalButton(
+                    label: 'Продолжить',
                     onPressed: _continueToNextStage,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.buttonPrimary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Продолжить',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    fontSize: 18,
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -358,32 +326,18 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
                 color: AppColors.buttonPrimary,
               ),
               const SizedBox(height: 20),
-              const Text(
-                'Поздравляем! Вы проделали большую работу. Переходите к следующему этапу.',
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+              Text(
+                'Поздравляем! Вы проделали большую работу. Продолжайте в том же духе',
+                style: NinjaText.title.copyWith(fontSize: 20),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
               SizedBox(
                 width: 220,
-                child: ElevatedButton(
+                child: MetalButton(
+                  label: 'Продолжить',
                   onPressed: _continueToNextStage,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.buttonPrimary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Продолжить',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                  ),
+                  fontSize: 18,
                 ),
               ),
               const SizedBox(height: 20),
@@ -480,7 +434,8 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
                           message: 'Выполните тренировку в назначенное время.',
                           type: MetalMessageType.warning,
                           title: 'Тренировка не активна',
-                          description: 'Выполните тренировку в назначенное время.',
+                          description:
+                              'Выполните тренировку в назначенное время.',
                         );
                         return;
                       }
@@ -530,35 +485,18 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
                     return const SizedBox.shrink();
                   },
                 ),
-                const Text(
-                  'Поздравляем! Вы проделали большую работу. Переходите к следующему этапу.',
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                Text(
+                  'Поздравляем! Вы проделали большую работу. Продолжайте в том же духе',
+                  style: NinjaText.title.copyWith(fontSize: 20),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
                 SizedBox(
                   width: 220,
-                  child: ElevatedButton(
+                  child: MetalButton(
+                    label: 'Продолжить',
                     onPressed: _continueToNextStage,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.buttonPrimary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Продолжить',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    fontSize: 18,
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -685,6 +623,11 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
   }
 
   void _onTrainingSelected(Map<String, dynamic>? training) {
+    // Не обновляем состояние, если показывается форма поздравления
+    if (_showCongrats) {
+      return;
+    }
+
     final prevUuid = _currentTraining?['training']?['uuid'];
     final newUuid = training?['training']?['uuid'];
     setState(() {
@@ -807,12 +750,14 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
         _currentTraining!['uuid'],
       );
       print('[PASS] Ответ passUserTraining: $response');
+
+      // Всегда показываем форму поздравления, независимо от ответа
+      setState(() {
+        _showCongrats = true;
+      });
+
       final success = response['success'] == true;
-      final nextStageCreated = response['next_stage_created'] == true;
       if (success) {
-        setState(() {
-          _showCongrats = nextStageCreated;
-        });
         MetalMessage.show(
           context: context,
           message: 'Тренировка успешно завершена',
@@ -825,21 +770,18 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
         print('[PASS] До refreshTrainings');
         await Future.delayed(Duration(seconds: 1));
         await _navigationKey.currentState?.refreshTrainings();
-        print('[PASS] После refreshTrainings, до goToActiveTraining');
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          print('[PASS] Внутри postFrameCallback, вызываю goToActiveTraining');
-          _navigationKey.currentState?.goToActiveTraining();
-        });
+        print('[PASS] После refreshTrainings');
+        // НЕ вызываем goToActiveTraining(), так как нужно показать форму поздравления
+        // Форма поздравления уже показана через setState выше
       } else {
-        MetalMessage.show(
-          context: context,
-          message: 'Не удалось завершить тренировку',
-          type: MetalMessageType.error,
-          title: 'Ошибка',
-          description: 'Ошибка завершения тренировки',
-        );
+        // Даже если success = false, форма поздравления уже показана
+        // Не показываем сообщение об ошибке, так как форма поздравления уже отображается
       }
     } catch (e) {
+      // Даже при ошибке показываем форму поздравления
+      setState(() {
+        _showCongrats = true;
+      });
       MetalMessage.show(
         context: context,
         message: e.toString(),
@@ -851,59 +793,7 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
   }
 
   Future<void> _continueToNextStage() async {
-    try {
-      final userUuid =
-          widget.userProgramData['user']?['uuid']?.toString() ?? '';
-      final programUuid =
-          widget.userProgramData['program']?['uuid']?.toString() ?? '';
-      final newUserProgram = await TrainingService.getActiveUserProgram(
-        userUuid: userUuid,
-        programUuid: programUuid,
-      );
-      final newUserProgramUuid = newUserProgram?['uuid']?.toString() ?? '';
-      final success = newUserProgramUuid.isNotEmpty;
-      print(
-        'RefreshUserProgramAndSchedule result: $success, newUserProgramUuid=$newUserProgramUuid',
-      );
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Программа и расписание обновлены')),
-        );
-        // Сброс состояния перед переходом на новый этап
-        setState(() {
-          _currentTraining = null;
-          _exerciseGroups = [];
-          _isLoadingGroups = false;
-          _showCongrats = false;
-          _navigatedToActive = false;
-        });
-        // Собираем новые userProgramData для передачи в новый этап
-        final newUserProgramData = Map<String, dynamic>.from(
-          newUserProgram ?? {},
-        );
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) =>
-                ActiveTrainingScreen(userProgramData: newUserProgramData),
-          ),
-        );
-      } else {
-        MetalMessage.show(
-          context: context,
-          message: 'Не удалось обновить программу и расписание',
-          type: MetalMessageType.error,
-          title: 'Ошибка',
-          description: 'Ошибка обновления программы и расписания',
-        );
-      }
-    } catch (e) {
-      MetalMessage.show(
-        context: context,
-        message: e.toString(),
-        type: MetalMessageType.error,
-        title: 'Ошибка',
-        description: 'Произошла ошибка при обновлении программы и расписания',
-      );
-    }
+    // Возвращаемся на главный экран
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 }

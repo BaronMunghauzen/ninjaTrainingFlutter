@@ -24,6 +24,7 @@ import '../../widgets/metal_button.dart';
 import '../../widgets/metal_modal.dart';
 import '../../widgets/metal_text_field.dart';
 import '../../widgets/metal_message.dart';
+import '../../widgets/subscription_error_dialog.dart';
 import '../../design/ninja_spacing.dart';
 import '../../design/ninja_typography.dart';
 
@@ -411,7 +412,18 @@ class _TrainingScreenState extends State<TrainingScreen> {
   }
 
   Future<void> _startNewFreeTrainingFlow() async {
+    // Проверяем подписку перед началом свободной тренировки
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userProfile = authProvider.userProfile;
+
+    if (userProfile == null || userProfile.subscriptionStatus != 'active') {
+      SubscriptionErrorDialog.show(
+        context: context,
+        barrierDismissible: false,
+      );
+      return; // Не вызываем никакие методы, если проверка не пройдена
+    }
+
     final userUuid = authProvider.userUuid;
     if (userUuid == null) {
       ScaffoldMessenger.of(context).showSnackBar(

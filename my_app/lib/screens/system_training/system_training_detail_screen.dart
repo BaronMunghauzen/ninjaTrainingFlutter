@@ -8,6 +8,7 @@ import '../../widgets/metal_back_button.dart';
 import '../../widgets/metal_card.dart';
 import '../../widgets/metal_button.dart';
 import '../../widgets/metal_list_item.dart';
+import '../../widgets/subscription_error_dialog.dart';
 import '../../design/ninja_typography.dart';
 import 'package:intl/intl.dart';
 
@@ -58,6 +59,10 @@ class _SystemTrainingDetailScreenState
 
   Future<void> _loadTrainingHistory({bool loadMore = false}) async {
     if (loadMore && !_hasNext) return;
+    if (loadMore && _isLoadingMore)
+      return; // Предотвращаем множественные запросы
+    if (!loadMore && _isLoadingHistory)
+      return; // Предотвращаем множественные запросы
 
     setState(() {
       if (!loadMore) {
@@ -77,11 +82,13 @@ class _SystemTrainingDetailScreenState
       }
 
       final page = loadMore ? _currentPage + 1 : 1;
+      print('📄 Загрузка истории тренировок: page=$page, loadMore=$loadMore');
+
       final response = await ApiService.get(
         '/user_trainings/',
         queryParams: {
           'page': page.toString(),
-          'page_size': '10',
+          'page_size': '20',
           'is_rest_day': 'false',
           'training_uuid': widget.training['uuid'],
           'user_uuid': userUuid,
@@ -94,13 +101,18 @@ class _SystemTrainingDetailScreenState
         final List<dynamic> items = data['data'] ?? [];
         final pagination = data['pagination'] ?? {};
 
+        print(
+          '📄 Получено элементов: ${items.length}, has_next: ${pagination['has_next']}',
+        );
+
         if (mounted) {
           setState(() {
             if (loadMore) {
               _trainingHistory.addAll(
                 items.map((item) => item as Map<String, dynamic>).toList(),
               );
-              _currentPage++;
+              _currentPage =
+                  page; // Используем номер страницы, который был запрошен
             } else {
               _trainingHistory = items
                   .map((item) => item as Map<String, dynamic>)
@@ -114,31 +126,21 @@ class _SystemTrainingDetailScreenState
           });
         }
       } else {
+        print('❌ Ошибка загрузки истории: ${response.statusCode}');
         if (mounted) {
           setState(() {
             _isLoadingHistory = false;
             _isLoadingMore = false;
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Ошибка загрузки истории: ${response.statusCode}'),
-              backgroundColor: Colors.red,
-            ),
-          );
         }
       }
     } catch (e) {
+      print('❌ Исключение при загрузке истории: $e');
       if (mounted) {
         setState(() {
           _isLoadingHistory = false;
           _isLoadingMore = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Ошибка загрузки истории: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
     }
   }
@@ -170,7 +172,15 @@ class _SystemTrainingDetailScreenState
   }
 
   Future<void> _startTraining(BuildContext context) async {
+    // Проверяем подписку перед началом тренировки
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userProfile = authProvider.userProfile;
+
+    if (userProfile == null || userProfile.subscriptionStatus != 'active') {
+      SubscriptionErrorDialog.show(context: context, barrierDismissible: false);
+      return; // Не вызываем никакие методы, если проверка не пройдена
+    }
+
     final userUuid = authProvider.userUuid;
     if (userUuid == null) {
       ScaffoldMessenger.of(context).showSnackBar(

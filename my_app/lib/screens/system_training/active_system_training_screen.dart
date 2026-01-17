@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../constants/app_colors.dart';
 import '../../services/training_service.dart';
 import '../../services/api_service.dart';
+import '../../services/notification_service.dart';
 import 'system_exercise_group_screen.dart';
-import '../../widgets/subscription_error_dialog.dart';
-import '../../providers/auth_provider.dart';
 import '../../widgets/textured_background.dart';
 import '../../widgets/metal_back_button.dart';
 import '../../widgets/metal_button.dart';
 import '../../widgets/exercise_group_list_item.dart';
 import '../../widgets/metal_message.dart';
+import '../../widgets/workout_timer_widget.dart';
 import '../../design/ninja_spacing.dart';
 import '../../design/ninja_typography.dart';
 
@@ -28,6 +27,7 @@ class _ActiveSystemTrainingScreenState
     extends State<ActiveSystemTrainingScreen> {
   List<Map<String, dynamic>> _exerciseGroups = [];
   bool _isLoadingGroups = false;
+  DateTime? _workoutStartTime;
 
   @override
   void initState() {
@@ -37,30 +37,39 @@ class _ActiveSystemTrainingScreenState
     print('🚀 training данные: ${widget.userTraining['training']}');
     print('🚀 training UUID: ${widget.userTraining['training']?['uuid']}');
 
-    // Проверяем подписку при открытии экрана
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkSubscription();
-    });
+    // Обрабатываем created_at для секундомера
+    _parseWorkoutStartTime();
 
     print('🚀 Вызываем _loadExerciseGroups...');
     _loadExerciseGroups();
     print('🚀 initState() завершен');
   }
 
-  void _checkSubscription() {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final userProfile = authProvider.userProfile;
-
-    if (userProfile != null && userProfile.subscriptionStatus != 'active') {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => SubscriptionErrorDialog(
-          onClose: () {
-            Navigator.of(context).pop();
-          },
-        ),
-      );
+  void _parseWorkoutStartTime() {
+    try {
+      final createdAt = widget.userTraining['created_at'];
+      if (createdAt != null) {
+        DateTime startTime;
+        if (createdAt is String) {
+          // Парсим строку в формате ISO 8601 с часовым поясом (например: "2026-01-17T09:50:49.262478+00:00")
+          // DateTime.parse автоматически конвертирует в локальное время
+          startTime = DateTime.parse(createdAt).toLocal();
+        } else if (createdAt is int) {
+          // Если это timestamp в секундах
+          startTime = DateTime.fromMillisecondsSinceEpoch(createdAt * 1000).toLocal();
+        } else {
+          print('⚠️ Неизвестный формат created_at: $createdAt');
+          return;
+        }
+        setState(() {
+          _workoutStartTime = startTime;
+        });
+        print('⏱️ Время начала тренировки: $_workoutStartTime');
+      } else {
+        print('⚠️ created_at не найден в userTraining');
+      }
+    } catch (e) {
+      print('❌ Ошибка парсинга created_at: $e');
     }
   }
 
@@ -111,6 +120,9 @@ class _ActiveSystemTrainingScreenState
 
   Future<void> _skipTraining() async {
     try {
+      // Закрываем постоянное уведомление о тренировке
+      await NotificationService.cancelWorkoutNotification();
+      
       final response = await TrainingService.skipUserTrainingWithResponse(
         widget.userTraining['uuid'],
       );
@@ -145,6 +157,9 @@ class _ActiveSystemTrainingScreenState
 
   Future<void> _passTraining() async {
     try {
+      // Закрываем постоянное уведомление о тренировке
+      await NotificationService.cancelWorkoutNotification();
+      
       final response = await TrainingService.passUserTrainingWithResponse(
         widget.userTraining['uuid'],
       );
@@ -213,8 +228,11 @@ class _ActiveSystemTrainingScreenState
                       ),
                     ),
                     const SizedBox(width: NinjaSpacing.md),
-                    // Пустое место для симметрии
-                    const SizedBox(width: 48),
+                    // Секундомер тренировки
+                    if (_workoutStartTime != null)
+                      WorkoutTimerWidget(startTime: _workoutStartTime!)
+                    else
+                      const SizedBox(width: 48),
                   ],
                 ),
                 const SizedBox(height: 16),

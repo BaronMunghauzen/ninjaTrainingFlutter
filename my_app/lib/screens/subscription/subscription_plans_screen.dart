@@ -10,8 +10,10 @@ import '../../widgets/metal_button.dart';
 import '../../widgets/metal_back_button.dart';
 import '../../widgets/metal_modal.dart';
 import '../../widgets/metal_message.dart';
+import '../../widgets/metal_text_field.dart';
 import '../../design/ninja_typography.dart';
 import '../../design/ninja_colors.dart';
+import '../../design/ninja_spacing.dart';
 
 class SubscriptionPlansScreen extends StatefulWidget {
   const SubscriptionPlansScreen({super.key});
@@ -23,18 +25,31 @@ class SubscriptionPlansScreen extends StatefulWidget {
 
 class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
   List<SubscriptionPlan> _plans = [];
+  List<SubscriptionPlan> _originalPlans = []; // Сохраняем оригинальные цены
   SubscriptionStatus? _status;
   bool _isLoading = true;
   bool _isPurchasing = false;
+  bool _isApplyingPromo = false;
   String? _error;
+  final TextEditingController _promoCodeController = TextEditingController();
+  String? _appliedPromoCode; // Сохраняем примененный промокод
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _promoCodeController.addListener(() {
+      setState(() {}); // Обновляем состояние для активации кнопки
+    });
   }
 
-  Future<void> _loadData() async {
+  @override
+  void dispose() {
+    _promoCodeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadData({String? promoCode}) async {
     setState(() {
       _isLoading = true;
       _error = null;
@@ -43,7 +58,7 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
     try {
       // Загружаем планы и статус подписки параллельно
       final results = await Future.wait([
-        SubscriptionService.getPlans(),
+        SubscriptionService.getPlans(promoCode: promoCode),
         SubscriptionService.getStatus(),
       ]);
 
@@ -51,14 +66,68 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
         setState(() {
           _plans = results[0] as List<SubscriptionPlan>;
           _status = results[1] as SubscriptionStatus;
+          // Сохраняем оригинальные цены только при первой загрузке (без промокода)
+          if (promoCode == null || promoCode.isEmpty) {
+            _originalPlans = List.from(_plans);
+            _appliedPromoCode = null; // Сбрасываем промокод при обычной загрузке
+          } else {
+            // Сохраняем примененный промокод
+            _appliedPromoCode = promoCode;
+          }
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
+        // Если это загрузка с промокодом, не устанавливаем _error (чтобы не показывать полноэкранную ошибку)
+        // Ошибка будет обработана в _applyPromoCode()
+        if (promoCode == null || promoCode.isEmpty) {
+          setState(() {
+            _error = e.toString();
+            _isLoading = false;
+          });
+        } else {
+          // При ошибке с промокодом просто сбрасываем состояние загрузки
+          // и пробрасываем исключение дальше
+          setState(() {
+            _isLoading = false;
+          });
+          rethrow; // Пробрасываем исключение, чтобы обработать его в _applyPromoCode()
+        }
+      }
+    }
+  }
+
+  Future<void> _applyPromoCode() async {
+    final promoCode = _promoCodeController.text.trim();
+    if (promoCode.isEmpty) return;
+
+    setState(() {
+      _isApplyingPromo = true;
+    });
+
+    try {
+      await _loadData(promoCode: promoCode);
+    } catch (e) {
+      if (mounted) {
+        // Извлекаем сообщение об ошибке
+        String errorMessage = e.toString();
+        
+        // Убираем префикс "Exception: " если он есть
+        if (errorMessage.startsWith('Exception: ')) {
+          errorMessage = errorMessage.substring('Exception: '.length);
+        }
+        
+        MetalMessage.show(
+          context: context,
+          message: errorMessage,
+          type: MetalMessageType.error,
+        );
+      }
+    } finally {
+      if (mounted) {
         setState(() {
-          _error = e.toString();
-          _isLoading = false;
+          _isApplyingPromo = false;
         });
       }
     }
@@ -75,6 +144,7 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
         planUuid: plan.uuid,
         returnUrl: 'https://ninjatraining.ru/payment/callback',
         paymentMode: ['card', 'sbp'],
+        promoCode: _appliedPromoCode, // Передаем примененный промокод, если он есть
       );
 
       // Сохраняем payment_uuid для проверки после возврата
@@ -288,6 +358,27 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    
+                    // Поле для промокода
+                    Row(
+                      children: [
+                        Expanded(
+                          child: MetalTextField(
+                            controller: _promoCodeController,
+                            hint: 'Промокод',
+                          ),
+                        ),
+                        const SizedBox(width: NinjaSpacing.md),
+                        MetalButton(
+                          label: 'Применить',
+                          onPressed: (_promoCodeController.text.trim().isNotEmpty && !_isApplyingPromo)
+                              ? _applyPromoCode
+                              : null,
+                          isLoading: _isApplyingPromo,
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 24),
 
                     // Список тарифных планов
@@ -365,27 +456,83 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
           const SizedBox(height: 16),
 
           // Цена
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                SubscriptionService.formatPrice(plan.price),
-                style: NinjaText.title.copyWith(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text(
-                  '${SubscriptionService.formatPrice(plan.pricePerMonth)}/мес',
-                  style: NinjaText.body.copyWith(
-                    color: NinjaColors.textSecondary,
+          Builder(
+            builder: (context) {
+              // Находим оригинальный план для сравнения цен
+              final originalPlan = _originalPlans.firstWhere(
+                (p) => p.uuid == plan.uuid,
+                orElse: () => plan,
+              );
+              
+              final hasDiscount = originalPlan.price != plan.price;
+              
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (hasDiscount) ...[
+                    // Старая цена (зачеркнутая)
+                    Flexible(
+                      child: Text(
+                        SubscriptionService.formatPrice(originalPlan.price),
+                        style: NinjaText.title.copyWith(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          decoration: TextDecoration.lineThrough,
+                          color: NinjaColors.textMuted,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  // Новая цена
+                  Flexible(
+                    child: Text(
+                      SubscriptionService.formatPrice(plan.price),
+                      style: NinjaText.title.copyWith(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: hasDiscount ? NinjaColors.success : null,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-              ),
-            ],
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (hasDiscount) ...[
+                            Flexible(
+                              child: Text(
+                                '${SubscriptionService.formatPrice(originalPlan.pricePerMonth)}/мес',
+                                style: NinjaText.body.copyWith(
+                                  color: NinjaColors.textSecondary,
+                                  decoration: TextDecoration.lineThrough,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                          Flexible(
+                            child: Text(
+                              '${SubscriptionService.formatPrice(plan.pricePerMonth)}/мес',
+                              style: NinjaText.body.copyWith(
+                                color: hasDiscount ? NinjaColors.success : NinjaColors.textSecondary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
 
           if (plan.description != null) ...[

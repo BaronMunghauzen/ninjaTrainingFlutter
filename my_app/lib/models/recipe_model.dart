@@ -4,7 +4,8 @@ class Recipe {
   final DateTime updatedAt;
   final bool actual;
   final String? userUuid;
-  final String category; // breakfast, lunch, dinner, salad, snack, dessert, other
+  final String
+  category; // breakfast, lunch, dinner, salad, snack, dessert, other
   final String? type;
   final String name;
   final Map<String, String> ingredients; // {"Яйцо": "1 шт"}
@@ -146,31 +147,38 @@ class RecipesGroupedByCategoryResponse {
 
   factory RecipesGroupedByCategoryResponse.fromJson(Map<String, dynamic> json) {
     return RecipesGroupedByCategoryResponse(
-      breakfast: (json['breakfast'] as List<dynamic>?)
+      breakfast:
+          (json['breakfast'] as List<dynamic>?)
               ?.map((e) => Recipe.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      lunch: (json['lunch'] as List<dynamic>?)
+      lunch:
+          (json['lunch'] as List<dynamic>?)
               ?.map((e) => Recipe.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      dinner: (json['dinner'] as List<dynamic>?)
+      dinner:
+          (json['dinner'] as List<dynamic>?)
               ?.map((e) => Recipe.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      salad: (json['salad'] as List<dynamic>?)
+      salad:
+          (json['salad'] as List<dynamic>?)
               ?.map((e) => Recipe.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      snack: (json['snack'] as List<dynamic>?)
+      snack:
+          (json['snack'] as List<dynamic>?)
               ?.map((e) => Recipe.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      dessert: (json['dessert'] as List<dynamic>?)
+      dessert:
+          (json['dessert'] as List<dynamic>?)
               ?.map((e) => Recipe.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      other: (json['other'] as List<dynamic>?)
+      other:
+          (json['other'] as List<dynamic>?)
               ?.map((e) => Recipe.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
@@ -216,7 +224,8 @@ class RecipesListResponse {
 
   factory RecipesListResponse.fromJson(Map<String, dynamic> json) {
     return RecipesListResponse(
-      items: (json['items'] as List<dynamic>?)
+      items:
+          (json['items'] as List<dynamic>?)
               ?.map((e) => Recipe.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
@@ -227,4 +236,3 @@ class RecipesListResponse {
     );
   }
 }
-

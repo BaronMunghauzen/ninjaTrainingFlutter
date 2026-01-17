@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../../constants/app_colors.dart';
 import '../../services/api_service.dart';
+import '../../services/notification_service.dart';
 import '../../providers/auth_provider.dart';
 import 'package:provider/provider.dart';
 import '../user_training_constructor/user_exercise_selector_screen.dart';
@@ -12,6 +13,8 @@ import '../../widgets/metal_back_button.dart';
 import '../../widgets/metal_button.dart';
 import '../../widgets/metal_list_item.dart';
 import '../../widgets/metal_modal.dart';
+import '../../widgets/metal_message.dart';
+import '../../widgets/workout_timer_widget.dart';
 import '../../design/ninja_spacing.dart';
 import '../../design/ninja_typography.dart';
 // import '../../widgets/video_player_widget.dart';
@@ -36,12 +39,54 @@ class _FreeWorkoutScreenState extends State<FreeWorkoutScreen> {
   Map<String, Uint8List> imageCache = {};
   Map<String, Map<String, dynamic>> exerciseData = {};
   String trainingCaption = 'Свободная тренировка'; // Значение по умолчанию
+  DateTime? _workoutStartTime;
 
   @override
   void initState() {
     super.initState();
+    _loadUserTraining();
     _loadTraining();
     _loadExerciseGroups();
+  }
+
+  Future<void> _loadUserTraining() async {
+    try {
+      final resp = await ApiService.get('/user_trainings/${widget.userTrainingUuid}');
+      if (resp.statusCode == 200) {
+        final data = ApiService.decodeJson(resp.body);
+        _parseWorkoutStartTime(data);
+      }
+    } catch (e) {
+      print('Error loading user training: $e');
+    }
+  }
+
+  void _parseWorkoutStartTime(Map<String, dynamic> userTraining) {
+    try {
+      final createdAt = userTraining['created_at'];
+      if (createdAt != null) {
+        DateTime startTime;
+        if (createdAt is String) {
+          // Парсим строку в формате ISO 8601 с часовым поясом (например: "2026-01-17T09:50:49.262478+00:00")
+          // DateTime.parse автоматически конвертирует в локальное время
+          startTime = DateTime.parse(createdAt).toLocal();
+        } else if (createdAt is int) {
+          // Если это timestamp в секундах
+          startTime = DateTime.fromMillisecondsSinceEpoch(createdAt * 1000).toLocal();
+        } else {
+          print('⚠️ Неизвестный формат created_at: $createdAt');
+          return;
+        }
+        setState(() {
+          _workoutStartTime = startTime;
+        });
+        print('⏱️ Время начала тренировки: $_workoutStartTime');
+      } else {
+        print('⚠️ created_at не найден в userTraining');
+      }
+    } catch (e) {
+      print('❌ Ошибка парсинга created_at: $e');
+    }
   }
 
   Future<void> _loadTraining() async {
@@ -55,6 +100,13 @@ class _FreeWorkoutScreenState extends State<FreeWorkoutScreen> {
       }
     } catch (e) {
       print('Error loading training: $e');
+      if (mounted) {
+        MetalMessage.show(
+          context: context,
+          message: 'Ошибка загрузки тренировки: $e',
+          type: MetalMessageType.error,
+        );
+      }
     }
   }
 
@@ -129,10 +181,24 @@ class _FreeWorkoutScreenState extends State<FreeWorkoutScreen> {
         });
       } else {
         setState(() => isLoading = false);
+        if (mounted) {
+          MetalMessage.show(
+            context: context,
+            message: 'Ошибка загрузки групп упражнений',
+            type: MetalMessageType.error,
+          );
+        }
       }
     } catch (e) {
       print('Error loading exercise groups: $e');
       setState(() => isLoading = false);
+      if (mounted) {
+        MetalMessage.show(
+          context: context,
+          message: 'Ошибка загрузки групп упражнений: $e',
+          type: MetalMessageType.error,
+        );
+      }
     }
   }
 
@@ -248,6 +314,9 @@ class _FreeWorkoutScreenState extends State<FreeWorkoutScreen> {
 
   Future<void> _finishTraining() async {
     try {
+      // Закрываем постоянное уведомление о тренировке
+      await NotificationService.cancelWorkoutNotification();
+      
       // POST /user_trainings/{user_training_uuid}/pass
       final response = await ApiService.post(
         '/user_trainings/${widget.userTrainingUuid}/pass',
@@ -258,16 +327,20 @@ class _FreeWorkoutScreenState extends State<FreeWorkoutScreen> {
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Ошибка завершения тренировки')),
+          MetalMessage.show(
+            context: context,
+            message: 'Ошибка завершения тренировки',
+            type: MetalMessageType.error,
           );
         }
       }
     } catch (e) {
       print('Error finishing training: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ошибка завершения тренировки')),
+        MetalMessage.show(
+          context: context,
+          message: 'Ошибка завершения тренировки: $e',
+          type: MetalMessageType.error,
         );
       }
     }
@@ -293,8 +366,10 @@ class _FreeWorkoutScreenState extends State<FreeWorkoutScreen> {
       final userUuid = authProvider.userUuid;
 
       if (userUuid == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ошибка: не найден userUuid')),
+        MetalMessage.show(
+          context: context,
+          message: 'Ошибка: не найден userUuid',
+          type: MetalMessageType.error,
         );
         return;
       }
@@ -311,13 +386,10 @@ class _FreeWorkoutScreenState extends State<FreeWorkoutScreen> {
 
       if (alreadyExists) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Упражнение "${exerciseRef.caption}" уже добавлено в тренировку',
-              ),
-              backgroundColor: Colors.orange,
-            ),
+          MetalMessage.show(
+            context: context,
+            message: 'Упражнение "${exerciseRef.caption}" уже добавлено в тренировку',
+            type: MetalMessageType.warning,
           );
         }
         return;
@@ -367,8 +439,10 @@ class _FreeWorkoutScreenState extends State<FreeWorkoutScreen> {
     } catch (e) {
       print('Error adding exercise: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка добавления упражнения: $e')),
+        MetalMessage.show(
+          context: context,
+          message: 'Ошибка добавления упражнения: $e',
+          type: MetalMessageType.error,
         );
       }
     }
@@ -401,8 +475,11 @@ class _FreeWorkoutScreenState extends State<FreeWorkoutScreen> {
                             ),
                           ),
                           const SizedBox(width: NinjaSpacing.md),
-                          // Пустое место для симметрии
-                          const SizedBox(width: 48),
+                          // Секундомер тренировки
+                          if (_workoutStartTime != null)
+                            WorkoutTimerWidget(startTime: _workoutStartTime!)
+                          else
+                            const SizedBox(width: 48),
                         ],
                       ),
                     ),

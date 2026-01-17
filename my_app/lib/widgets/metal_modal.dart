@@ -20,9 +20,11 @@ class MetalModal extends StatelessWidget {
     required String title,
     required List<Widget> children,
     VoidCallback? onClose,
+    bool barrierDismissible = true,
   }) {
     return showDialog<T>(
       context: context,
+      barrierDismissible: barrierDismissible,
       barrierColor: Colors.black.withOpacity(0.7),
       builder: (context) => MetalModal(
         title: title,

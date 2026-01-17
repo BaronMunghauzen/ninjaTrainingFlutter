@@ -100,12 +100,10 @@ class _FoodScreenState extends State<FoodScreen> {
     final userProfile = authProvider.userProfile;
 
     if (userProfile == null || userProfile.subscriptionStatus != 'active') {
-      showDialog(
+      SubscriptionErrorDialog.show(
         context: context,
-        builder: (context) => const SubscriptionErrorDialog(
-          message:
-              'Для использования функции сканирования еды необходима активная подписка',
-        ),
+        message:
+            'Для использования функции сканирования еды необходима активная подписка',
       );
       return;
     }
@@ -429,20 +427,6 @@ class _FoodScreenState extends State<FoodScreen> {
   }
 
   void _checkSubscriptionAndOpenRecipes() {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final userProfile = authProvider.userProfile;
-
-    if (userProfile == null || userProfile.subscriptionStatus != 'active') {
-      showDialog(
-        context: context,
-        builder: (context) => const SubscriptionErrorDialog(
-          message:
-              'Для использования функции рецептов необходима активная подписка',
-        ),
-      );
-      return;
-    }
-
     Navigator.of(context).push(ninjaRoute(const RecipesScreen())).then((_) {
       _refresh();
     });

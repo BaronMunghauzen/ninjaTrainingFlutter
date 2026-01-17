@@ -10,6 +10,7 @@ import '../../../widgets/metal_button.dart';
 import '../../../widgets/metal_card.dart';
 import '../../../widgets/metal_back_button.dart';
 import '../../../widgets/metal_text_field.dart';
+import '../../../widgets/metal_message.dart';
 import '../../../utils/ninja_route.dart' show ninjaRouteReplacement;
 import 'food_recognition_result_screen.dart';
 import '../../../models/food_recognition_model.dart';
@@ -45,11 +46,10 @@ class _FoodPhotoSelectionScreenState extends State<FoodPhotoSelectionScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Ошибка выбора изображения: $e'),
-            backgroundColor: NinjaColors.error,
-          ),
+        MetalMessage.show(
+          context: context,
+          message: 'Ошибка выбора изображения: $e',
+          type: MetalMessageType.error,
         );
       }
     }
@@ -95,11 +95,10 @@ class _FoodPhotoSelectionScreenState extends State<FoodPhotoSelectionScreen> {
 
   Future<void> _sendForRecognition() async {
     if (_selectedImage == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Пожалуйста, выберите изображение'),
-          backgroundColor: NinjaColors.error,
-        ),
+      MetalMessage.show(
+        context: context,
+        message: 'Пожалуйста, выберите изображение',
+        type: MetalMessageType.warning,
       );
       return;
     }
@@ -140,16 +139,26 @@ class _FoodPhotoSelectionScreenState extends State<FoodPhotoSelectionScreen> {
           _isUploading = false;
         });
 
-        final errorData = ApiService.decodeJson(response.body);
-        final errorMessage = errorData is Map<String, dynamic>
-            ? (errorData['detail'] ?? 'Ошибка распознавания')
-            : 'Ошибка распознавания';
+        // Извлекаем сообщение об ошибке из detail.message
+        String errorMessage = 'Ошибка распознавания';
+        try {
+          final errorData = ApiService.decodeJson(response.body);
+          if (errorData is Map<String, dynamic> && errorData.containsKey('detail')) {
+            final detail = errorData['detail'];
+            if (detail is Map<String, dynamic> && detail.containsKey('message')) {
+              errorMessage = detail['message'] as String;
+            } else if (detail is String) {
+              errorMessage = detail;
+            }
+          }
+        } catch (_) {
+          // Если не удалось распарсить, используем стандартное сообщение
+        }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: NinjaColors.error,
-          ),
+        MetalMessage.show(
+          context: context,
+          message: errorMessage,
+          type: MetalMessageType.error,
         );
       }
     } catch (e) {
@@ -159,11 +168,10 @@ class _FoodPhotoSelectionScreenState extends State<FoodPhotoSelectionScreen> {
         _isUploading = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Ошибка: $e'),
-          backgroundColor: NinjaColors.error,
-        ),
+      MetalMessage.show(
+        context: context,
+        message: 'Ошибка: $e',
+        type: MetalMessageType.error,
       );
     }
   }

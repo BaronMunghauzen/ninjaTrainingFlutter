@@ -2,6 +2,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/services.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter/material.dart';
 import 'fcm_service.dart';
 
 class NotificationService {
@@ -117,6 +118,7 @@ class NotificationService {
 
       // Создаём notification channel для Android 8.0+ (API 26+)
       await _createNotificationChannel();
+      await _createWorkoutNotificationChannel();
 
       print('🔔 NotificationService: Инициализация завершена успешно');
     } catch (e) {
@@ -150,6 +152,35 @@ class NotificationService {
       );
     } catch (e) {
       print('🔔 NotificationService: ОШИБКА при создании channel: $e');
+    }
+  }
+
+  /// Создание notification channel для тренировок
+  static Future<void> _createWorkoutNotificationChannel() async {
+    print('🔔 NotificationService: Создание workout notification channel...');
+
+    const AndroidNotificationChannel channel = AndroidNotificationChannel(
+      'workout_channel', // ID канала
+      'Workout Notifications', // Название канала
+      description: 'Уведомления о активных тренировках',
+      importance: Importance.low, // Важно: low для постоянных уведомлений
+      playSound: false, // Без звука
+      enableVibration: false, // Без вибрации
+      showBadge: false, // Без badge
+    );
+
+    try {
+      await _notificationsPlugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
+          ?.createNotificationChannel(channel);
+
+      print(
+        '🔔 NotificationService: Workout notification channel создан: ${channel.id}',
+      );
+    } catch (e) {
+      print('🔔 NotificationService: ОШИБКА при создании workout channel: $e');
     }
   }
 
@@ -206,8 +237,45 @@ class NotificationService {
     print('🔔 NotificationService: Нажатие на уведомление (ID: ${response.id}, payload: ${response.payload})');
     
     if (response.payload != null && response.payload!.isNotEmpty) {
+      final payload = response.payload!;
+      
+      // Проверяем тип payload
+      if (payload.startsWith('workout_navigation:')) {
+        // Навигация на тренировку
+        final parts = payload.split(':');
+        if (parts.length >= 3) {
+          final userTrainingUuid = parts[1];
+          final trainingUuid = parts[2];
+          final trainingType = parts.length > 3 ? parts[3] : null;
+          
+          print('🔔 NotificationService: Навигация на тренировку: userTrainingUuid=$userTrainingUuid, trainingUuid=$trainingUuid, trainingType=$trainingType');
+          
+          // Сохраняем payload для пересоздания уведомления
+          final savedPayload = payload;
+          
+          // Сразу пересоздаем уведомление БЕЗ задержки, чтобы оно не закрылось при нажатии
+          // Вызываем синхронно, чтобы успеть до того, как система закроет уведомление
+          showWorkoutNotification(
+            title: 'Тренировка',
+            body: 'Тренировка активна',
+            payload: savedPayload,
+          );
+          
+          // Выполняем навигацию асинхронно (не ждем завершения)
+          print('🔔 NotificationService: Вызываем навигацию...');
+          _handleWorkoutNavigationTap(
+            userTrainingUuid: userTrainingUuid,
+            trainingUuid: trainingUuid,
+            trainingType: trainingType,
+          ).catchError((error) {
+            print('🔔 NotificationService: Ошибка навигации: $error');
+          });
+        }
+        return;
+      }
+      
       // Парсим payload (ожидаем формат: "achievement_uuid:UUID")
-      final parts = response.payload!.split(':');
+      final parts = payload.split(':');
       if (parts.length == 2 && parts[0] == 'achievement_uuid') {
         final achievementUuid = parts[1];
         print('🔔 NotificationService: Открытие достижения: $achievementUuid');
@@ -215,6 +283,28 @@ class NotificationService {
         // Импортируем FCMService для открытия модального окна
         _handleAchievementNotificationTap(achievementUuid);
       }
+    }
+  }
+
+  /// Обработка нажатия на уведомление тренировки
+  static Future<void> _handleWorkoutNavigationTap({
+    required String userTrainingUuid,
+    required String trainingUuid,
+    String? trainingType,
+  }) async {
+    print('🔔 NotificationService: _handleWorkoutNavigationTap вызван');
+    try {
+      // Используем FCMService для навигации
+      print('🔔 NotificationService: Вызываем FCMService.handleWorkoutNavigationTap...');
+      await FCMService.handleWorkoutNavigationTap(
+        userTrainingUuid: userTrainingUuid,
+        trainingUuid: trainingUuid,
+        trainingType: trainingType,
+      );
+      print('🔔 NotificationService: Навигация выполнена успешно');
+    } catch (e, stackTrace) {
+      print('🔔 NotificationService: Ошибка навигации на тренировку: $e');
+      print('🔔 NotificationService: Stack trace: $stackTrace');
     }
   }
 
@@ -427,22 +517,36 @@ class NotificationService {
   }
 
   /// Очистить все уведомления и badge (включая FCM уведомления)
+  /// НЕ удаляет уведомление об активной тренировке (workoutNotificationId)
   static Future<void> clearAllNotifications() async {
-    print('🔔 NotificationService: Очистка всех уведомлений...');
+    print('🔔 NotificationService: Очистка всех уведомлений (кроме workout notification)...');
     try {
-      // Отменяем все локальные уведомления (включая запланированные)
-      await _notificationsPlugin.cancelAll();
-      print('🔔 NotificationService: Все локальные уведомления отменены');
+      // Получаем список всех активных уведомлений
+      final activeNotifications = await _notificationsPlugin.getActiveNotifications();
+      print('🔔 NotificationService: Найдено активных уведомлений: ${activeNotifications.length}');
+      
+      // Отменяем все уведомления кроме workout notification
+      for (final notification in activeNotifications) {
+        final notificationId = notification.id ?? -1;
+        if (notificationId != workoutNotificationId) {
+          await _notificationsPlugin.cancel(notificationId);
+          print('🔔 NotificationService: Отменено уведомление ID: $notificationId');
+        } else {
+          print('🔔 NotificationService: Пропущено workout уведомление (ID: $notificationId)');
+        }
+      }
+      print('🔔 NotificationService: Все локальные уведомления отменены (кроме workout)');
 
       // Очищаем все уведомления приложения на Android (включая FCM) через platform channel
+      // НО исключаем workout notification
       try {
         const platform = MethodChannel('ru.ninjatraining.app/notifications');
-        await platform.invokeMethod('cancelAllNotifications');
-        print('🔔 NotificationService: Все уведомления приложения очищены на Android (включая FCM)');
+        await platform.invokeMethod('cancelAllNotificationsExceptWorkout');
+        print('🔔 NotificationService: Все уведомления приложения очищены на Android (кроме workout)');
       } catch (e) {
         // Если platform channel не настроен, это не критично
         print('🔔 NotificationService: Platform channel для очистки уведомлений не доступен: $e');
-        print('🔔 NotificationService: Используется только cancelAll() из flutter_local_notifications');
+        print('🔔 NotificationService: Используется только отмена через flutter_local_notifications');
       }
 
       // Очищаем badge на iOS (показываем уведомление с badgeNumber: 0, затем сразу отменяем)
@@ -474,6 +578,89 @@ class NotificationService {
       }
     } catch (e) {
       print('🔔 NotificationService: ОШИБКА при очистке уведомлений: $e');
+    }
+  }
+
+  /// ID для постоянного уведомления тренировки
+  static const int workoutNotificationId = 1000;
+
+  /// Показать постоянное уведомление о тренировке
+  static Future<void> showWorkoutNotification({
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
+    print('🔔 NotificationService: Показ постоянного уведомления тренировки');
+
+    final AndroidNotificationDetails androidPlatformChannelSpecifics =
+        AndroidNotificationDetails(
+      'workout_channel',
+      'Workout Notifications',
+      channelDescription: 'Уведомления о активных тренировках',
+      importance: Importance.low,
+      priority: Priority.low,
+      ongoing: true,
+      autoCancel: false,
+      showWhen: false,
+      playSound: false,
+      enableVibration: false,
+      category: AndroidNotificationCategory.service,
+      color: const Color(0xFF1A1A1A),
+      styleInformation: BigTextStyleInformation(
+        body,
+        contentTitle: title,
+        htmlFormatContentTitle: false,
+        htmlFormatSummaryText: false,
+      ),
+    );
+
+    final DarwinNotificationDetails iOSPlatformChannelSpecifics =
+        DarwinNotificationDetails(
+      presentAlert: false, // Не показывать alert на iOS
+      presentBadge: false,
+      presentSound: false,
+      interruptionLevel: InterruptionLevel.passive, // Пассивное уведомление
+    );
+
+    final NotificationDetails platformChannelSpecifics = NotificationDetails(
+      android: androidPlatformChannelSpecifics,
+      iOS: iOSPlatformChannelSpecifics,
+    );
+
+    try {
+      await _notificationsPlugin.show(
+        workoutNotificationId,
+        title,
+        body,
+        platformChannelSpecifics,
+        payload: payload,
+      );
+      print('🔔 NotificationService: Постоянное уведомление показано (ID: $workoutNotificationId)');
+    } catch (e) {
+      print('🔔 NotificationService: ОШИБКА при показе постоянного уведомления: $e');
+    }
+  }
+
+  /// Обновить постоянное уведомление тренировки
+  static Future<void> updateWorkoutNotification({
+    required String title,
+    required String body,
+  }) async {
+    // Используем тот же ID и те же параметры для обновления (включая стилизацию metal_card)
+    await showWorkoutNotification(
+      title: title,
+      body: body,
+    );
+  }
+
+  /// Закрыть постоянное уведомление тренировки
+  static Future<void> cancelWorkoutNotification() async {
+    print('🔔 NotificationService: Закрытие постоянного уведомления (ID: $workoutNotificationId)');
+    try {
+      await _notificationsPlugin.cancel(workoutNotificationId);
+      print('🔔 NotificationService: Постоянное уведомление закрыто');
+    } catch (e) {
+      print('🔔 NotificationService: ОШИБКА при закрытии уведомления: $e');
     }
   }
 }

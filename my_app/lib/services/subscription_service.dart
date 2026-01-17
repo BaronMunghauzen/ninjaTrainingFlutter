@@ -6,23 +6,95 @@ import '../models/subscription_status_model.dart';
 import '../models/payment_model.dart';
 import 'api_service.dart';
 
+/// Кастомный класс исключения для SubscriptionService
+/// Позволяет извлечь сообщение без префикса "Exception: "
+class _SubscriptionServiceException implements Exception {
+  final String message;
+  _SubscriptionServiceException(this.message);
+  
+  @override
+  String toString() => message;
+}
+
 class SubscriptionService {
   /// Получить список всех доступных тарифных планов
   /// НЕ требует авторизации
-  static Future<List<SubscriptionPlan>> getPlans() async {
+  /// [promoCode] - опциональный промокод для применения скидки
+  static Future<List<SubscriptionPlan>> getPlans({String? promoCode}) async {
+    const String _logPrefix = '🌐 API';
+    var uri = Uri.parse('${ApiConstants.baseUrl}/api/subscriptions/plans');
+    
+    // Добавляем промокод как query параметр, если он указан
+    if (promoCode != null && promoCode.isNotEmpty) {
+      uri = uri.replace(queryParameters: {'promo_code': promoCode});
+    }
+    
+    final headers = {'Content-Type': 'application/json'};
+    
     try {
+      // Логирование запроса
+      final timestamp = DateTime.now().toIso8601String();
+      print('$_logPrefix ================================================================================');
+      print('$_logPrefix 🕐 ВРЕМЯ: $timestamp');
+      print('$_logPrefix 📡 МЕТОД: GET');
+      print('$_logPrefix 🌐 URI: $uri');
+      print('$_logPrefix 📋 ЗАГОЛОВКИ:');
+      headers.forEach((key, value) {
+        print('$_logPrefix    $key: $value');
+      });
+      print('$_logPrefix ================================================================================');
+      
       final response = await http.get(
-        Uri.parse('${ApiConstants.baseUrl}/api/subscriptions/plans'),
-        headers: {'Content-Type': 'application/json'},
+        uri,
+        headers: headers,
       );
 
+      // Логирование ответа
+      final responseHeaders = <String, String>{};
+      response.headers.forEach((key, value) {
+        responseHeaders[key] = value;
+      });
+      final responseBody = utf8.decode(response.bodyBytes);
+      
+      print('$_logPrefix ================================================================================');
+      print('$_logPrefix 📥 ОТВЕТ API (GET):');
+      print('$_logPrefix 📊 СТАТУС: ${response.statusCode}');
+      if (responseHeaders.isNotEmpty) {
+        print('$_logPrefix 📋 ЗАГОЛОВКИ ОТВЕТА:');
+        responseHeaders.forEach((key, value) {
+          print('$_logPrefix    $key: $value');
+        });
+      }
+      print('$_logPrefix 📦 ТЕЛО ОТВЕТА:');
+      print('$_logPrefix    $responseBody');
+      print('$_logPrefix ================================================================================');
+
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(utf8.decode(response.bodyBytes));
+        final List<dynamic> data = json.decode(responseBody);
         return data.map((json) => SubscriptionPlan.fromJson(json)).toList();
       } else {
-        throw Exception('Ошибка загрузки тарифов: ${response.statusCode}');
+        // Пытаемся извлечь сообщение об ошибке из поля detail
+        String errorMessage = 'Ошибка загрузки тарифов: ${response.statusCode}';
+        try {
+          final errorData = json.decode(responseBody);
+          if (errorData is Map && errorData.containsKey('detail')) {
+            errorMessage = errorData['detail'] as String;
+          }
+        } catch (_) {
+          // Если не удалось распарсить, используем стандартное сообщение
+        }
+        // Используем кастомный класс исключения, чтобы можно было извлечь только сообщение
+        throw _SubscriptionServiceException(errorMessage);
       }
     } catch (e) {
+      // Логирование ошибки
+      final errorTimestamp = DateTime.now().toIso8601String();
+      print('$_logPrefix ================================================================================');
+      print('$_logPrefix ❌ ОШИБКА API (GET):');
+      print('$_logPrefix 🕐 ВРЕМЯ: $errorTimestamp');
+      print('$_logPrefix 🌐 URI: $uri');
+      print('$_logPrefix 💥 ОШИБКА: $e');
+      print('$_logPrefix ================================================================================');
       throw Exception('Ошибка загрузки тарифов: $e');
     }
   }
@@ -70,12 +142,14 @@ class SubscriptionService {
     required String planUuid,
     String? returnUrl,
     List<String>? paymentMode,
+    String? promoCode,
   }) async {
     try {
       final body = {
         'plan_uuid': planUuid,
         if (returnUrl != null) 'return_url': returnUrl,
         if (paymentMode != null) 'payment_mode': paymentMode,
+        if (promoCode != null && promoCode.isNotEmpty) 'promo_code': promoCode,
       };
 
       final response = await ApiService.post(

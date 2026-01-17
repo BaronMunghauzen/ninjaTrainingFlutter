@@ -21,6 +21,22 @@ class MainActivity : FlutterActivity() {
                 } catch (e: Exception) {
                     result.error("ERROR", "Failed to cancel notifications: ${e.message}", null)
                 }
+            } else if (call.method == "cancelAllNotificationsExceptWorkout") {
+                try {
+                    val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                    val activeNotifications = notificationManager.activeNotifications
+                    val workoutNotificationId = 1000
+                    
+                    // Отменяем все уведомления кроме workout notification
+                    for (notification in activeNotifications) {
+                        if (notification.id != workoutNotificationId) {
+                            notificationManager.cancel(notification.id)
+                        }
+                    }
+                    result.success(true)
+                } catch (e: Exception) {
+                    result.error("ERROR", "Failed to cancel notifications: ${e.message}", null)
+                }
             } else {
                 result.notImplemented()
             }
