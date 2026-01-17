@@ -191,7 +191,7 @@ class _FoodProgressMealsHistoryScreenState
         await _loadMeals();
         MetalMessage.show(
           context: context,
-          message: 'Прием пищи добавлен',
+          message: 'Запись добавлена в дневник питания',
           type: MetalMessageType.success,
         );
       }
@@ -303,7 +303,7 @@ class _FoodProgressMealsHistoryScreenState
 
     MetalModal.show(
       context: context,
-      title: 'Редактировать прием пищи',
+      title: 'Редактировать',
       children: [
         StatefulBuilder(
           builder: (context, setState) {
@@ -364,7 +364,7 @@ class _FoodProgressMealsHistoryScreenState
                     const SizedBox(height: NinjaSpacing.sm),
                     MetalTextField(
                       controller: nameController,
-                      hint: 'Введите название приема пищи',
+                      hint: 'Введите название',
                     ),
                   ],
                 ),
@@ -444,7 +444,7 @@ class _FoodProgressMealsHistoryScreenState
                         if (nameController.text.trim().isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Укажите название приема пищи'),
+                              content: Text('Укажите название'),
                               backgroundColor: Colors.red,
                             ),
                           );
@@ -479,7 +479,7 @@ class _FoodProgressMealsHistoryScreenState
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('Ошибка обновления приема пищи: $e'),
+                                content: Text('Ошибка обновления записи: $e'),
                                 backgroundColor: Colors.red,
                               ),
                             );
@@ -522,7 +522,7 @@ class _FoodProgressMealsHistoryScreenState
                     const SizedBox(width: NinjaSpacing.md),
                     Expanded(
                       child: Text(
-                        'История приемов пищи',
+                        'Дневник питания',
                         style: NinjaText.title,
                       ),
                     ),

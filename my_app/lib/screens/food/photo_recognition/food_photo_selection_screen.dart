@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
 import '../../../design/ninja_colors.dart';
 import '../../../design/ninja_radii.dart';
 import '../../../design/ninja_spacing.dart';
@@ -40,9 +42,28 @@ class _FoodPhotoSelectionScreenState extends State<FoodPhotoSelectionScreen> {
       );
 
       if (image != null) {
-        setState(() {
-          _selectedImage = File(image.path);
-        });
+        // На iOS путь к файлу из камеры может быть временным
+        // Копируем файл в постоянное место
+        File? savedFile;
+        if (Platform.isIOS && source == ImageSource.camera) {
+          try {
+            final appDir = await getApplicationDocumentsDirectory();
+            final fileName = path.basename(image.path);
+            final savedPath = path.join(appDir.path, fileName);
+            savedFile = await File(image.path).copy(savedPath);
+          } catch (e) {
+            // Если не удалось скопировать, используем оригинальный путь
+            savedFile = File(image.path);
+          }
+        } else {
+          savedFile = File(image.path);
+        }
+
+        if (mounted) {
+          setState(() {
+            _selectedImage = savedFile;
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -56,9 +77,13 @@ class _FoodPhotoSelectionScreenState extends State<FoodPhotoSelectionScreen> {
   }
 
   Future<void> _showImageSourceDialog() async {
-    final source = await showDialog<ImageSource>(
+    if (!mounted) return;
+    
+    ImageSource? selectedSource;
+    
+    await showDialog<ImageSource>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: NinjaColors.bgElevated,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(NinjaRadii.lg),
@@ -73,7 +98,10 @@ class _FoodPhotoSelectionScreenState extends State<FoodPhotoSelectionScreen> {
                 color: NinjaColors.textPrimary,
               ),
               title: Text('Галерея', style: NinjaText.body),
-              onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+              onTap: () {
+                selectedSource = ImageSource.gallery;
+                Navigator.of(dialogContext).pop();
+              },
             ),
             ListTile(
               leading: const Icon(
@@ -81,15 +109,22 @@ class _FoodPhotoSelectionScreenState extends State<FoodPhotoSelectionScreen> {
                 color: NinjaColors.textPrimary,
               ),
               title: Text('Камера', style: NinjaText.body),
-              onTap: () => Navigator.of(context).pop(ImageSource.camera),
+              onTap: () {
+                selectedSource = ImageSource.camera;
+                Navigator.of(dialogContext).pop();
+              },
             ),
           ],
         ),
       ),
     );
 
-    if (source != null) {
-      await _pickImage(source);
+    // Добавляем небольшую задержку после закрытия диалога для iOS
+    if (selectedSource != null && mounted) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (mounted) {
+        await _pickImage(selectedSource!);
+      }
     }
   }
 

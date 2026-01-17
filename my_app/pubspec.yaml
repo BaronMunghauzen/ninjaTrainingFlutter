@@ -145,8 +145,11 @@ flutter:
 # Конфигурация для генерации иконок приложения
 flutter_launcher_icons:
   android: true
-  ios: true
   image_path: "assets/images/iconsForApp/icon.png"
+  
+  # iOS использует отдельную иконку
+  ios:
+    image_path: "assets/images/iconsForApp/iconIos.png"
   
   # Адаптивная иконка для Android (Android 8.0+)
   adaptive_icon_background: "#1A1A1A"  # Цвет фона (темный)

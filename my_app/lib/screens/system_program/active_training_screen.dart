@@ -623,15 +623,12 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
   }
 
   void _onTrainingSelected(Map<String, dynamic>? training) {
-    // Не обновляем состояние, если показывается форма поздравления
-    if (_showCongrats) {
-      return;
-    }
-
     final prevUuid = _currentTraining?['training']?['uuid'];
     final newUuid = training?['training']?['uuid'];
     setState(() {
       _currentTraining = training;
+      // Сбрасываем флаг поздравления при выборе новой тренировки
+      _showCongrats = false;
       if (prevUuid != newUuid) {
         _exerciseGroups = [];
         _groupsLoadedOnce = false; // <--- добавлено
@@ -751,12 +748,13 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
       );
       print('[PASS] Ответ passUserTraining: $response');
 
-      // Всегда показываем форму поздравления, независимо от ответа
-      setState(() {
-        _showCongrats = true;
-      });
-
       final success = response['success'] == true;
+      
+      // Проверяем, является ли это последним днем программы (7 день, 4 неделя)
+      final week = _currentTraining!['week'] ?? 0;
+      final weekday = _currentTraining!['weekday'] ?? 0;
+      final isLastDay = (week == 4 && weekday == 7);
+
       if (success) {
         MetalMessage.show(
           context: context,
@@ -771,17 +769,28 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
         await Future.delayed(Duration(seconds: 1));
         await _navigationKey.currentState?.refreshTrainings();
         print('[PASS] После refreshTrainings');
-        // НЕ вызываем goToActiveTraining(), так как нужно показать форму поздравления
-        // Форма поздравления уже показана через setState выше
+        
+        if (isLastDay) {
+          // Последний день - показываем поздравление
+          setState(() {
+            _showCongrats = true;
+          });
+        } else {
+          // Не последний день - переходим на следующий день
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _navigationKey.currentState?.goToActiveTraining();
+          });
+        }
       } else {
-        // Даже если success = false, форма поздравления уже показана
-        // Не показываем сообщение об ошибке, так как форма поздравления уже отображается
+        MetalMessage.show(
+          context: context,
+          message: 'Не удалось завершить тренировку',
+          type: MetalMessageType.error,
+          title: 'Ошибка',
+          description: 'Ошибка завершения тренировки',
+        );
       }
     } catch (e) {
-      // Даже при ошибке показываем форму поздравления
-      setState(() {
-        _showCongrats = true;
-      });
       MetalMessage.show(
         context: context,
         message: e.toString(),

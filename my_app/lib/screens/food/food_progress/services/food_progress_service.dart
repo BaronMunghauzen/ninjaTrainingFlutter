@@ -97,11 +97,11 @@ class FoodProgressService {
         return FoodProgressMeal.fromJson(data as Map<String, dynamic>);
       } else {
         throw Exception(
-          'Ошибка добавления приема пищи: ${response.statusCode}',
+          'Ошибка добавления в дневнике питания: ${response.statusCode}',
         );
       }
     } catch (e) {
-      throw Exception('Ошибка добавления приема пищи: $e');
+      throw Exception('Ошибка добавления в дневнике питания: $e');
     }
   }
 
@@ -155,11 +155,11 @@ class FoodProgressService {
 
       if (response.statusCode != 200 && response.statusCode != 204) {
         throw Exception(
-          'Ошибка удаления приема пищи: ${response.statusCode}',
+          'Ошибка удаления в дневнике питания: ${response.statusCode}',
         );
       }
     } catch (e) {
-      throw Exception('Ошибка удаления приема пищи: $e');
+      throw Exception('Ошибка удаления в дневнике питания: $e');
     }
   }
 
@@ -193,11 +193,11 @@ class FoodProgressService {
         return FoodProgressMeal.fromJson(data as Map<String, dynamic>);
       } else {
         throw Exception(
-          'Ошибка обновления приема пищи: ${response.statusCode}',
+          'Ошибка обновления в дневнике питания: ${response.statusCode}',
         );
       }
     } catch (e) {
-      throw Exception('Ошибка обновления приема пищи: $e');
+      throw Exception('Ошибка обновления в дневнике питания: $e');
     }
   }
 }

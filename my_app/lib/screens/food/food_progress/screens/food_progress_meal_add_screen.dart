@@ -87,7 +87,7 @@ class _FoodProgressMealAddScreenState
     if (_nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Укажите название приема пищи'),
+          content: Text('Укажите название'),
           backgroundColor: Colors.red,
         ),
       );
@@ -139,7 +139,7 @@ class _FoodProgressMealAddScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка добавления приема пищи: $e'),
+            content: Text('Ошибка добавления: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -227,7 +227,7 @@ class _FoodProgressMealAddScreenState
                               const SizedBox(height: NinjaSpacing.sm),
                               MetalTextField(
                                 controller: _nameController,
-                                hint: 'Введите название приема пищи',
+                                hint: 'Введите название',
                               ),
                             ],
                           ),

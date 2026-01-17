@@ -223,7 +223,7 @@ class MacroInfoChip extends StatelessWidget {
                 Text(
                   value,
                   style: TextStyle(
-                    fontSize: size * 0.34,
+                    fontSize: size * 0.27,
                     color: Colors.white.withOpacity(0.85),
                     fontWeight: FontWeight.w600,
                   ),

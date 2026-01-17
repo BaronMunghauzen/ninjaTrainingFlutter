@@ -90,7 +90,7 @@ class FoodProgressSection extends StatelessWidget {
           const SizedBox(height: NinjaSpacing.lg),
           // Кнопка истории приемов пищи
           MetalButton(
-            label: 'История приемов пищи',
+            label: 'Дневник питания',
             icon: Icons.history,
             onPressed: onMealsHistory,
             height: 48,

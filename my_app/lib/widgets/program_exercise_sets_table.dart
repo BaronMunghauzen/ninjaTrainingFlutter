@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/fcm_service.dart';
 import '../models/exercise_model.dart';
 import 'metal_button.dart';
 import 'metal_table.dart';
@@ -323,6 +324,12 @@ class _ProgramExerciseSetsTableState extends State<ProgramExerciseSetsTable> {
 
     if (value == false && row.userExerciseUuid != null) {
       await ApiService.delete('/user_exercises/delete/${row.userExerciseUuid}');
+
+      // Для программ и тренировок (не свободных) отменяем таймер при снятии галочки
+      if (!widget.isFreeWorkout && userUuid.isNotEmpty) {
+        await FCMService.cancelTimerOnBackend(userUuid: userUuid);
+      }
+
       if (widget.isFreeWorkout) {
         // Для свободных тренировок перезагружаем все подходы
         await _loadAllUserExercises();

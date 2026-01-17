@@ -114,7 +114,7 @@ class _RecipeCardWidgetState extends State<RecipeCardWidget> {
       children: [
         _buildMenuItem(
           icon: Icons.restaurant,
-          title: 'Добавить в приемы пищи',
+          title: 'Добавить в дневник питания',
           color: NinjaColors.textPrimary,
           onTap: () {
             Navigator.of(context).pop();
@@ -255,10 +255,10 @@ class _RecipeCardWidgetState extends State<RecipeCardWidget> {
     _selectedPortions = 1; // Сбрасываем на 1 при открытии
     MetalModal.show(
       context: context,
-      title: 'Добавить в приемы пищи',
+      title: 'Добавить в дневник',
       children: [
         Text(
-          'Добавить "${widget.recipe.name}" в приемы пищи?',
+          'Добавить "${widget.recipe.name}" в дневник?',
           style: NinjaText.body,
         ),
         const SizedBox(height: NinjaSpacing.lg),
@@ -474,7 +474,7 @@ class _RecipeCardWidgetState extends State<RecipeCardWidget> {
         });
         MetalMessage.show(
           context: context,
-          message: 'Рецепт успешно добавлен в прием пищи',
+          message: 'Рецепт успешно добавлен в дневник питания',
           type: MetalMessageType.success,
         );
       }

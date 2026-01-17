@@ -8,6 +8,7 @@ import '../../../widgets/metal_card.dart';
 import '../../../widgets/metal_back_button.dart';
 import '../../../widgets/metal_list_item.dart';
 import '../../../widgets/metal_modal.dart';
+import '../../../widgets/metal_message.dart';
 import '../../../widgets/macro_info_chip.dart';
 import '../../../models/food_recognition_model.dart';
 import '../../food/food_progress/services/food_progress_service.dart';
@@ -30,10 +31,10 @@ class _FoodRecognitionResultScreenState
   void _showAddToMealsConfirmation() {
     MetalModal.show(
       context: context,
-      title: 'Добавить в приемы пищи?',
+      title: 'Добавить в дневник?',
       children: [
         Text(
-          'Добавить "${widget.recognition.name}" в приемы пищи?',
+          'Добавить "${widget.recognition.name}" в дневник?',
           style: NinjaText.body,
         ),
         const SizedBox(height: NinjaSpacing.lg),
@@ -80,6 +81,11 @@ class _FoodRecognitionResultScreenState
         setState(() {
           _isAdding = false;
         });
+        MetalMessage.show(
+          context: context,
+          message: 'Запись успешно добавлена в дневник питания',
+          type: MetalMessageType.success,
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -88,7 +94,7 @@ class _FoodRecognitionResultScreenState
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка добавления приема пищи: $e'),
+            content: Text('Ошибка добавления в дневник питания: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -128,157 +134,174 @@ class _FoodRecognitionResultScreenState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                // Комментарий пользователя
+                      // Комментарий пользователя
                       if (widget.recognition.comment != null &&
                           widget.recognition.comment!.isNotEmpty) ...[
-                  _buildSection(
-                    title: 'Комментарий пользователя',
+                        _buildSection(
+                          title: 'Комментарий пользователя',
                           child: Text(
                             widget.recognition.comment!,
                             style: NinjaText.body,
                           ),
-                  ),
-                  const SizedBox(height: NinjaSpacing.lg),
-                ],
+                        ),
+                        const SizedBox(height: NinjaSpacing.lg),
+                      ],
 
-                // Название
-                _buildSection(
-                  title: 'Название',
-                  child: Text(
+                      // Название
+                      _buildSection(
+                        title: 'Название',
+                        child: Text(
                           widget.recognition.name,
-                    style: NinjaText.title.copyWith(fontSize: 18),
-                  ),
-                ),
-                const SizedBox(height: NinjaSpacing.lg),
+                          style: NinjaText.title.copyWith(fontSize: 18),
+                        ),
+                      ),
+                      const SizedBox(height: NinjaSpacing.lg),
 
-                // КБЖУ в порции
-                _buildSection(
-                  title: 'КБЖУ в порции',
-                  child: Column(
-                    children: [
+                      // КБЖУ в порции
+                      _buildSection(
+                        title: 'КБЖУ в порции',
+                        child: Column(
+                          children: [
                             _buildNutritionRow(
                               'Калории',
                               widget.recognition.caloriesTotal,
                             ),
-                      const SizedBox(height: NinjaSpacing.sm),
+                            const SizedBox(height: NinjaSpacing.sm),
                             _buildNutritionRow(
                               'Белки',
                               widget.recognition.proteinsTotal,
                             ),
-                      const SizedBox(height: NinjaSpacing.sm),
-                            _buildNutritionRow('Жиры', widget.recognition.fatsTotal),
-                      const SizedBox(height: NinjaSpacing.sm),
+                            const SizedBox(height: NinjaSpacing.sm),
+                            _buildNutritionRow(
+                              'Жиры',
+                              widget.recognition.fatsTotal,
+                            ),
+                            const SizedBox(height: NinjaSpacing.sm),
                             _buildNutritionRow(
                               'Углеводы',
                               widget.recognition.carbsTotal,
                             ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: NinjaSpacing.lg),
-
-                // Вес порции
-                _buildSection(
-                  title: 'Вес порции',
-                  child: Text(
-                          '${widget.recognition.weightG.toStringAsFixed(0)} г',
-                    style: NinjaText.body,
-                  ),
-                ),
-                const SizedBox(height: NinjaSpacing.lg),
-
-                // КБЖУ на 100 гр
-                _buildSection(
-                  title: 'КБЖУ на 100 гр',
-                  child: Column(
-                    children: [
-                      _buildNutritionRow(
-                        'Калории',
-                              widget.recognition.caloriesPer100g,
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: NinjaSpacing.sm),
+                      const SizedBox(height: NinjaSpacing.lg),
+
+                      // Вес порции
+                      _buildSection(
+                        title: 'Вес порции',
+                        child: Text(
+                          '${widget.recognition.weightG.toStringAsFixed(0)} г',
+                          style: NinjaText.body,
+                        ),
+                      ),
+                      const SizedBox(height: NinjaSpacing.lg),
+
+                      // КБЖУ на 100 гр
+                      _buildSection(
+                        title: 'КБЖУ на 100 гр',
+                        child: Column(
+                          children: [
+                            _buildNutritionRow(
+                              'Калории',
+                              widget.recognition.caloriesPer100g,
+                            ),
+                            const SizedBox(height: NinjaSpacing.sm),
                             _buildNutritionRow(
                               'Белки',
                               widget.recognition.proteinsPer100g,
                             ),
-                      const SizedBox(height: NinjaSpacing.sm),
-                            _buildNutritionRow('Жиры', widget.recognition.fatsPer100g),
-                      const SizedBox(height: NinjaSpacing.sm),
+                            const SizedBox(height: NinjaSpacing.sm),
+                            _buildNutritionRow(
+                              'Жиры',
+                              widget.recognition.fatsPer100g,
+                            ),
+                            const SizedBox(height: NinjaSpacing.sm),
                             _buildNutritionRow(
                               'Углеводы',
                               widget.recognition.carbsPer100g,
                             ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: NinjaSpacing.lg),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: NinjaSpacing.lg),
 
-                // Микронутриенты
+                      // Микронутриенты
                       if (widget.recognition.micronutrients.isNotEmpty) ...[
-                  _buildSection(
-                    title: 'Микронутриенты',
-                    child: Column(
+                        _buildSection(
+                          title: 'Микронутриенты',
+                          child: Column(
                             children: widget.recognition.micronutrients
-                          .map(
-                            (micronutrient) =>
-                                _buildMicronutrientItem(micronutrient),
-                          )
-                          .toList(),
-                    ),
-                  ),
-                  const SizedBox(height: NinjaSpacing.lg),
-                ],
+                                .map(
+                                  (micronutrient) =>
+                                      _buildMicronutrientItem(micronutrient),
+                                )
+                                .toList(),
+                          ),
+                        ),
+                        const SizedBox(height: NinjaSpacing.lg),
+                      ],
 
-                // Ингредиенты
+                      // Ингредиенты
                       if (widget.recognition.ingredients.isNotEmpty) ...[
-                  _buildSection(
-                    title: 'Ингредиенты',
-                    child: Column(
+                        _buildSection(
+                          title: 'Ингредиенты',
+                          child: Column(
                             children: widget.recognition.ingredients
                                 .map(
                                   (ingredient) =>
                                       _buildIngredientItem(ingredient),
                                 )
-                          .toList(),
-                    ),
-                  ),
-                  const SizedBox(height: NinjaSpacing.lg),
-                ],
+                                .toList(),
+                          ),
+                        ),
+                        const SizedBox(height: NinjaSpacing.lg),
+                      ],
 
-                // Советы/рекомендации/альтернативы
+                      // Советы/рекомендации/альтернативы
                       if ((widget.recognition.recommendationsTip != null &&
-                              widget.recognition.recommendationsTip!.isNotEmpty) ||
+                              widget
+                                  .recognition
+                                  .recommendationsTip!
+                                  .isNotEmpty) ||
                           (widget.recognition.recommendationsAlternative !=
-                              null &&
-                              widget.recognition
-                            .recommendationsAlternative!
-                            .isNotEmpty)) ...[
-                  _buildSection(
-                    title: 'Советы/рекомендации/альтернативы',
-                    child: Column(
-                      children: [
+                                  null &&
+                              widget
+                                  .recognition
+                                  .recommendationsAlternative!
+                                  .isNotEmpty)) ...[
+                        _buildSection(
+                          title: 'Советы/рекомендации/альтернативы',
+                          child: Column(
+                            children: [
                               if (widget.recognition.recommendationsTip != null)
                                 ...widget.recognition.recommendationsTip!.map(
-                            (rec) => _buildRecommendationItem(rec),
-                          ),
-                              if (widget.recognition.recommendationsAlternative !=
+                                  (rec) => _buildRecommendationItem(rec),
+                                ),
+                              if (widget
+                                      .recognition
+                                      .recommendationsAlternative !=
                                   null)
-                                ...widget.recognition.recommendationsAlternative!.map(
-                            (rec) => _buildRecommendationItem(rec),
+                                ...widget
+                                    .recognition
+                                    .recommendationsAlternative!
+                                    .map(
+                                      (rec) => _buildRecommendationItem(rec),
+                                    ),
+                            ],
                           ),
+                        ),
+                        const SizedBox(height: NinjaSpacing.lg),
                       ],
-                    ),
-                  ),
-                  const SizedBox(height: NinjaSpacing.lg),
-                ],
 
                       // Кнопки
                       Row(
                         children: [
                           Expanded(
                             child: MetalButton(
-                              label: 'Добавить в приемы пищи',
-                              onPressed: _isAdding ? null : _showAddToMealsConfirmation,
+                              label: 'Добавить в дневник',
+                              onPressed: _isAdding
+                                  ? null
+                                  : _showAddToMealsConfirmation,
                               isLoading: _isAdding,
                               height: 56,
                             ),
@@ -286,9 +309,9 @@ class _FoodRecognitionResultScreenState
                           const SizedBox(width: NinjaSpacing.md),
                           Expanded(
                             child: MetalButton(
-                        label: 'Закрыть',
-                        onPressed: () => Navigator.of(context).pop(),
-                        height: 56,
+                              label: 'Закрыть',
+                              onPressed: () => Navigator.of(context).pop(),
+                              height: 56,
                             ),
                           ),
                         ],
@@ -316,7 +339,7 @@ class _FoodRecognitionResultScreenState
                             const SizedBox(width: NinjaSpacing.sm),
                             Expanded(
                               child: Text(
-                                'Результат сканирования фото - это анализ искусственного интеллекта и может быть неверным. Пожалуйста, проверьте данные перед добавлением в приемы пищи.',
+                                'Результат сканирования фото - это анализ искусственного интеллекта и может быть неверным. Пожалуйста, проверьте данные перед добавлением в дневник питания.',
                                 style: NinjaText.caption.copyWith(
                                   color: Colors.orange.withOpacity(0.9),
                                 ),
