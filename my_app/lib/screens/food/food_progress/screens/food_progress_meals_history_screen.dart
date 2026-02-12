@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +12,7 @@ import '../../../../widgets/metal_back_button.dart';
 import '../../../../widgets/metal_modal.dart';
 import '../../../../widgets/metal_message.dart';
 import '../../../../widgets/metal_text_field.dart';
+import '../../../../widgets/metal_search_bar.dart';
 import '../../../../widgets/macro_info_chip.dart';
 import '../../../../providers/auth_provider.dart';
 import '../models/food_progress_model.dart';
@@ -32,11 +34,15 @@ class _FoodProgressMealsHistoryScreenState
   int _currentPage = 1;
   bool _hasNext = false;
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  Timer? _searchDebounceTimer;
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    _searchController.addListener(_onSearchChanged);
     _loadMeals();
   }
 
@@ -44,7 +50,28 @@ class _FoodProgressMealsHistoryScreenState
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
+    _searchDebounceTimer?.cancel();
     super.dispose();
+  }
+
+  void _onSearchChanged() {
+    final query = _searchController.text;
+
+    // Отменяем предыдущий таймер
+    _searchDebounceTimer?.cancel();
+
+    // Создаем новый таймер на 0.5 секунды
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        setState(() {
+          _searchQuery = query;
+          _currentPage = 1;
+        });
+        _loadMeals();
+      }
+    });
   }
 
   void _onScroll() {
@@ -70,19 +97,31 @@ class _FoodProgressMealsHistoryScreenState
     });
 
     try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final userUuid = authProvider.userUuid;
-
-      if (userUuid == null) {
-        throw Exception('Пользователь не авторизован');
-      }
-
       final page = loadMore ? _currentPage + 1 : 1;
-      final response = await FoodProgressService.getMeals(
-        userUuid: userUuid,
-        page: page,
-        size: 10,
-      );
+      final FoodProgressMealsListResponse response;
+
+      if (_searchQuery.isNotEmpty) {
+        // Используем поиск, если есть поисковый запрос
+        response = await FoodProgressService.searchMeals(
+          query: _searchQuery,
+          page: page,
+          size: 10,
+        );
+      } else {
+        // Используем обычную загрузку, если поиска нет
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final userUuid = authProvider.userUuid;
+
+        if (userUuid == null) {
+          throw Exception('Пользователь не авторизован');
+        }
+
+        response = await FoodProgressService.getMeals(
+          userUuid: userUuid,
+          page: page,
+          size: 10,
+        );
+      }
 
       if (mounted) {
         setState(() {
@@ -307,7 +346,6 @@ class _FoodProgressMealsHistoryScreenState
       children: [
         StatefulBuilder(
           builder: (context, setState) {
-
             return Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -323,14 +361,18 @@ class _FoodProgressMealsHistoryScreenState
                         final picked = await showDatePicker(
                           context: context,
                           initialDate: selectedDateTime,
-                          firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                          firstDate: DateTime.now().subtract(
+                            const Duration(days: 365),
+                          ),
                           lastDate: DateTime.now().add(const Duration(days: 1)),
                         );
 
                         if (picked != null) {
                           final time = await showTimePicker(
                             context: context,
-                            initialTime: TimeOfDay.fromDateTime(selectedDateTime),
+                            initialTime: TimeOfDay.fromDateTime(
+                              selectedDateTime,
+                            ),
                           );
 
                           if (time != null) {
@@ -386,7 +428,10 @@ class _FoodProgressMealsHistoryScreenState
                               MetalTextField(
                                 controller: proteinsController,
                                 hint: '0',
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
                                 inputFormatters: [_NumericTextInputFormatter()],
                               ),
                             ],
@@ -402,7 +447,10 @@ class _FoodProgressMealsHistoryScreenState
                               MetalTextField(
                                 controller: fatsController,
                                 hint: '0',
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
                                 inputFormatters: [_NumericTextInputFormatter()],
                               ),
                             ],
@@ -418,7 +466,10 @@ class _FoodProgressMealsHistoryScreenState
                               MetalTextField(
                                 controller: carbsController,
                                 hint: '0',
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
                                 inputFormatters: [_NumericTextInputFormatter()],
                               ),
                             ],
@@ -461,6 +512,13 @@ class _FoodProgressMealsHistoryScreenState
                           _normalizeNumberString(carbsController.text),
                         );
 
+                        // Рассчитываем калории по формуле (аналогично созданию)
+                        final calories = calculateCaloriesFromMacros(
+                          proteins: proteins ?? 0.0,
+                          fats: fats ?? 0.0,
+                          carbs: carbs ?? 0.0,
+                        );
+
                         Navigator.of(context).pop();
 
                         try {
@@ -468,6 +526,7 @@ class _FoodProgressMealsHistoryScreenState
                             mealUuid: meal.uuid,
                             mealDatetime: selectedDateTime,
                             name: nameController.text.trim(),
+                            calories: calories,
                             proteins: proteins,
                             fats: fats,
                             carbs: carbs,
@@ -521,12 +580,20 @@ class _FoodProgressMealsHistoryScreenState
                     const MetalBackButton(),
                     const SizedBox(width: NinjaSpacing.md),
                     Expanded(
-                      child: Text(
-                        'Дневник питания',
-                        style: NinjaText.title,
-                      ),
+                      child: Text('Дневник питания', style: NinjaText.title),
                     ),
                   ],
+                ),
+              ),
+              // Строка поиска
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: NinjaSpacing.lg,
+                  vertical: NinjaSpacing.md,
+                ),
+                child: MetalSearchBar(
+                  controller: _searchController,
+                  hint: 'Поиск в дневнике питания',
                 ),
               ),
               // Контент
@@ -540,108 +607,106 @@ class _FoodProgressMealsHistoryScreenState
                         ),
                       )
                     : _meals.isEmpty
-                        ? Center(
-                            child: Text(
-                              'Нет приемов пищи',
+                    ? Center(
+                        child: Text(
+                          'Нет приемов пищи',
+                          style: NinjaText.body.copyWith(
+                            color: NinjaColors.textSecondary,
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.all(NinjaSpacing.lg),
+                        itemCount: _meals.length + (_isLoadingMore ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          // Показываем индикатор загрузки в конце списка
+                          if (index == _meals.length) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(NinjaSpacing.lg),
+                                child: CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    NinjaColors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                          final meal = _meals[index];
+                          final isFirst = index == 0;
+                          final isLast = index == _meals.length - 1;
+                          return MetalListItem(
+                            leading: const SizedBox.shrink(),
+                            title: Text(
+                              meal.name.isNotEmpty ? meal.name : 'Без названия',
                               style: NinjaText.body.copyWith(
-                                color: NinjaColors.textSecondary,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                          )
-                        : ListView.builder(
-                            controller: _scrollController,
-                            padding: const EdgeInsets.all(NinjaSpacing.lg),
-                            itemCount: _meals.length + (_isLoadingMore ? 1 : 0),
-                            itemBuilder: (context, index) {
-                              // Показываем индикатор загрузки в конце списка
-                              if (index == _meals.length) {
-                                return const Center(
-                                  child: Padding(
-                                    padding: EdgeInsets.all(NinjaSpacing.lg),
-                                    child: CircularProgressIndicator(
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        NinjaColors.textPrimary,
-                                      ),
-                                    ),
+                            subtitle: Padding(
+                              padding: const EdgeInsets.only(
+                                top: NinjaSpacing.sm,
+                              ),
+                              child: Wrap(
+                                spacing: NinjaSpacing.sm,
+                                runSpacing: NinjaSpacing.xs,
+                                children: [
+                                  MacroInfoChip(
+                                    label: 'К',
+                                    value: meal.calories.toStringAsFixed(1),
+                                    size: 32,
                                   ),
-                                );
-                              }
-                              final meal = _meals[index];
-                              final isFirst = index == 0;
-                              final isLast = index == _meals.length - 1;
-                              return MetalListItem(
-                                leading: const SizedBox.shrink(),
-                                title: Text(
-                                  meal.name.isNotEmpty
-                                      ? meal.name
-                                      : 'Без названия',
+                                  MacroInfoChip(
+                                    label: 'Б',
+                                    value: meal.proteins.toStringAsFixed(1),
+                                    size: 32,
+                                  ),
+                                  MacroInfoChip(
+                                    label: 'Ж',
+                                    value: meal.fats.toStringAsFixed(1),
+                                    size: 32,
+                                  ),
+                                  MacroInfoChip(
+                                    label: 'У',
+                                    value: meal.carbs.toStringAsFixed(1),
+                                    size: 32,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            trailing: Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _formatDateTime(meal.mealDatetime),
                                   style: NinjaText.body.copyWith(
-                                    fontWeight: FontWeight.bold,
+                                    color: NinjaColors.textSecondary
+                                        .withOpacity(0.7),
+                                    fontSize: 12,
                                   ),
                                 ),
-                                subtitle: Padding(
-                                  padding: const EdgeInsets.only(
-                                    top: NinjaSpacing.sm,
+                                const SizedBox(height: NinjaSpacing.xs),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.more_vert,
+                                    color: NinjaColors.textSecondary,
+                                    size: 20,
                                   ),
-                                  child: Wrap(
-                                    spacing: NinjaSpacing.sm,
-                                    runSpacing: NinjaSpacing.xs,
-                                    children: [
-                                      MacroInfoChip(
-                                        label: 'К',
-                                        value: meal.calories.toStringAsFixed(1),
-                                        size: 32,
-                                      ),
-                                      MacroInfoChip(
-                                        label: 'Б',
-                                        value: meal.proteins.toStringAsFixed(1),
-                                        size: 32,
-                                      ),
-                                      MacroInfoChip(
-                                        label: 'Ж',
-                                        value: meal.fats.toStringAsFixed(1),
-                                        size: 32,
-                                      ),
-                                      MacroInfoChip(
-                                        label: 'У',
-                                        value: meal.carbs.toStringAsFixed(1),
-                                        size: 32,
-                                      ),
-                                    ],
-                                  ),
+                                  onPressed: () => _showMealActionsModal(meal),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
                                 ),
-                                trailing: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      _formatDateTime(meal.mealDatetime),
-                                      style: NinjaText.body.copyWith(
-                                        color: NinjaColors.textSecondary
-                                            .withOpacity(0.7),
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                    const SizedBox(height: NinjaSpacing.xs),
-                                        IconButton(
-                                      icon: const Icon(
-                                        Icons.more_vert,
-                                          color: NinjaColors.textSecondary,
-                                        size: 20,
-                                      ),
-                                      onPressed: () => _showMealActionsModal(meal),
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(),
-                                    ),
-                                  ],
-                                ),
-                                onTap: () {}, // Не кликабельный
-                                isFirst: isFirst,
-                                isLast: isLast,
-                                removeSpacing: true,
-                              );
-                            },
-                          ),
+                              ],
+                            ),
+                            onTap: () {}, // Не кликабельный
+                            isFirst: isFirst,
+                            isLast: isLast,
+                            removeSpacing: true,
+                          );
+                        },
+                      ),
               ),
             ],
           ),
@@ -666,7 +731,10 @@ class _NumericTextInputFormatter extends TextInputFormatter {
 
     // Разрешаем только цифры, точку и запятую
     final allowedChars = RegExp(r'[0-9.,]');
-    final filteredText = text.split('').where((char) => allowedChars.hasMatch(char)).join('');
+    final filteredText = text
+        .split('')
+        .where((char) => allowedChars.hasMatch(char))
+        .join('');
 
     // Проверяем, что есть максимум одна точка или запятая
     final dotCount = filteredText.split('.').length - 1;
@@ -701,4 +769,3 @@ class _NumericTextInputFormatter extends TextInputFormatter {
     );
   }
 }
-

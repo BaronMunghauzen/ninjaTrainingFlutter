@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../constants/app_colors.dart';
 import '../widgets/gif_widget.dart';
 import '../widgets/video_player_widget.dart';
+import '../widgets/auth_image_widget.dart';
 import '../widgets/exercise_statistics_table.dart';
 import '../widgets/metal_modal.dart';
 import '../widgets/metal_card.dart';
@@ -230,7 +231,7 @@ class _ExerciseInfoContentState extends State<_ExerciseInfoContent> {
         children.add(const SizedBox(height: 16));
       }
 
-      // Медиа: приоритет видео, затем гифка
+      // Медиа: приоритет видео, затем гифка, затем картинка
       if (exerciseReference?['video_uuid'] != null) {
         children.add(
           SizedBox(
@@ -254,6 +255,19 @@ class _ExerciseInfoContentState extends State<_ExerciseInfoContent> {
               gifUuid: exerciseReference!['gif_uuid'],
               width: double.infinity,
               height: 200,
+            ),
+          ),
+        );
+        children.add(const SizedBox(height: 16));
+      } else if (exerciseReference?['image_uuid'] != null) {
+        children.add(
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: AuthImageWidget(
+              imageUuid: exerciseReference!['image_uuid'],
+              width: double.infinity,
+              height: 200,
+              fit: BoxFit.cover,
             ),
           ),
         );

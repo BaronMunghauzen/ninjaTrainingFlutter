@@ -27,6 +27,7 @@ class FoodRecognitionResultScreen extends StatefulWidget {
 class _FoodRecognitionResultScreenState
     extends State<FoodRecognitionResultScreen> {
   bool _isAdding = false;
+  bool _mealAdded = false;
 
   void _showAddToMealsConfirmation() {
     MetalModal.show(
@@ -80,6 +81,7 @@ class _FoodRecognitionResultScreenState
       if (mounted) {
         setState(() {
           _isAdding = false;
+          _mealAdded = true;
         });
         MetalMessage.show(
           context: context,
@@ -120,7 +122,7 @@ class _FoodRecognitionResultScreenState
                   children: [
                     MetalBackButton(
                       icon: Icons.close,
-                      onTap: () => Navigator.of(context).pop(),
+                      onTap: () => Navigator.of(context).pop(_mealAdded),
                     ),
                     const SizedBox(width: NinjaSpacing.md),
                     Text('Результаты анализа', style: NinjaText.title),
@@ -310,7 +312,7 @@ class _FoodRecognitionResultScreenState
                           Expanded(
                             child: MetalButton(
                               label: 'Закрыть',
-                              onPressed: () => Navigator.of(context).pop(),
+                              onPressed: () => Navigator.of(context).pop(_mealAdded),
                               height: 56,
                             ),
                           ),

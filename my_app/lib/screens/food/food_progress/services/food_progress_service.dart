@@ -169,6 +169,7 @@ class FoodProgressService {
     required String mealUuid,
     required DateTime mealDatetime,
     required String name,
+    double? calories,
     double? proteins,
     double? fats,
     double? carbs,
@@ -179,6 +180,7 @@ class FoodProgressService {
         'name': name,
       };
 
+      if (calories != null) body['calories'] = calories;
       if (proteins != null) body['proteins'] = proteins;
       if (fats != null) body['fats'] = fats;
       if (carbs != null) body['carbs'] = carbs;
@@ -198,6 +200,42 @@ class FoodProgressService {
       }
     } catch (e) {
       throw Exception('Ошибка обновления в дневнике питания: $e');
+    }
+  }
+
+  /// Поиск приемов пищи
+  /// [query] - поисковый запрос
+  /// [page] - номер страницы (по умолчанию 1)
+  /// [size] - размер страницы (по умолчанию 10)
+  static Future<FoodProgressMealsListResponse> searchMeals({
+    required String query,
+    int page = 1,
+    int size = 10,
+  }) async {
+    try {
+      final response = await ApiService.get(
+        '/api/food-progress/meals/search/',
+        queryParams: {
+          'query': query,
+          'page': page.toString(),
+          'size': size.toString(),
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = ApiService.decodeJson(response.body);
+        if (data is Map<String, dynamic>) {
+          return FoodProgressMealsListResponse.fromJson(data);
+        } else {
+          throw Exception('Неверный формат ответа API');
+        }
+      } else {
+        throw Exception(
+          'Ошибка поиска приемов пищи: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Ошибка поиска приемов пищи: $e');
     }
   }
 }

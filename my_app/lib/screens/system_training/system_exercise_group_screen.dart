@@ -3,6 +3,7 @@ import '../../services/api_service.dart';
 import '../../models/exercise_model.dart';
 import '../../widgets/gif_widget.dart';
 import '../../widgets/video_player_widget.dart';
+import '../../widgets/auth_image_widget.dart';
 import '../../widgets/exercise_info_modal.dart';
 import '../../widgets/textured_background.dart';
 import '../../widgets/metal_back_button.dart';
@@ -442,28 +443,11 @@ class _SystemExerciseGroupScreenState extends State<SystemExerciseGroupScreen> {
     // Этот метод вызывается только когда image_uuid есть
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
-      child: Image.network(
-        '${ApiService.baseUrl}/files/file/$imageUuid',
+      child: AuthImageWidget(
+        imageUuid: imageUuid,
         width: double.infinity,
         height: 250,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
-            height: 250,
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.inputBorder),
-            ),
-            child: const Center(
-              child: Icon(
-                Icons.broken_image,
-                size: 64,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          );
-        },
       ),
     );
   }

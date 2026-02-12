@@ -749,7 +749,7 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
       print('[PASS] Ответ passUserTraining: $response');
 
       final success = response['success'] == true;
-      
+
       // Проверяем, является ли это последним днем программы (7 день, 4 неделя)
       final week = _currentTraining!['week'] ?? 0;
       final weekday = _currentTraining!['weekday'] ?? 0;
@@ -769,7 +769,7 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
         await Future.delayed(Duration(seconds: 1));
         await _navigationKey.currentState?.refreshTrainings();
         print('[PASS] После refreshTrainings');
-        
+
         if (isLastDay) {
           // Последний день - показываем поздравление
           setState(() {

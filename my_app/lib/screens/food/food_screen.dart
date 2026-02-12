@@ -110,8 +110,12 @@ class _FoodScreenState extends State<FoodScreen> {
 
     Navigator.of(
       context,
-    ).push(ninjaRoute(const FoodPhotoSelectionScreen())).then((_) {
+    ).push(ninjaRoute(const FoodPhotoSelectionScreen())).then((result) {
       _loadLastRecognition();
+      // Если была добавлена еда в дневник, обновляем прогресс бары
+      if (result == true) {
+        _loadProgress();
+      }
     });
   }
 

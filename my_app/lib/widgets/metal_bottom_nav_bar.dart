@@ -232,12 +232,12 @@ class _NavItemState extends State<_NavItem>
           return Transform.scale(
             scale: scale,
             child: Transform.translate(
-              offset: const Offset(0, 2),
+              offset: const Offset(0, 6),
               child: Center(
                 child: Image.asset(
                   widget.item.iconPath,
-                  width: 28,
-                  height: 28,
+                  width: 30,
+                  height: 30,
                   color: Colors.white.withOpacity(
                     widget.selected ? 0.95 : 0.45,
                   ),

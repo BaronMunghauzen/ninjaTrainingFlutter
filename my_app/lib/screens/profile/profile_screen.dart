@@ -16,6 +16,7 @@ import 'edit_profile_screen.dart';
 import 'contact_screen.dart';
 import 'auth_screen.dart';
 import '../subscription/subscription_plans_screen.dart';
+import '../admin_panel/admin_panel_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final bool isPaymentVisible;
@@ -63,25 +64,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   case _ProfileMenuAction.deleteProfile:
                     _confirmDeleteProfile();
                     break;
+                  case _ProfileMenuAction.adminPanel:
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AdminPanelScreen(),
+                      ),
+                    );
+                    break;
                 }
               },
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: _ProfileMenuAction.deleteProfile,
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete_forever, color: NinjaColors.error),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Удалить профиль',
-                        style: NinjaText.body.copyWith(
-                          color: NinjaColors.error,
+              itemBuilder: (context) {
+                final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                final isAdmin = authProvider.userProfile?.isAdmin ?? false;
+                
+                final items = <PopupMenuItem<_ProfileMenuAction>>[
+                  PopupMenuItem(
+                    value: _ProfileMenuAction.deleteProfile,
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_forever, color: NinjaColors.error),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Удалить профиль',
+                          style: NinjaText.body.copyWith(
+                            color: NinjaColors.error,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ];
+                
+                if (isAdmin) {
+                  items.add(
+                    PopupMenuItem(
+                      value: _ProfileMenuAction.adminPanel,
+                      child: Row(
+                        children: [
+                          Icon(Icons.admin_panel_settings, color: NinjaColors.accent),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Перейти в админку',
+                            style: NinjaText.body.copyWith(
+                              color: NinjaColors.accent,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+                
+                return items;
+              },
             ),
           ],
         ),
@@ -817,4 +853,4 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-enum _ProfileMenuAction { deleteProfile }
+enum _ProfileMenuAction { deleteProfile, adminPanel }

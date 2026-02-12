@@ -164,11 +164,20 @@ class _FoodPhotoSelectionScreenState extends State<FoodPhotoSelectionScreen> {
           data as Map<String, dynamic>,
         );
 
-        Navigator.of(context).pushReplacement(
+        final result = await Navigator.of(context).push(
           ninjaRouteReplacement(
             FoodRecognitionResultScreen(recognition: recognition),
           ),
         );
+        
+        // Если была добавлена еда в дневник, возвращаемся на food_screen с результатом для обновления прогресс баров
+        if (mounted) {
+          if (result == true) {
+            // Возвращаемся на food_screen с результатом (делаем pop для FoodPhotoSelectionScreen с результатом)
+            Navigator.of(context).pop(true);
+          }
+          // Если result != true, пользователь остается на FoodPhotoSelectionScreen (не делаем pop)
+        }
       } else {
         setState(() {
           _isUploading = false;

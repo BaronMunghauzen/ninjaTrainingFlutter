@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.5+6
+version: 1.0.6+7
 
 environment:
   sdk: '^3.8.0'
@@ -145,7 +145,7 @@ flutter:
 # Конфигурация для генерации иконок приложения
 flutter_launcher_icons:
   android: true
-  image_path: "assets/images/iconsForApp/icon.png"
+  image_path: "assets/images/iconsForApp/iconIos.png"
   
   # iOS использует отдельную иконку
   ios:
@@ -153,22 +153,22 @@ flutter_launcher_icons:
   
   # Адаптивная иконка для Android (Android 8.0+)
   adaptive_icon_background: "#1A1A1A"  # Цвет фона (темный)
-  adaptive_icon_foreground: "assets/images/iconsForApp/icon.png"
+  adaptive_icon_foreground: "assets/images/iconsForApp/iconIos.png"
   
   # Web иконка
   web:
     generate: true
-    image_path: "assets/images/iconsForApp/icon.png"
+    image_path: "assets/images/iconsForApp/iconIos.png"
     background_color: "#1A1A1A"
     theme_color: "#1A1A1A"
   
   # Windows иконка
   windows:
     generate: true
-    image_path: "assets/images/iconsForApp/icon.png"
+    image_path: "assets/images/iconsForApp/iconIos.png"
     icon_size: 48
   
   # macOS иконка
   macos:
     generate: true
-    image_path: "assets/images/iconsForApp/icon.png"
+    image_path: "assets/images/iconsForApp/iconIos.png"
